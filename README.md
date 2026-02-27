@@ -15,7 +15,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Chat Panel (VS Code Chat API)               │  │
+│  │         Enclave Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
@@ -126,19 +126,19 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Open Copilot Chat in VS Code (`Ctrl+L` / `Cmd+L`)
-2. Type `@copilot` followed by your message
+1. Click the Enclave icon in the VS Code activity bar (left sidebar)
+2. Type your message in the chat input field
 3. Press Enter to send
 
 ### Example prompts
 
 - ` Explain how this function works`
-- `@copilot Write a unit test for this code`
-- `@copilot What are the performance implications?`
+- `Write a unit test for this code`
+- `What are the performance implications?`
 
 ### Stop generation
 
-Click the stop button in the chat panel to cancel in-flight requests.
+Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
 ---
 
@@ -193,7 +193,7 @@ Creates `enclave-0.1.0.vsix` for sideloading or distribution.
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Chat Panel (VS Code Chat API)               │  │
+│  │         Enclave Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
