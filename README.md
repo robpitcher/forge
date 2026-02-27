@@ -84,21 +84,23 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 | Setting | Required | Default | Description |
 |---------|----------|---------|-------------|
 | `forge.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `forge.copilot.apiKey` | ✓ | — | API key for the Azure endpoint |
 | `forge.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
 | `forge.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
 | `forge.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
+
+**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
 
 ### Example Configuration
 
 ```json
 {
   "forge.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "sk-...",
   "forge.copilot.model": "gpt-4.1",
   "forge.copilot.wireApi": "completions"
 }
 ```
+
+**API Key Setup:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)" to enter your API key via a masked password input. The key is stored securely in VS Code SecretStorage and never appears in settings.json.
 
 ---
 
@@ -111,10 +113,11 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
    | Setting | Description |
    |---------|-------------|
    | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
-   | `forge.copilot.apiKey` | Your API key |
    | `forge.copilot.model` | Model deployment name (default: `gpt-4.1`) |
 
-3. **Open the Forge sidebar:** Click the Forge icon in the VS Code activity bar (left sidebar)
+   **API Key:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
+
+3. **Open Forge:** Click the Forge icon in the VS Code bottom panel (next to Terminal and Output)
 
 4. **Send a message:** Type a message in the input field, then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS)
 
@@ -126,7 +129,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Click the Forge icon in the VS Code activity bar to open the Forge sidebar
+1. Click the Forge icon in the VS Code bottom panel (next to Terminal and Output) to open the Forge chat
 2. Type your message in the input field
 3. Click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit
 
@@ -228,10 +231,11 @@ Creates `forge-0.1.0.vsix` for sideloading or distribution.
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
 | `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
-| `forge.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
 | `forge.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
 | `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
 | `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
+
+**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
 
 ---
 

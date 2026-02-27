@@ -24,12 +24,13 @@ The Forge extension communicates with your Azure AI Foundry endpoint using crede
 
 ### Required Settings
 
-To use Forge, you must configure two settings in VS Code:
+To use Forge, you must configure one setting in VS Code:
 
 | Setting | Type | Required | Purpose |
 |---------|------|----------|---------|
 | `forge.copilot.endpoint` | `string` | **Yes** | Azure AI Foundry endpoint URL |
-| `forge.copilot.apiKey` | `string` | **Yes** | API key for authentication |
+
+You must also set your API key via the Forge chat toolbar (see [API Key Retrieval](#api-key-storage-via-secretstorage) below).
 
 ### Optional Settings
 
@@ -67,32 +68,6 @@ https://{resource-name}.openai.azure.com/openai/v1/
 - Must include the trailing slash (`/`)
 - Must include the `/openai/v1/` path segment (Azure AI Foundry's OpenAI-compatible endpoint)
 - Verify the URL is reachable from your machine (check network connectivity and firewall rules)
-
----
-
-### forge.copilot.apiKey
-
-**Type:** `string`  
-**Required:** Yes  
-**Default:** (empty)
-
-The API key used to authenticate with your Azure AI Foundry endpoint.
-
-**Format:**
-
-Paste the full key value exactly as shown in the Azure Portal for your Azure AI Foundry / Azure OpenAI resource.
-
-**Example:**
-```json
-{
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
-}
-```
-
-**Security Note:**
-- API keys are stored as plaintext in VS Code settings. For production or highly sensitive environments, consider using an alternative authentication method (e.g., environment variables, Azure Managed Identity — planned for Phase 3).
-- Never commit your API key to version control.
-- Treat API keys as sensitive credentials — only share through secure channels.
 
 ---
 
@@ -317,12 +292,15 @@ Endpoint
 https://my-ai-resource.openai.azure.com/openai/v1/
 ```
 
-### Step 4: Add to Forge Settings
+### Step 4: Set Your API Key in Forge
 
-1. Open VS Code
-2. Go to **Settings** (`Ctrl+,` / `Cmd+,`)
-3. Search for `forge.copilot.apiKey`
-4. Paste your API key into the field
+The API key is stored securely and **not** in settings.json:
+
+1. Open the Forge chat panel in VS Code (click the Forge icon in the bottom panel)
+2. Click the ⚙️ **gear icon** in the chat toolbar
+3. Select **"Set API Key (secure)"**
+4. Enter your Azure AI Foundry API key in the masked password input
+5. The key is now stored securely in VS Code SecretStorage (encrypted by your OS keychain)
 
 ---
 
@@ -457,53 +435,58 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/"
 }
 ```
+
+Then use the gear icon to set your API key securely.
 
 ### Example 2: With Custom Model Deployment
 
 ```json
 {
   "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "forge.copilot.model": "my-company-gpt5-prod"
 }
 ```
+
+Then use the gear icon to set your API key securely.
 
 ### Example 3: With Custom CLI Path
 
 ```json
 {
   "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "forge.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
 }
 ```
+
+Then use the gear icon to set your API key securely.
 
 ### Example 4: Using Alternative Wire Format
 
 ```json
 {
   "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "forge.copilot.model": "my-deployment",
   "forge.copilot.wireApi": "responses"
 }
 ```
+
+Then use the gear icon to set your API key securely.
 
 ### Example 5: Windows with Full Configuration
 
 ```json
 {
   "forge.copilot.endpoint": "https://research-gpt.openai.azure.com/openai/v1/",
-  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "forge.copilot.model": "research-gpt4-v2",
   "forge.copilot.wireApi": "completions",
   "forge.copilot.cliPath": "C:\\Users\\researcher\\tools\\copilot-windows-amd64.exe"
 }
 ```
+
+Then use the gear icon to set your API key securely.
 
 ---
 
@@ -553,7 +536,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 3. Check VS Code logs:
    - Open **Output** panel (`Ctrl+Shift+U`)
-   - Select **"Forge"** from the dropdown
+   - Select **"Log (Extension Host)"** from the dropdown
    - Look for error messages
 
 4. Verify Copilot CLI:

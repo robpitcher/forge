@@ -119,14 +119,14 @@ Forking `microsoft/vscode-copilot-chat` was evaluated and rejected due to extrem
 
 ## 6. Functional Requirements
 
-### FR1: WebviewView Sidebar Registration
+### FR1: WebviewView Panel Registration
 
-The extension registers a VS Code **WebviewView** in the activity bar as a custom sidebar view.
+The extension registers a VS Code **WebviewView** in the bottom panel as a custom chat view.
 
 - **View ID:** `forge.chatView`
 - **View Container ID:** `forge`
-- **Display Name:** `AI Chat` (in the sidebar)
-- **Icon:** A custom SVG icon in the activity bar (configured in `package.json`)
+- **Display Name:** `AI Chat` (in the panel)
+- **Icon:** A custom SVG icon in the bottom panel (configured in `package.json`)
 - **Type:** Webview with custom HTML/CSS/JS chat UI
 
 ### FR2: Copilot SDK Client Lifecycle
@@ -145,7 +145,7 @@ When the user sends a chat message, the extension creates (or reuses) a session 
 | `model` | VS Code setting: `forge.copilot.model` |
 | `provider.type` | `"openai"` (Azure AI Foundry's OpenAI-compatible endpoint) |
 | `provider.baseUrl` | VS Code setting: `forge.copilot.endpoint` |
-| `provider.apiKey` | VS Code setting: `forge.copilot.apiKey` (stored as a string; users should use VS Code's secret storage in production) |
+| `provider.apiKey` | VS Code SecretStorage via gear menu: "Set API Key (secure)" (never stored in settings.json) |
 | `provider.wireApi` | VS Code setting: `forge.copilot.wireApi` (default: `"completions"`) |
 | `streaming` | `true` |
 
@@ -168,7 +168,7 @@ The extension contributes the following VS Code settings:
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
 | `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `forge.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
+| `forge.copilot.apiKey` | `string` | No | `""` | (Deprecated) API key — use the gear menu instead |
 | `forge.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
 | `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
 | `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |

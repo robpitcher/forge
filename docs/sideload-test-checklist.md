@@ -64,10 +64,10 @@
 
 ## Activation Test
 
-1. **Open the Forge sidebar:**
-   - Look for the Forge icon in the Activity Bar (left sidebar)
+1. **Open the Forge panel:**
+   - Look for the Forge icon in the VS Code bottom panel (next to Terminal and Output)
    - Click the icon
-   - ✅ "AI Chat" panel opens in the sidebar
+   - ✅ "AI Chat" panel opens in the panel area
    - ✅ Extension activates (check in Output > Log (Extension Host) if needed)
 
 2. **Verify UI:**
@@ -84,17 +84,16 @@
 1. **Attempt to send a message before configuration:**
    - Type "Hello" in the input field
    - Click "Send"
-   - ✅ One or more warning messages appear in the sidebar, each starting with "⚠️ "
-   - ✅ Each missing required setting shows its own message (for example, "⚠️ Please configure the Azure AI Foundry endpoint…", "⚠️ Please configure the Azure AI Foundry API key…", "⚠️ Please configure the Azure AI Foundry model…")
+   - ✅ One or more warning messages appear in the panel, each starting with "⚠️ "
 
 2. **Configure the extension:**
    - Open Settings (`Ctrl+,` / `Cmd+,`)
    - Search for "Forge"
    - Set the following:
      - `Forge: Copilot Endpoint` — Your Azure AI Foundry endpoint URL
-     - `Forge: Copilot Api Key` — Your API key
      - `Forge: Copilot Model` — Your model deployment name (e.g., `gpt-4.1`)
      - `Forge: Copilot Wire Api` — `completions` (default)
+   - Set your API key via the ⚙️ gear icon in the Forge chat toolbar: "Set API Key (secure)"
    - ✅ All settings save without errors
 
 ---
@@ -151,7 +150,7 @@
 
 2. **Verify cleanup:**
    - ✅ Extension is removed from Extensions list
-   - ✅ Activity Bar icon is removed
+   - ✅ Bottom panel icon is removed
    - ✅ No errors appear in the console
 
 ---
