@@ -1,0 +1,83 @@
+{
+  "name": "enclave",
+  "displayName": "Enclave",
+  "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+  "version": "0.1.0",
+  "publisher": "robpitcher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robpitcher/enclave"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onChatParticipant:enclave.copilot"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "enclave.copilot",
+        "fullName": "Enclave",
+        "name": "copilot",
+        "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+        "isSticky": true
+      }
+    ],
+    "configuration": {
+      "title": "Enclave",
+      "properties": {
+        "enclave.copilot.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
+        },
+        "enclave.copilot.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the Azure AI Foundry endpoint"
+        },
+        "enclave.copilot.model": {
+          "type": "string",
+          "default": "gpt-4.1",
+          "description": "Model deployment name"
+        },
+        "enclave.copilot.wireApi": {
+          "type": "string",
+          "default": "completions",
+          "enum": [
+            "completions",
+            "responses"
+          ],
+          "description": "API format: 'completions' or 'responses'"
+        },
+        "enclave.copilot.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Copilot CLI binary (if not on PATH)"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "0.1.26"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.93.0",
+    "@vscode/vsce": "3.7.1",
+    "esbuild": "0.27.3",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "vsce package",
+    "lint": "tsc --noEmit"
+  }
+}
