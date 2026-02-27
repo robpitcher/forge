@@ -51,7 +51,7 @@
         "enclave.copilot.apiKey": {
           "type": "string",
           "default": "",
-          "description": "API key for the Azure AI Foundry endpoint"
+          "description": "API key for the Azure AI Foundry endpoint (legacy — prefer setting via the gear menu 'Set API Key' for secure storage)"
         },
         "enclave.copilot.model": {
           "type": "string",

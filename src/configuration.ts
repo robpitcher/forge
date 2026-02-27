@@ -24,6 +24,18 @@ export function getConfiguration(): ExtensionConfig {
   };
 }
 
+/** Checks SecretStorage first for the API key, falls back to settings.json. */
+export async function getConfigurationAsync(
+  secrets: vscode.SecretStorage
+): Promise<ExtensionConfig> {
+  const config = getConfiguration();
+  const secretApiKey = await secrets.get("enclave.copilot.apiKey");
+  if (secretApiKey) {
+    config.apiKey = secretApiKey;
+  }
+  return config;
+}
+
 export function validateConfiguration(
   config: ExtensionConfig
 ): ConfigValidationError[] {

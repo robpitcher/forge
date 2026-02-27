@@ -112,6 +112,12 @@ describe("Error: WebviewView error paths", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      secrets: {
+        get: vi.fn().mockResolvedValue(undefined),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 

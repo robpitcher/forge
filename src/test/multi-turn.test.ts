@@ -197,6 +197,12 @@ describe("multi-turn conversation context (SC4)", () => {
       const mockExtCtx = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
+        secrets: {
+          get: vi.fn().mockResolvedValue(undefined),
+          store: vi.fn().mockResolvedValue(undefined),
+          delete: vi.fn().mockResolvedValue(undefined),
+          onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
       };
       activate(mockExtCtx as unknown as import("vscode").ExtensionContext);
 

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { getConfiguration, validateConfiguration } from "./configuration.js";
+import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
 import {
   getOrCreateSession,
   destroySession,
@@ -14,7 +14,7 @@ import type {
 } from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri);
+  const provider = new ChatViewProvider(context.extensionUri, context.secrets);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("enclave.chatView", provider)
   );
@@ -30,7 +30,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _secrets: vscode.SecretStorage
+  ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -58,7 +61,23 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     if (message.command === "sendMessage") {
       await this._handleChatMessage(message.text ?? "");
     } else if (message.command === "openSettings") {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "enclave.copilot");
+      const choice = await vscode.window.showQuickPick(
+        ["Open Settings", "Set API Key (secure)"],
+        { placeHolder: "Enclave Configuration" }
+      );
+      if (choice === "Open Settings") {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "enclave.copilot");
+      } else if (choice === "Set API Key (secure)") {
+        const value = await vscode.window.showInputBox({
+          prompt: "Enter your API key",
+          password: true,
+          placeHolder: "Paste your Azure AI Foundry API key",
+        });
+        if (value !== undefined) {
+          await this._secrets.store("enclave.copilot.apiKey", value);
+          await vscode.window.showInformationMessage("API key stored securely.");
+        }
+      }
     } else if (message.command === "newConversation") {
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
@@ -69,7 +88,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleChatMessage(prompt: string): Promise<void> {
     if (this._isProcessing) { return; }
 
-    const config = getConfiguration();
+    const config = await getConfigurationAsync(this._secrets);
     const validationErrors = validateConfiguration(config);
 
     if (validationErrors.length > 0) {
