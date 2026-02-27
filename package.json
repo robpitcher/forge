@@ -23,7 +23,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "forge",
           "title": "Forge",
@@ -37,6 +37,22 @@
           "type": "webview",
           "id": "forge.chatView",
           "name": "AI Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "forge.openSettings",
+        "title": "Forge Settings",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "forge.openSettings",
+          "when": "view == forge.chatView",
+          "group": "navigation"
         }
       ]
     },
