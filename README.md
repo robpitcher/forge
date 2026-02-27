@@ -118,7 +118,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 4. **Activate Enclave:** Start typing a message and press Enter
 
-5. **Multi-turn conversations:** The chat maintains session context within the same the same session context
+5. **Multi-turn conversations:** The chat maintains session context within the same session
 
 ---
 
@@ -132,7 +132,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Example prompts
 
-- ` Explain how this function works`
+- `Explain how this function works`
 - `Write a unit test for this code`
 - `What are the performance implications?`
 
