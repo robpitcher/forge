@@ -196,7 +196,7 @@ The extension contributes the following VS Code settings:
 | NFR1 | **First token latency** | Should feel responsive — first streamed token appears within the same latency as a direct API call to Azure AI Foundry (SDK overhead < 500ms) |
 | NFR2 | **Extension activation time** | < 2 seconds (lazy activation on first chat interaction) |
 | NFR3 | **VS Code version compatibility** | VS Code 1.93.0+ (Chat Participant API GA) |
-| NFR4 | **Node.js compatibility** | Node.js 18+ (VS Code's extension host) |
+| NFR4 | **Node.js compatibility** | Node.js 20+ (VS Code's extension host, per `@github/copilot-sdk` engines requirement) |
 | NFR5 | **Copilot SDK version** | `@github/copilot-sdk` latest (Technical Preview) — MIT licensed |
 | NFR6 | **Copilot CLI version** | v0.0.418+ (current GA stable as of 2026-02-25) |
 | NFR7 | **No external network calls** | The extension must make zero network calls except to the configured Azure AI Foundry endpoint |
