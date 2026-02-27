@@ -1,0 +1,16 @@
+src/**
+node_modules/**
+.squad/**
+.squad-templates/**
+specs/**
+.github/**
+.copilot/**
+.devcontainer/**
+.vscode/**
+*.ts
+!*.d.ts
+tsconfig.json
+esbuild.config.mjs
+.gitignore
+enclave-*.vsix
+dist/**/*.map
