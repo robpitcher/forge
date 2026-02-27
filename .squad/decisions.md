@@ -763,3 +763,395 @@ All 59 existing tests pass. Session cleanup is exercised in:
 - `copilotService.test.ts` — validates session removal and client stop behavior
 
 Mock update: `abort: vi.fn().mockResolvedValue(undefined)` — required for async abort compatibility.
+
+---
+
+### 2026-02-27T15:06:00Z: User directive — Standalone chat UI required
+**By:** Rob Pitcher (via Copilot)
+**What:** Enclave must be a standalone VS Code extension with its own chat UI. Users must NOT be required to sign into GitHub Copilot or have Copilot installed. The Chat Participant API (`vscode.chat.createChatParticipant`) cannot be used because it depends on the Copilot Chat extension. The extension needs a self-contained UI (e.g., Webview panel) that works in air-gapped environments with zero GitHub dependencies.
+**Why:** User request — the entire purpose of Enclave is air-gapped environments. Requiring GitHub Copilot defeats the purpose. This is a critical architectural change.
+
+---
+
+### 2026-02-27: Architecture Decision — Standalone Chat UI (No GitHub Auth Dependency)
+**By:** MacReady (Lead)
+**Context:** Rob Pitcher confirmed "i dont want users to have to sign into github copilot to use this"
+
+## Critical Issue
+
+The current extension uses `vscode.chat.createChatParticipant()` which **requires GitHub Copilot Chat to be installed and authenticated**. This violates PRD Goal G3: "Zero GitHub authentication — the extension works without any GitHub account, token, or internet connectivity to GitHub."
+
+**Confirmed by research:** The Chat Participant API is tightly coupled to GitHub Copilot infrastructure. Authentication via GitHub is essential for access to Copilot Chat's native LLM features and related APIs. Users must have an active Copilot subscription and be signed into GitHub Copilot in VS Code.
+
+**This is a blocking architecture issue for air-gapped/zero-auth requirement.**
+
+## Recommended Solution: WebviewView (Sidebar)
+
+Replace the Chat Participant API with **`vscode.window.registerWebviewViewProvider`** to create a custom sidebar chat panel.
+
+### Why WebviewView Sidebar
+
+1. **✅ Works in air-gapped (no GitHub auth required)**: Completely self-contained; no external dependencies
+2. **✅ Native-like UX**: Appears in activity bar like Copilot Chat; persistent sidebar experience
+3. **✅ Moderate complexity**: Well-documented API with official samples; React/Vue integration available
+4. **✅ Full UI control**: Custom HTML/CSS/JS for chat interface; message history, streaming, markdown rendering
+5. **✅ Bidirectional communication**: `postMessage` API for extension ↔ webview messaging
+
+## Architecture Options Comparison
+
+### Option 1: WebviewView (Sidebar) — **RECOMMENDED**
+
+**Description:** Register a custom view in the sidebar using `vscode.window.registerWebviewViewProvider`. The extension contributes its own activity bar icon and a webview-based chat panel.
+
+#### Pros
+- **Air-gapped compatible:** Zero external dependencies; no GitHub auth
+- **Native UX:** Persistent sidebar view in activity bar (like Copilot Chat sidebar)
+- **Well-documented:** Official samples, extensive community examples
+- **Framework support:** Can use React, Vue, plain JS/HTML
+- **Theme-aware:** Can use VS Code Webview UI Toolkit (deprecated Jan 2025 but still functional) or custom theming with CSS variables
+
+#### Cons
+- **Moderate implementation effort:** Need to build HTML/CSS/JS chat UI from scratch
+- **Webview overhead:** More resource usage than native VS Code UI
+- **Limited native integration:** Cannot use VS Code's built-in chat context features (but we don't need them for MVP)
+
+#### Implementation Details
+
+**package.json changes:**
+```json
+{
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "enclaveChat",
+          "title": "Enclave",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "enclaveChat": [
+        {
+          "type": "webview",
+          "id": "enclave.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
+  },
+  "activationEvents": [
+    "onView:enclave.chatView"
+  ]
+}
+```
+
+**extension.ts changes:**
+```typescript
+// Remove: vscode.chat.createChatParticipant()
+// Add:
+const provider = new ChatViewProvider(context.extensionUri);
+context.subscriptions.push(
+  vscode.window.registerWebviewViewProvider('enclave.chatView', provider)
+);
+```
+
+**New files needed:**
+- `src/chatViewProvider.ts` — WebviewViewProvider implementation
+- `src/webview/chat.html` — Chat UI (message list, input box)
+- `src/webview/chat.css` — Styling (VS Code theme integration)
+- `src/webview/chat.js` — Client-side logic (message rendering, input handling, postMessage)
+
+**What we keep:**
+- ✅ `copilotService.ts` — SDK BYOK backend (no changes)
+- ✅ `configuration.ts` — Settings reader/validator (no changes)
+- ✅ `types.ts` — Type definitions (no changes)
+- ✅ All streaming logic — just route to webview instead of ChatResponseStream
+
+**Complexity:** Moderate — 2-3 days for a skilled developer
+
+### Option 2: Webview Panel (Editor Tab)
+
+**Description:** Open a full webview panel as an editor tab using `vscode.window.createWebviewPanel`.
+
+#### Pros
+- **Air-gapped compatible:** Zero external dependencies
+- **More screen real estate:** Full editor area instead of sidebar
+- **Simpler than sidebar:** No activity bar icon contribution needed
+
+#### Cons
+- **Poor UX for chat:** Chat should be persistent sidebar, not a tab
+- **Competes with editor:** Takes focus away from code
+- **Less "native" feel:** Webview panels are for tools/visualizations, not persistent chat
+- **User must manually open:** No "always available" sidebar presence
+
+#### Implementation Details
+Similar to Option 1, but simpler `package.json` (no viewsContainers) and use `createWebviewPanel` instead of `registerWebviewViewProvider`.
+
+**Complexity:** Moderate — 2 days
+
+**Recommendation:** ❌ Not recommended — UX is worse than sidebar for a chat assistant
+
+### Option 3: Native VS Code TreeView + QuickInput
+
+**Description:** Use TreeView for message history, QuickInput for prompt input.
+
+#### Pros
+- **Air-gapped compatible:** Zero external dependencies
+- **Native performance:** No webview overhead
+- **Theme-aware:** Automatic VS Code theming
+
+#### Cons
+- **❌ Poor chat UX:** TreeView is for hierarchical data, not conversational UI
+- **❌ No markdown rendering:** Cannot display formatted code, syntax highlighting, etc.
+- **❌ Limited styling:** Cannot create a proper chat bubble interface
+- **❌ Streaming very difficult:** Would need to update tree nodes on every token delta
+
+**Recommendation:** ❌ Not viable — TreeView is fundamentally wrong UI pattern for chat
+
+### Option 4: Terminal-based UI
+
+**Description:** Render chat in an integrated terminal.
+
+#### Pros
+- **Air-gapped compatible:** Zero external dependencies
+- **Simple implementation:** Just write to terminal output
+
+#### Cons
+- **❌ Terrible UX:** No scrollback control, no message editing, no proper formatting
+- **❌ Not a chat interface:** Terminal is for command output, not conversation
+- **❌ Cannot display markdown properly:** Limited ANSI color support
+
+**Recommendation:** ❌ Not viable — completely wrong UX for chat assistant
+
+## What We Keep from Current Implementation
+
+The architecture change only affects the **UI layer**. All backend logic remains intact:
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `copilotService.ts` | ✅ Keep as-is | CopilotClient lifecycle, BYOK session creation — no changes |
+| `configuration.ts` | ✅ Keep as-is | Settings reader/validator — no changes |
+| `types.ts` | ✅ Keep as-is | Type definitions — no changes |
+| Streaming logic | ✅ Refactor routing | Same `assistant.message_delta` event handling, but send to webview instead of ChatResponseStream |
+| Error handling | ✅ Refactor display | Same error detection, but display in webview chat instead of ChatResponseStream |
+| Session reuse | ✅ Keep as-is | Conversation ID derivation, session Map — no changes |
+
+**Key insight:** We're only swapping the presentation layer. The SDK integration and BYOK backend are unaffected.
+
+## Implementation Plan
+
+### Phase 1: Minimal Viable Sidebar (P0)
+1. Remove `chatParticipants` contribution from `package.json`
+2. Add `viewsContainers` and `views` for sidebar
+3. Create `ChatViewProvider` implementing `WebviewViewProvider`
+4. Create minimal HTML chat UI (message list + input box)
+5. Wire up `postMessage` for bidirectional communication
+6. Route streaming responses to webview instead of `ChatResponseStream`
+7. Test end-to-end: open sidebar, send prompt, see streamed response
+
+**Estimate:** 2-3 days
+
+### Phase 2: UX Polish (P1)
+1. Add markdown rendering in webview (use `marked.js` or similar)
+2. Add syntax highlighting for code blocks (use `highlight.js`)
+3. Add VS Code theme integration (CSS variables)
+4. Add message history persistence (optional — can defer to Phase 2)
+5. Add loading indicators, error states
+
+**Estimate:** 1-2 days
+
+### Phase 3: Feature Parity (P2)
+1. Add conversation management (clear, export)
+2. Add settings button in webview
+3. Add cancellation button for in-flight requests
+4. Add copy button for messages
+
+**Estimate:** 1-2 days
+
+## Risks & Mitigations
+
+### Risk 1: Webview resource usage
+- **Impact:** Webviews use more memory than native UI
+- **Mitigation:** For MVP, single sidebar panel is acceptable. Monitor performance in testing.
+- **Severity:** Low — not a blocker for PoC
+
+### Risk 2: Custom UI maintenance
+- **Impact:** We own all HTML/CSS/JS for chat interface
+- **Mitigation:** Use well-known libraries (marked.js, highlight.js). Keep UI minimal for MVP.
+- **Severity:** Low — acceptable tradeoff for air-gapped requirement
+
+### Risk 3: Webview UI Toolkit deprecation (Jan 2025)
+- **Impact:** Official toolkit for VS Code-themed webviews is being deprecated
+- **Mitigation:** Use custom CSS with VS Code CSS variables, or plain styling. Toolkit still works for now.
+- **Severity:** Low — we can style manually or use community alternatives
+
+### Risk 4: Learning curve for webview development
+- **Impact:** Team may not be familiar with webview API
+- **Mitigation:** Excellent official samples exist; well-documented API
+- **Severity:** Low — 1-2 hours to learn basics
+
+## Decision
+
+**Adopt Option 1: WebviewView (Sidebar)**
+
+**Rationale:**
+1. **Meets air-gapped requirement:** No GitHub auth dependency
+2. **Best UX:** Persistent sidebar is correct pattern for chat assistant
+3. **Proven approach:** Many VS Code extensions use WebviewView for custom UIs
+4. **Preserves backend:** No changes to SDK integration, BYOK, or streaming logic
+5. **Moderate complexity:** Well within team capability for 2-3 day implementation
+
+**Trade-offs accepted:**
+- Custom UI implementation effort (vs. free native Chat Participant UI)
+- Webview resource overhead (vs. native UI performance)
+- Manual theme integration (vs. automatic native theming)
+
+**Why not Chat Participant API:**
+- ❌ Requires GitHub Copilot authentication (violates G3)
+- ❌ Cannot work in air-gapped environment
+- ❌ Blocking issue for MVP
+
+## Next Steps
+
+1. **Blair or Windows**: Implement Phase 1 (Minimal Viable Sidebar)
+   - Priority: P0 (blocks all testing and validation)
+   - Dependencies: None (can start immediately)
+   - Acceptance criteria: User can open sidebar, send prompt, see streamed markdown response
+
+2. **Childs**: Update documentation
+   - Update README to reflect sidebar UI instead of Chat Participant
+   - No mention of GitHub Copilot authentication required
+
+3. **MacReady**: Create GitHub issue for WebviewView migration
+   - Link this decision document
+   - Assign to Blair or Windows based on availability
+
+4. **Squad**: Plan testing strategy
+   - SC1-SC7 still apply, but using sidebar instead of Chat Participant panel
+
+## References
+
+- [VS Code Webview API Docs](https://code.visualstudio.com/api/extension-guides/webview)
+- [VS Code WebviewView Sample](https://github.com/microsoft/vscode-extension-samples/tree/main/webview-view-sample)
+- [Webview UI Toolkit (deprecated but functional)](https://github.com/microsoft/vscode-webview-ui-toolkit)
+- [Research: Chat Participant API requires GitHub Copilot authentication](https://code.visualstudio.com/api/extension-guides/ai/chat)
+
+## Appendix: Example WebviewViewProvider Skeleton
+
+```typescript
+import * as vscode from 'vscode';
+
+export class ChatViewProvider implements vscode.WebviewViewProvider {
+  constructor(private readonly extensionUri: vscode.Uri) {}
+
+  public resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    context: vscode.WebviewViewResolveContext,
+    token: vscode.CancellationToken
+  ) {
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this.extensionUri]
+    };
+
+    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
+
+    // Handle messages from webview
+    webviewView.webview.onDidReceiveMessage(async (data) => {
+      switch (data.type) {
+        case 'sendMessage':
+          await this.handleSendMessage(data.prompt, webviewView.webview);
+          break;
+      }
+    });
+  }
+
+  private async handleSendMessage(prompt: string, webview: vscode.Webview) {
+    // 1. Get config and validate
+    // 2. Get or create session (existing copilotService logic)
+    // 3. Subscribe to assistant.message_delta events
+    // 4. Send deltas to webview via postMessage
+    // Example:
+    // session.on('assistant.message_delta', (event) => {
+    //   webview.postMessage({ type: 'messageDelta', content: event.delta.content });
+    // });
+  }
+
+  private getHtmlForWebview(webview: vscode.Webview): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Enclave Chat</title>
+        <style>
+          body { 
+            padding: 0; 
+            margin: 0; 
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+          }
+          #messages { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 10px; 
+          }
+          #input-container { 
+            display: flex; 
+            padding: 10px; 
+            border-top: 1px solid var(--vscode-panel-border);
+          }
+          #prompt { 
+            flex: 1; 
+            margin-right: 5px; 
+          }
+        </style>
+      </head>
+      <body>
+        <div id="messages"></div>
+        <div id="input-container">
+          <input type="text" id="prompt" placeholder="Ask a question..." />
+          <button id="send">Send</button>
+        </div>
+        <script>
+          const vscode = acquireVsCodeApi();
+          const messages = document.getElementById('messages');
+          const prompt = document.getElementById('prompt');
+          const send = document.getElementById('send');
+
+          send.addEventListener('click', () => {
+            const value = prompt.value.trim();
+            if (value) {
+              vscode.postMessage({ type: 'sendMessage', prompt: value });
+              prompt.value = '';
+            }
+          });
+
+          window.addEventListener('message', (event) => {
+            const message = event.data;
+            switch (message.type) {
+              case 'messageDelta':
+                // Append delta to last message or create new message
+                // (simplified — real implementation needs message tracking)
+                messages.innerHTML += message.content;
+                break;
+            }
+          });
+        </script>
+      </body>
+      </html>
+    `;
+  }
+}
+```
+
+**Why:** Provides actionable architecture decision to resolve air-gapped/zero-auth requirement blocking issue.
+
+---
+
+### 2026-02-27T12:29:54Z: User directive — Copilot must target dev branch
+**By:** Rob Pitcher (via Copilot)
+**What:** The Copilot coding agent must always base branches off `dev` and open PRs targeting `dev`. PRs must never target `main` — `main` is the release branch only. PRs #31, #32, #33 were closed because they incorrectly targeted `main`.
+**Why:** User request — branching strategy requires all development work flows through `dev`. Captured for team memory.

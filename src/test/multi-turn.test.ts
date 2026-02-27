@@ -6,12 +6,22 @@ import {
   setMockClient,
   type MockClient,
 } from "./__mocks__/copilot-sdk.js";
-import type { ExtensionConfig } from "../configuration.js";
 import {
   getOrCreateSession,
   removeSession,
   stopClient,
 } from "../copilotService.js";
+import { activate } from "../extension.js";
+import type { ExtensionConfig } from "../configuration.js";
+import {
+  createMockWebviewView,
+  createMockResolveContext,
+  createMockCancellationToken,
+  simulateUserMessage,
+  simulateNewConversation,
+  getPostedMessagesOfType,
+  type MockWebviewView,
+} from "./webview-test-helpers.js";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
@@ -81,16 +91,16 @@ describe("multi-turn conversation context (SC4)", () => {
       const resultA = await getOrCreateSession("conv-A", validConfig);
       const resultB = await getOrCreateSession("conv-B", validConfig);
 
-      await resultA.sendMessage({ role: "user", content: "message A" });
-      await resultB.sendMessage({ role: "user", content: "message B" });
+      await resultA.send({ prompt: "message A" });
+      await resultB.send({ prompt: "message B" });
 
-      expect(sessionA.sendMessage).toHaveBeenCalledWith({
-        role: "user",
-        content: "message A",
+      expect(sessionA.send).toHaveBeenCalledWith({
+        
+        prompt: "message A",
       });
-      expect(sessionB.sendMessage).toHaveBeenCalledWith({
-        role: "user",
-        content: "message B",
+      expect(sessionB.send).toHaveBeenCalledWith({
+        
+        prompt: "message B",
       });
     });
   });
@@ -99,31 +109,31 @@ describe("multi-turn conversation context (SC4)", () => {
     it("accepts multiple sendMessage calls on the same session", async () => {
       const session = await getOrCreateSession("conv-multi", validConfig);
 
-      await session.sendMessage({ role: "user", content: "first message" });
-      await session.sendMessage({ role: "user", content: "second message" });
-      await session.sendMessage({ role: "user", content: "third message" });
+      await session.send({ prompt: "first message" });
+      await session.send({ prompt: "second message" });
+      await session.send({ prompt: "third message" });
 
-      expect(session.sendMessage).toHaveBeenCalledTimes(3);
-      expect(session.sendMessage).toHaveBeenNthCalledWith(1, {
-        role: "user",
-        content: "first message",
+      expect(session.send).toHaveBeenCalledTimes(3);
+      expect(session.send).toHaveBeenNthCalledWith(1, {
+        
+        prompt: "first message",
       });
-      expect(session.sendMessage).toHaveBeenNthCalledWith(2, {
-        role: "user",
-        content: "second message",
+      expect(session.send).toHaveBeenNthCalledWith(2, {
+        
+        prompt: "second message",
       });
-      expect(session.sendMessage).toHaveBeenNthCalledWith(3, {
-        role: "user",
-        content: "third message",
+      expect(session.send).toHaveBeenNthCalledWith(3, {
+        
+        prompt: "third message",
       });
     });
 
     it("returns the same session after intermediate messages", async () => {
       const session1 = await getOrCreateSession("conv-persist", validConfig);
-      await session1.sendMessage({ role: "user", content: "turn 1" });
+      await session1.send({ prompt: "turn 1" });
 
       const session2 = await getOrCreateSession("conv-persist", validConfig);
-      await session2.sendMessage({ role: "user", content: "turn 2" });
+      await session2.send({ prompt: "turn 2" });
 
       expect(session1).toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledOnce();
@@ -155,17 +165,18 @@ describe("multi-turn conversation context (SC4)", () => {
     });
   });
 
-  describe("conversation ID generation", () => {
-    let capturedHandler: (
-      request: unknown,
-      context: unknown,
-      stream: unknown,
-      token: unknown
-    ) => Promise<void>;
+  // --- WebviewView-specific conversation ID tests ---
+  describe("internal conversation ID via WebviewViewProvider", () => {
+    let capturedProvider: {
+      resolveWebviewView: (
+        view: unknown,
+        context: unknown,
+        token: unknown
+      ) => void;
+    };
+    let mockView: MockWebviewView;
 
-    beforeEach(async () => {
-      const { activate } = await import("../extension.js");
-
+    function setupValidSettings() {
       const settings: Record<string, string> = {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",
         apiKey: "test-key-123",
@@ -178,79 +189,132 @@ describe("multi-turn conversation context (SC4)", () => {
           (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
         ),
       } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+    }
 
-      vi.mocked(vscode.chat.createChatParticipant).mockReturnValue({
-        iconPath: null,
-        dispose: vi.fn(),
-      } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>);
+    beforeEach(() => {
+      setupValidSettings();
 
       const mockExtCtx = {
         subscriptions: [] as { dispose: () => void }[],
+        extensionUri: { toString: () => "mock-ext-uri" },
       };
       activate(mockExtCtx as unknown as import("vscode").ExtensionContext);
 
-      const calls = vi.mocked(vscode.chat.createChatParticipant).mock.calls;
-      capturedHandler = calls[calls.length - 1][1] as typeof capturedHandler;
+      const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+      capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+
+      mockView = createMockWebviewView();
+      capturedProvider.resolveWebviewView(
+        mockView,
+        createMockResolveContext(),
+        createMockCancellationToken()
+      );
     });
 
     afterEach(() => {
-      vi.mocked(vscode.chat.createChatParticipant).mockClear();
+      vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
     });
 
-    function makeStream() {
-      return { markdown: vi.fn(), button: vi.fn() };
-    }
-
-    function makeToken() {
-      return {
-        isCancellationRequested: false,
-        onCancellationRequested: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      };
-    }
-
-    it("uses context.id when it is a valid string", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+    it("same provider instance reuses conversation ID across messages", async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
-      const context1 = { id: "stable-id" };
-      await capturedHandler({ prompt: "hi" }, context1, makeStream(), makeToken());
-      await capturedHandler({ prompt: "again" }, context1, makeStream(), makeToken());
+      simulateUserMessage(mockView, "first message");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
+      });
+
+      simulateUserMessage(mockView, "second message");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(2);
+      });
+
+      // Session created only once = same conversation ID reused
+      expect(mockClient.createSession).toHaveBeenCalledOnce();
+    });
+
+    it("newConversation command generates new conversation ID", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "first message");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
+      });
+
+      // New conversation resets the ID
+      simulateNewConversation(mockView);
+      await vi.waitFor(() => {
+        const resets = getPostedMessagesOfType(mockView, "conversationReset");
+        expect(resets.length).toBe(1);
+      });
+
+      // New session should be created for the next message
+      const newSession = createMockSession();
+      newSession.send.mockImplementation(async () => {
+        newSession._emit("session.idle");
+      });
+      mockClient.createSession.mockResolvedValueOnce(newSession);
+
+      simulateUserMessage(mockView, "after reset");
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it("session is reused for messages within same conversation", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "message 1");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
+      });
+
+      simulateUserMessage(mockView, "message 2");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(2);
+      });
+
+      simulateUserMessage(mockView, "message 3");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(3);
+      });
 
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
 
-    it("generates a fallback ID when context.id is undefined", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+    it("new session created after newConversation command", async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
-      await capturedHandler({ prompt: "hi" }, {}, makeStream(), makeToken());
-      await capturedHandler({ prompt: "again" }, {}, makeStream(), makeToken());
-
-      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
-    });
-
-    it("generates a fallback ID when context.id is empty string", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
-        mockSession._emit("session.idle");
+      simulateUserMessage(mockView, "before reset");
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
       });
 
-      await capturedHandler({ prompt: "hi" }, { id: "" }, makeStream(), makeToken());
-      await capturedHandler({ prompt: "again" }, { id: "" }, makeStream(), makeToken());
+      simulateNewConversation(mockView);
 
-      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
-    });
-
-    it("generates a fallback ID when context.id is a non-string value", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
-        mockSession._emit("session.idle");
+      // Wait for conversationReset confirming destroySession completed
+      await vi.waitFor(() => {
+        const resets = getPostedMessagesOfType(mockView, "conversationReset");
+        expect(resets.length).toBe(1);
       });
 
-      await capturedHandler({ prompt: "hi" }, { id: 42 }, makeStream(), makeToken());
-      await capturedHandler({ prompt: "again" }, { id: 42 }, makeStream(), makeToken());
+      const freshSession = createMockSession();
+      freshSession.send.mockImplementation(async () => {
+        freshSession._emit("session.idle");
+      });
+      mockClient.createSession.mockResolvedValueOnce(freshSession);
 
-      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+      simulateUserMessage(mockView, "after reset");
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+      });
     });
   });
 

@@ -8,27 +8,34 @@ import {
 } from "./__mocks__/copilot-sdk.js";
 import { stopClient } from "../copilotService.js";
 import { activate } from "../extension.js";
+import {
+  createMockWebviewView,
+  createMockResolveContext,
+  createMockCancellationToken,
+  simulateUserMessage,
+  simulateNewConversation,
+  getPostedMessages,
+  getPostedMessagesOfType,
+  type MockWebviewView,
+} from "./webview-test-helpers.js";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
-describe("handleChatRequest integration", () => {
+describe("WebviewView chat panel", () => {
   let mockSession: ReturnType<typeof createMockSession>;
   let mockClient: MockClient;
-  let capturedHandler: (
-    request: unknown,
-    context: unknown,
-    stream: unknown,
-    token: unknown
-  ) => Promise<void>;
+  let capturedProvider: {
+    resolveWebviewView: (
+      view: unknown,
+      context: unknown,
+      token: unknown
+    ) => void;
+  };
+  let mockView: MockWebviewView;
 
-  beforeEach(() => {
-    mockSession = createMockSession();
-    mockClient = createMockClient(mockSession);
-    setMockClient(mockClient);
-
-    // Configure vscode mocks for valid settings
+  function setupValidConfig() {
     const settings: Record<string, string> = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
@@ -41,55 +48,201 @@ describe("handleChatRequest integration", () => {
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
       ),
     } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+  }
 
-    // Capture the handler registered by activate()
-    vi.mocked(vscode.chat.createChatParticipant).mockReturnValue({
-      iconPath: null,
-      dispose: vi.fn(),
-    } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>);
+  function resolveProvider(): MockWebviewView {
+    const view = createMockWebviewView();
+    capturedProvider.resolveWebviewView(
+      view,
+      createMockResolveContext(),
+      createMockCancellationToken()
+    );
+    return view;
+  }
 
-    const mockContext = {
+  beforeEach(() => {
+    mockSession = createMockSession();
+    mockClient = createMockClient(mockSession);
+    setMockClient(mockClient);
+    setupValidConfig();
+
+    const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
+      extensionUri: { toString: () => "mock-ext-uri" },
     };
-    activate(mockContext as unknown as import("vscode").ExtensionContext);
+    activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 
-    // Extract the handler passed to createChatParticipant
-    const calls = vi.mocked(vscode.chat.createChatParticipant).mock.calls;
-    capturedHandler = calls[calls.length - 1][1] as typeof capturedHandler;
+    // Capture the provider registered with registerWebviewViewProvider
+    const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+    capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+
+    mockView = resolveProvider();
   });
 
   afterEach(async () => {
     await stopClient();
-    vi.mocked(vscode.chat.createChatParticipant).mockClear();
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
   });
 
-  it("streams markdown content from session deltas to the response stream", async () => {
-    const stream = { markdown: vi.fn(), button: vi.fn() };
-    const token = {
-      isCancellationRequested: false,
-      onCancellationRequested: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    };
-    const request = { prompt: "Hello world" };
-    const context = { id: "test-conv-1" };
+  // --- Registration ---
+  describe("provider registration", () => {
+    it("registers with correct view ID 'enclave.chatView'", () => {
+      const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+      expect(calls[calls.length - 1][0]).toBe("enclave.chatView");
+    });
+  });
 
-    // Make sendMessage trigger deltas then idle
-    mockSession.sendMessage.mockImplementation(async () => {
-      mockSession._emit("assistant.message_delta", {
-        delta: { content: "Hello " },
-      });
-      mockSession._emit("assistant.message_delta", {
-        delta: { content: "there!" },
-      });
-      mockSession._emit("session.idle");
+  // --- resolveWebviewView ---
+  describe("resolveWebviewView", () => {
+    it("sets enableScripts to true", () => {
+      expect(mockView.webview.options).toEqual(
+        expect.objectContaining({ enableScripts: true })
+      );
     });
 
-    await capturedHandler(request, context, stream, token);
+    it("sets localResourceRoots", () => {
+      expect(mockView.webview.options).toHaveProperty("localResourceRoots");
+    });
 
-    expect(stream.markdown).toHaveBeenCalledWith("Hello ");
-    expect(stream.markdown).toHaveBeenCalledWith("there!");
-    expect(mockSession.sendMessage).toHaveBeenCalledWith({
-      role: "user",
-      content: "Hello world",
+    it("sets HTML with required elements", () => {
+      const html = mockView.webview.html;
+      expect(html).toContain("chatMessages");
+      expect(html).toContain("userInput");
+      expect(html).toContain("sendBtn");
+      expect(html).toContain("newConvBtn");
+    });
+  });
+
+  // --- Streaming message protocol ---
+  describe("sendMessage command", () => {
+    it("sends streamStart → streamDelta → streamEnd in order", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "Hello " },
+        });
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "there!" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      // Allow async handlers to complete
+      await vi.waitFor(() => {
+        const messages = getPostedMessages(mockView);
+        expect(messages.length).toBeGreaterThanOrEqual(4);
+      });
+
+      const messages = getPostedMessages(mockView);
+      const types = messages.map((m: unknown) => (m as { type: string }).type);
+
+      expect(types[0]).toBe("streamStart");
+      expect(types[types.length - 1]).toBe("streamEnd");
+
+      const deltas = getPostedMessagesOfType(mockView, "streamDelta");
+      expect(deltas).toContainEqual({ type: "streamDelta", content: "Hello " });
+      expect(deltas).toContainEqual({ type: "streamDelta", content: "there!" });
+    });
+
+    it("creates a session and sends user prompt", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalled();
+      });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        prompt: "hello",
+      });
+    });
+  });
+
+  // --- New conversation ---
+  describe("newConversation command", () => {
+    it("posts conversationReset message", async () => {
+      simulateNewConversation(mockView);
+
+      await vi.waitFor(() => {
+        const resets = getPostedMessagesOfType(mockView, "conversationReset");
+        expect(resets.length).toBe(1);
+      });
+    });
+  });
+
+  // --- Configuration errors ---
+  describe("configuration errors", () => {
+    it("posts error messages when config is missing", async () => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
+      } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map(
+        (e: unknown) => (e as { message: string }).message
+      );
+      expect(messages.some((m: string) => m.includes("endpoint"))).toBe(true);
+    });
+  });
+
+  // --- CopilotCliNotFoundError ---
+  describe("CopilotCliNotFoundError", () => {
+    it("posts error message when CLI is not found", async () => {
+      mockClient.start.mockRejectedValueOnce(
+        new Error("spawn copilot ENOENT")
+      );
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map(
+        (e: unknown) => (e as { message: string }).message
+      );
+      expect(messages.some((m: string) => m.includes("Copilot CLI not found"))).toBe(
+        true
+      );
+    });
+  });
+
+  // --- Session errors ---
+  describe("session error events", () => {
+    it("posts error message and removes session on session.error", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.error", {
+          data: { message: "Connection reset by peer" },
+        });
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map(
+        (e: unknown) => (e as { message: string }).message
+      );
+      expect(
+        messages.some((m: string) => m.includes("Connection reset by peer"))
+      ).toBe(true);
     });
   });
 });

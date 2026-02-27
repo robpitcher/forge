@@ -8,12 +8,19 @@ import {
 } from "./__mocks__/copilot-sdk.js";
 import {
   getOrCreateClient,
-  removeSession as _removeSession,
   stopClient,
   CopilotCliNotFoundError,
 } from "../copilotService.js";
 import { activate } from "../extension.js";
 import type { ExtensionConfig } from "../configuration.js";
+import {
+  createMockWebviewView,
+  createMockResolveContext,
+  createMockCancellationToken,
+  simulateUserMessage,
+  getPostedMessagesOfType,
+  type MockWebviewView,
+} from "./webview-test-helpers.js";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
@@ -80,51 +87,43 @@ describe("Error: CopilotCliNotFoundError", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Session error — session.error event during a conversation
-// 4. General startup error — getOrCreateClient throws non-CLI error
-// 5. sendMessage rejection
-// 6. Config validation displayed — handleChatRequest shows errors + button
-// 7. Session removed on error
+// 3-7. WebviewView error paths — postMessage assertions
 // ---------------------------------------------------------------------------
 
-describe("Error: handleChatRequest error paths", () => {
+describe("Error: WebviewView error paths", () => {
   let mockSession: ReturnType<typeof createMockSession>;
   let mockClient: MockClient;
-  let capturedHandler: (
-    request: unknown,
-    context: unknown,
-    stream: unknown,
-    token: unknown
-  ) => Promise<void>;
+  let capturedProvider: {
+    resolveWebviewView: (
+      view: unknown,
+      context: unknown,
+      token: unknown
+    ) => void;
+  };
+  let mockView: MockWebviewView;
 
-  function makeStream() {
-    return { markdown: vi.fn(), button: vi.fn() };
-  }
-
-  function makeToken() {
-    return {
-      isCancellationRequested: false,
-      onCancellationRequested: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    };
-  }
-
-  function activateExtension(settings: Record<string, string>) {
+  function setupProvider(settings: Record<string, string>) {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn(
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
       ),
     } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
 
-    vi.mocked(vscode.chat.createChatParticipant).mockReturnValue({
-      iconPath: null,
-      dispose: vi.fn(),
-    } as unknown as ReturnType<typeof vscode.chat.createChatParticipant>);
+    const mockExtContext = {
+      subscriptions: [] as { dispose: () => void }[],
+      extensionUri: { toString: () => "mock-ext-uri" },
+    };
+    activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 
-    const mockContext = { subscriptions: [] as { dispose: () => void }[] };
-    activate(mockContext as unknown as import("vscode").ExtensionContext);
+    const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+    capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
 
-    const calls = vi.mocked(vscode.chat.createChatParticipant).mock.calls;
-    capturedHandler = calls[calls.length - 1][1] as typeof capturedHandler;
+    mockView = createMockWebviewView();
+    capturedProvider.resolveWebviewView(
+      mockView,
+      createMockResolveContext(),
+      createMockCancellationToken()
+    );
   }
 
   beforeEach(() => {
@@ -135,41 +134,60 @@ describe("Error: handleChatRequest error paths", () => {
 
   afterEach(async () => {
     await stopClient();
-    vi.mocked(vscode.chat.createChatParticipant).mockClear();
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
   });
 
-  // (6) Config validation displayed
-  it("shows validation errors with settings button when config is missing", async () => {
-    activateExtension({
+  // Missing endpoint → error message posted to webview
+  it("posts error when endpoint is missing", async () => {
+    setupProvider({
       endpoint: "",
+      apiKey: "key-123",
+      model: "gpt-4.1",
+      wireApi: "completions",
+      cliPath: "",
+    });
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
+    );
+    expect(messages.some((m: string) => m.includes("endpoint"))).toBe(true);
+  });
+
+  // Missing API key → error message posted to webview
+  it("posts error when API key is missing", async () => {
+    setupProvider({
+      endpoint: "https://example.com",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     });
 
-    const stream = makeStream();
-    const token = makeToken();
+    simulateUserMessage(mockView, "hello");
 
-    await capturedHandler({ prompt: "hello" }, { id: "conv-err-1" }, stream, token);
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
 
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("endpoint")
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
     );
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("API key")
-    );
-    expect(stream.button).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: "workbench.action.openSettings",
-        title: "Open Settings",
-      })
-    );
+    expect(messages.some((m: string) => m.includes("API key"))).toBe(true);
   });
 
-  // (2 + extension layer) CopilotCliNotFoundError shown in chat
-  it("displays CLI-not-found message in chat when CLI is missing", async () => {
-    activateExtension({
+  // CLI not found → CopilotCliNotFoundError message posted
+  it("posts CLI-not-found error to webview", async () => {
+    setupProvider({
       endpoint: "https://example.com",
       apiKey: "key-123",
       model: "gpt-4.1",
@@ -179,19 +197,25 @@ describe("Error: handleChatRequest error paths", () => {
 
     mockClient.start.mockRejectedValueOnce(new Error("spawn copilot ENOENT"));
 
-    const stream = makeStream();
-    const token = makeToken();
+    simulateUserMessage(mockView, "hi");
 
-    await capturedHandler({ prompt: "hi" }, { id: "conv-err-2" }, stream, token);
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
 
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("Copilot CLI not found")
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
     );
+    expect(
+      messages.some((m: string) => m.includes("Copilot CLI not found"))
+    ).toBe(true);
   });
 
-  // (4) General startup error — non-CLI error
-  it("displays general startup error when client throws non-CLI error", async () => {
-    activateExtension({
+  // General startup error
+  it("posts general startup error to webview", async () => {
+    setupProvider({
       endpoint: "https://example.com",
       apiKey: "key-123",
       model: "gpt-4.1",
@@ -201,22 +225,28 @@ describe("Error: handleChatRequest error paths", () => {
 
     mockClient.start.mockRejectedValueOnce(new Error("Permission denied"));
 
-    const stream = makeStream();
-    const token = makeToken();
+    simulateUserMessage(mockView, "hi");
 
-    await capturedHandler({ prompt: "hi" }, { id: "conv-err-3" }, stream, token);
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
 
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to start Copilot service")
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
     );
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("Permission denied")
-    );
+    expect(
+      messages.some((m: string) => m.includes("Failed to start Copilot service"))
+    ).toBe(true);
+    expect(
+      messages.some((m: string) => m.includes("Permission denied"))
+    ).toBe(true);
   });
 
-  // (3) Session error event during conversation
-  it("shows error when session.error event fires during conversation", async () => {
-    activateExtension({
+  // Network error during streaming → error posted, session removed
+  it("posts error and removes session on sendMessage rejection", async () => {
+    setupProvider({
       endpoint: "https://example.com",
       apiKey: "key-123",
       model: "gpt-4.1",
@@ -224,49 +254,42 @@ describe("Error: handleChatRequest error paths", () => {
       cliPath: "",
     });
 
-    mockSession.sendMessage.mockImplementation(async () => {
-      mockSession._emit("session.error", {
-        error: { message: "Connection reset by peer" },
-      });
-    });
-
-    const stream = makeStream();
-    const token = makeToken();
-
-    await capturedHandler({ prompt: "hi" }, { id: "conv-err-4" }, stream, token);
-
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("Connection reset by peer")
-    );
-  });
-
-  // (5) sendMessage rejection
-  it("shows error when sendMessage rejects", async () => {
-    activateExtension({
-      endpoint: "https://example.com",
-      apiKey: "key-123",
-      model: "gpt-4.1",
-      wireApi: "completions",
-      cliPath: "",
-    });
-
-    mockSession.sendMessage.mockRejectedValueOnce(
+    mockSession.send.mockRejectedValueOnce(
       new Error("Network timeout")
     );
 
-    const stream = makeStream();
-    const token = makeToken();
+    simulateUserMessage(mockView, "hi");
 
-    await capturedHandler({ prompt: "hi" }, { id: "conv-err-5" }, stream, token);
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
 
-    expect(stream.markdown).toHaveBeenCalledWith(
-      expect.stringContaining("Network timeout")
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
     );
+    expect(messages.some((m: string) => m.includes("Network timeout"))).toBe(
+      true
+    );
+
+    // Verify session was removed: next request should create a new session
+    const newSession = createMockSession();
+    newSession.send.mockImplementation(async () => {
+      newSession._emit("session.idle");
+    });
+    mockClient.createSession.mockResolvedValueOnce(newSession);
+
+    simulateUserMessage(mockView, "retry");
+
+    await vi.waitFor(() => {
+      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+    });
   });
 
-  // (7) Session removed on error
-  it("calls removeSession after a sendMessage error", async () => {
-    activateExtension({
+  // Session error event → error posted, session removed
+  it("posts error and removes session on session.error event", async () => {
+    setupProvider({
       endpoint: "https://example.com",
       apiKey: "key-123",
       model: "gpt-4.1",
@@ -274,26 +297,38 @@ describe("Error: handleChatRequest error paths", () => {
       cliPath: "",
     });
 
-    mockSession.sendMessage.mockRejectedValueOnce(
-      new Error("Server unavailable")
-    );
-
-    const stream = makeStream();
-    const token = makeToken();
-    const conversationId = "conv-err-6";
-
-    await capturedHandler({ prompt: "hi" }, { id: conversationId }, stream, token);
-
-    // Verify session was removed: next call should create a new session
-    const newSession = createMockSession();
-    mockClient.createSession.mockResolvedValueOnce(newSession);
-    newSession.sendMessage.mockImplementation(async () => {
-      newSession._emit("session.idle");
+    mockSession.send.mockImplementation(async () => {
+      mockSession._emit("session.error", {
+        data: { message: "Connection reset by peer" },
+      });
     });
 
-    await capturedHandler({ prompt: "retry" }, { id: conversationId }, stream, token);
+    simulateUserMessage(mockView, "hi");
 
-    // createSession should have been called twice: once for the first request, once after removal
-    expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map(
+      (e: unknown) => (e as { message: string }).message
+    );
+    expect(
+      messages.some((m: string) => m.includes("Connection reset by peer"))
+    ).toBe(true);
+
+    // Verify session was removed: next request should create a new session
+    const newSession = createMockSession();
+    newSession.send.mockImplementation(async () => {
+      newSession._emit("session.idle");
+    });
+    mockClient.createSession.mockResolvedValueOnce(newSession);
+
+    simulateUserMessage(mockView, "retry");
+
+    await vi.waitFor(() => {
+      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+    });
   });
 });

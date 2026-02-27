@@ -13,6 +13,10 @@ export const chat = {
   }),
 };
 
+export const window = {
+  registerWebviewViewProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+};
+
 export class ThemeIcon {
   constructor(public id: string) {}
 }
@@ -24,4 +28,13 @@ export class CancellationTokenSource {
   };
   cancel = vi.fn();
   dispose = vi.fn();
+}
+
+export class Uri {
+  static joinPath(..._args: unknown[]): Uri {
+    return new Uri();
+  }
+  toString(): string {
+    return "mock-uri";
+  }
 }
