@@ -17,6 +17,44 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-02-27 (Evening): PRD Work Decomposition
+
+**Decomposition Strategy:**
+- PRD maps to 28 work items: 8 foundational/core (P0), 4 testing (P0-P1), 6 packaging/documentation (P0-P1), 2 quality polish (P2), 8 post-MVP (Phase 2–6)
+- MVP focus: Issues 1–23 (core, test, package, docs, polish). Post-MVP: Issues 24–28 (reference only).
+- Work is ordered by dependency chain: scaffolding → core functionality → testing → packaging → documentation.
+- Each issue is right-sized for one squad member in one session; avoids "add import" granularity and "build the extension" broadness.
+- Testing issues (9–13, 16) are manual (no automated test suite in MVP); tie directly to success criteria SC1–SC7.
+
+**Key Decomposition Decisions:**
+1. **No automated tests for MVP** — per PRD and existing decisions, manual E2E testing via SC1–SC7 is the validation path.
+2. **Session ID derivation (Issue 23, P2)** — flagged as a risk because VS Code `ChatContext.id` is not guaranteed by API docs. Deferred to post-MVP investigation.
+3. **Type safety (Issue 20, P2)** — SDK is Technical Preview; `any` types are acceptable for MVP. Revisit when SDK stabilizes.
+4. **Session cleanup (Issue 22, P2)** — deferred; no immediate risk for small PoC usage, but design should be sound for Phase 2.
+5. **Managed Identity (Phase 3)** — deferred; API key is sufficient for MVP and most air-gapped environments. SecretStorage support also deferred.
+6. **CLI bundling (Phase 5)** — deferred; users install CLI separately for MVP (documented in Issue 18). Bundling adds complexity and licensing questions.
+7. **Tools (Phase 2)** — deliberately disabled in MVP (`availableTools: []`) to minimize scope and security surface.
+
+**File Ownership Patterns:**
+- `src/extension.ts`: Chat participant registration, request handler, streaming, error display, cancellation wiring
+- `src/copilotService.ts`: CopilotClient lifecycle, BYOK session creation, session map management
+- `src/configuration.ts`: VS Code settings reader, validation
+- `package.json`: Manifest, chat participant contribution, settings schema
+
+**Risks Identified (Already documented in decisions.md):**
+- Conversation ID derivation assumes `ChatContext.id` exists (not guaranteed)
+- Event listener cleanup uses defensive fallback (`session.off` vs `session.removeListener`)
+- API key stored as plain string (not using SecretStorage)
+- No E2E automated tests — all validation is manual
+
+**Next Steps for Squad:**
+1. **Windows**: Execute Issues 1 (scaffolding validation), 14–16 (build/package/sideload), 9–10, 13 (test happy path, air-gap, streaming)
+2. **Blair**: Execute Issues 2–8 (all core functionality) and dependency-ordered tests 11–12, 21 (linting)
+3. **Childs**: Execute Issues 5 (settings), 17–19 (README, CLI guide, Azure guide)
+4. Remain flexible on Phase 2–6 roadmap based on customer feedback post-MVP.
+
+---
+
 ### 2026-02-27: PRD Decomposition & Code Review
 
 **Architecture:**

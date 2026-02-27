@@ -114,3 +114,114 @@ The codebase implements:
 5. **Defer Q-1, Q-3 to post-MVP** — Type safety and session cleanup are polish items, not blockers.
 
 **Why:** Baseline work plan for the Enclave MVP
+# PRD Decomposition Decision
+
+**Date:** 2026-02-27 (Evening)  
+**Author:** MacReady  
+**Context:** Rob Pitcher requested decomposition of PRD into GitHub issues/work items
+
+---
+
+## Decision
+
+The Enclave MVP has been decomposed into **28 work items** organized by dependency and priority:
+
+- **Issues 1–23**: MVP scope (scaffolding, core functionality, testing, packaging, documentation, quality polish)
+- **Issues 24–28**: Post-MVP roadmap (Phase 2–6, reference only — not actionable in MVP)
+
+Work is ordered by dependency chain: scaffolding → core → test → package → docs.
+
+**Critical Path (Blocking):**
+1. Issue 1 (Scaffolding)
+2. Issues 2–5 (Chat Participant, Client, BYOK, Settings)
+3. Issues 6–8 (Streaming, Error Handling, Cancellation)
+4. Issues 9–12 (Testing)
+5. Issues 14–16 (Build, Package, Sideload)
+
+**Supporting Path (Parallel):**
+- Issues 17–19 (Documentation) can start after Issues 2–8 are stable
+- Issues 20–23 (Polish) are optional P2; can be deferred or done in parallel
+
+---
+
+## Rationale
+
+### Right-Sized Issues
+Each issue is scoped for **one squad member, one session**. This avoids:
+- Micro-granularity (e.g., "add import statement")
+- Macro-granularity (e.g., "build the extension")
+- Dependency creep (e.g., one issue blocking 5 others)
+
+### Respect PRD & Non-Goals
+- **Goals G1–G7, FR1–FR8, SC1–SC7** are fully covered as Issues 2–8 (functionality) and 9–16 (validation).
+- **Non-Goals NG1–NG10** are explicitly OUT of scope (no inline completions, no custom tools, no slash commands, etc.).
+- Deferred features (Managed Identity, tools, Phase 2–6 roadmap) are listed as P2 or post-MVP to avoid scope creep.
+
+### No Automated Tests for MVP
+The PRD and existing decisions confirm that manual E2E testing (SC1–SC7) is the validation path. No unit test suite is required for MVP. This is consistent with the PoC nature of the work.
+
+### Dependency Graph
+Issues are ordered so that:
+- Foundational work (scaffolding, settings schema) is P0-blocking
+- Core implementation (client, BYOK, streaming) depends on foundation
+- Testing depends on core implementation
+- Packaging depends on build output
+- Documentation depends on working code and packaging
+
+### Risk Ownership
+Known risks are explicitly listed as issues or documented in decisions:
+- **Conversation ID derivation** (Issue 23, P2): VS Code API uncertainty → defer investigation, but flag for future hardening
+- **Type safety** (Issue 20, P2): SDK is Technical Preview → use `any` for now, revisit when SDK stabilizes
+- **Session cleanup** (Issue 22, P2): No immediate risk for PoC, but design should be sound for Phase 2
+- **API key storage** (documented): Plain string is acceptable for MVP; SecretStorage is Phase 3 (Managed Identity support)
+- **CLI bundling** (documented): Deferred to Phase 5; users install manually for MVP
+
+### Squad Routing
+- **Windows**: Build pipeline (Issues 1, 14–16), testing (9–10, 13)
+- **Blair**: Core implementation (Issues 2–8), feature testing (11–12), linting (21), type safety (20)
+- **Childs**: Settings & configuration (5), documentation (17–19), post-MVP features (25, 28)
+
+---
+
+## What This Enables
+
+1. **Traceability**: Each PRD requirement maps to one or more work items.
+2. **Parallelization**: Windows, Blair, Childs can work in parallel on independent issues (with dependency ordering).
+3. **Progress Tracking**: Each issue has clear acceptance criteria and dependencies; can be tracked in GitHub Projects.
+4. **Scope Control**: P2 and post-MVP items are clearly deferred; cannot be added to MVP without explicit re-prioritization.
+5. **Confidence**: Core code is already complete (per existing decisions); remaining work is validation, packaging, and documentation.
+
+---
+
+## What Is Explicitly Deferred
+
+| Feature | Reason | Phase |
+|---------|--------|-------|
+| Automated tests | PRD & decisions: manual E2E sufficient for PoC | MVP (manual), Phase 2+ (automated) |
+| Azure Managed Identity | API key is sufficient; SecretStorage is complex | Phase 3 |
+| Copilot CLI bundling | Licensing & complexity; users install manually | Phase 5 |
+| Built-in tools (file, git) | Security surface; `availableTools: []` for MVP | Phase 2 |
+| Slash commands | Not in MVP scope | Phase 4 |
+| `@workspace` context | Not in MVP scope | Phase 2 |
+| Conversation history | Not in MVP scope | Phase 4 |
+| Multi-model endpoints | Single endpoint only | Phase 6 |
+| VS Code for Web support | Desktop only | Post-MVP investigation |
+
+---
+
+## Next Steps
+
+1. **Scribe**: Merge this decision into `.squad/decisions.md` (append-only)
+2. **Windows**: Start Issue 1 (scaffolding validation)
+3. **Blair**: Start Issue 2 (chat participant) — dependent on Issue 1 ready
+4. **Childs**: Start Issue 5 (settings schema) — can run in parallel after scaffolding
+5. **Squad**: Plan daily standup to sync on blockers and handoffs
+
+---
+
+## References
+
+- PRD: `specs/PRD-airgapped-copilot-vscode-extension.md`
+- Existing decisions: `.squad/decisions.md` (dated 2026-02-27)
+- Project context: `.squad/agents/macready/history.md`
+- Team roster: `.squad/team.md`
