@@ -47,10 +47,10 @@ export interface SessionErrorEvent {
 
 // ---------------------------------------------------------------------------
 // CopilotSession structural interface
-// CopilotSession structural interface
 // ---------------------------------------------------------------------------
 
-type EventCallback = (...args: unknown[]) => void;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type EventCallback = (...args: any[]) => void;
 
 /**
  * Structural interface for a Copilot SDK session.
