@@ -84,8 +84,8 @@
 1. **Attempt to send a message before configuration:**
    - Type "Hello" in the input field
    - Click "Send"
-   - ✅ Error message appears: "⚠️ Missing required configuration: enclave.copilot.endpoint"
-   - ✅ Error lists all missing required settings
+   - ✅ One or more warning messages appear in the sidebar, each starting with "⚠️ "
+   - ✅ Each missing required setting shows its own message (for example, "⚠️ Please configure the Azure AI Foundry endpoint…", "⚠️ Please configure the Azure AI Foundry API key…", "⚠️ Please configure the Azure AI Foundry model…")
 
 2. **Configure the extension:**
    - Open Settings (`Ctrl+,` / `Cmd+,`)
@@ -130,7 +130,7 @@
 1. **Test network error (optional):**
    - Temporarily set an invalid endpoint in settings
    - Send a message
-   - ✅ Error message appears in the chat
+   - ✅ Error message appears in the sidebar
    - ✅ Extension does not crash
 
 2. **Test cancellation (optional):**

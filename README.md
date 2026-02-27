@@ -41,7 +41,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 ## Prerequisites
 
 - **VS Code** 1.93 or later
-- **Node.js** 18+ (for development/build)
+- **Node.js** 20.19.0+ (for development/build)
 - **Copilot CLI** v0.0.418+ ([installation guide](https://github.com/github/copilot-cli) or air-gapped distribution)
 - **Azure AI Foundry** endpoint (OpenAI-compatible API)
 
@@ -116,9 +116,9 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 3. **Open the Enclave sidebar:** Click the Enclave icon in the VS Code activity bar (left sidebar)
 
-4. **Activate Enclave:** Start typing a message and press Enter
+4. **Send a message:** Type a message in the input field, then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS)
 
-5. **Multi-turn conversations:** The chat maintains session context within the same the same session context
+5. **Multi-turn conversations:** The chat maintains session context within the same session
 
 ---
 
@@ -126,15 +126,15 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Open Copilot Chat in VS Code (`Ctrl+L` / `Cmd+L`)
-2. Type `@copilot` followed by your message
-3. Press Enter to send
+1. Click the Enclave icon in the VS Code activity bar to open the Enclave sidebar
+2. Type your message in the input field
+3. Click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit
 
 ### Example prompts
 
-- ` Explain how this function works`
-- `@copilot Write a unit test for this code`
-- `@copilot What are the performance implications?`
+- `Explain how this function works`
+- `Write a unit test for this code`
+- `What are the performance implications?`
 
 ### Stop generation
 

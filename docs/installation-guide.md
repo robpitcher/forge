@@ -186,7 +186,7 @@ Once the CLI is verified:
 1. Open VS Code
 2. Look for the Enclave icon in the VS Code activity bar (left sidebar)
 3. Click the icon to open the Enclave sidebar
-4. Type a message (e.g., `hello`) and press Enter
+4. Type a message (e.g., `hello`), then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit it
 5. If configured correctly, you should see the response stream
 
 ---
