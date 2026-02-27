@@ -14,7 +14,7 @@ export interface ConfigValidationError {
 }
 
 export function getConfiguration(): ExtensionConfig {
-  const config = vscode.workspace.getConfiguration("airgapped.copilot");
+  const config = vscode.workspace.getConfiguration("enclave.copilot");
   return {
     endpoint: config.get<string>("endpoint", ""),
     apiKey: config.get<string>("apiKey", ""),
@@ -31,17 +31,17 @@ export function validateConfiguration(
 
   if (!config.endpoint) {
     errors.push({
-      field: "airgapped.copilot.endpoint",
+      field: "enclave.copilot.endpoint",
       message:
-        "Please configure the Azure AI Foundry endpoint in Settings (airgapped.copilot.endpoint)",
+        "Please configure the Azure AI Foundry endpoint in Settings (enclave.copilot.endpoint)",
     });
   }
 
   if (!config.apiKey) {
     errors.push({
-      field: "airgapped.copilot.apiKey",
+      field: "enclave.copilot.apiKey",
       message:
-        "Please configure the API key in Settings (airgapped.copilot.apiKey)",
+        "Please configure the API key in Settings (enclave.copilot.apiKey)",
     });
   }
 

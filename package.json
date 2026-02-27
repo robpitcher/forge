@@ -1,8 +1,13 @@
 {
-  "name": "airgapped-copilot",
-  "displayName": "Air-Gapped Copilot",
+  "name": "enclave",
+  "displayName": "Enclave",
   "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
   "version": "0.1.0",
+  "publisher": "robpitcher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robpitcher/enclave"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.93.0"
@@ -12,38 +17,38 @@
     "Chat"
   ],
   "activationEvents": [
-    "onChatParticipant:airgapped.copilot"
+    "onChatParticipant:enclave.copilot"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
       {
-        "id": "airgapped.copilot",
-        "fullName": "Air-Gapped Copilot",
+        "id": "enclave.copilot",
+        "fullName": "Enclave",
         "name": "copilot",
         "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
         "isSticky": true
       }
     ],
     "configuration": {
-      "title": "Air-Gapped Copilot",
+      "title": "Enclave",
       "properties": {
-        "airgapped.copilot.endpoint": {
+        "enclave.copilot.endpoint": {
           "type": "string",
           "default": "",
           "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
         },
-        "airgapped.copilot.apiKey": {
+        "enclave.copilot.apiKey": {
           "type": "string",
           "default": "",
           "description": "API key for the Azure AI Foundry endpoint"
         },
-        "airgapped.copilot.model": {
+        "enclave.copilot.model": {
           "type": "string",
           "default": "gpt-4.1",
           "description": "Model deployment name"
         },
-        "airgapped.copilot.wireApi": {
+        "enclave.copilot.wireApi": {
           "type": "string",
           "default": "completions",
           "enum": [
@@ -52,7 +57,7 @@
           ],
           "description": "API format: 'completions' or 'responses'"
         },
-        "airgapped.copilot.cliPath": {
+        "enclave.copilot.cliPath": {
           "type": "string",
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"

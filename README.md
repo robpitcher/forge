@@ -1,4 +1,4 @@
-# Air-Gapped Copilot
+# Enclave
 
 A VS Code extension that provides a Copilot-like chat experience for **air-gapped environments** — no GitHub authentication, no internet access to GitHub services required. The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint.
 
@@ -39,7 +39,7 @@ A VS Code extension that provides a Copilot-like chat experience for **air-gappe
 ## Prerequisites
 
 - **VS Code** 1.93.0 or later
-- **Copilot CLI** v0.0.418 or later — must be installed and available on `PATH` (or configured via `airgapped.copilot.cliPath`)
+- **Copilot CLI** v0.0.418 or later — must be installed and available on `PATH` (or configured via `enclave.copilot.cliPath`)
 - **Azure AI Foundry endpoint** — a running Azure AI Foundry deployment with a known endpoint URL and API key
 
 ---
@@ -48,17 +48,17 @@ A VS Code extension that provides a Copilot-like chat experience for **air-gappe
 
 1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments).
 
-2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Air-Gapped Copilot`):
+2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Enclave`):
 
    | Setting | Description |
    |---------|-------------|
-   | `airgapped.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
-   | `airgapped.copilot.apiKey` | Your API key |
-   | `airgapped.copilot.model` | Model deployment name (default: `gpt-4.1`) |
+   | `enclave.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
+   | `enclave.copilot.apiKey` | Your API key |
+   | `enclave.copilot.model` | Model deployment name (default: `gpt-4.1`) |
 
 3. **Sideload the `.vsix`**:
    ```sh
-   code --install-extension airgapped-copilot-0.1.0.vsix
+   code --install-extension enclave-0.1.0.vsix
    ```
 
 4. **Open the Chat panel** in VS Code and start chatting with `@copilot`.
@@ -69,11 +69,11 @@ A VS Code extension that provides a Copilot-like chat experience for **air-gappe
 
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
-| `airgapped.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
-| `airgapped.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
-| `airgapped.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
-| `airgapped.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
-| `airgapped.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
+| `enclave.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
+| `enclave.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
+| `enclave.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
+| `enclave.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
+| `enclave.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
 
 ---
 
@@ -85,7 +85,7 @@ npm run build
 npm run package
 ```
 
-This produces `airgapped-copilot-0.1.0.vsix` in the project root.
+This produces `enclave-0.1.0.vsix` in the project root.
 
 ---
 

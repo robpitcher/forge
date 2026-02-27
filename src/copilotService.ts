@@ -43,7 +43,7 @@ export async function getOrCreateClient(
       message.toLowerCase().includes("cannot find")
     ) {
       throw new CopilotCliNotFoundError(
-        "Copilot CLI not found. Please install it or set the path in airgapped.copilot.cliPath"
+        "Copilot CLI not found. Please install it or set the path in enclave.copilot.cliPath"
       );
     }
     throw err;

@@ -9,7 +9,7 @@ import {
 
 export function activate(context: vscode.ExtensionContext): void {
   const participant = vscode.chat.createChatParticipant(
-    "airgapped.copilot",
+    "enclave.copilot",
     handleChatRequest
   );
   participant.iconPath = new vscode.ThemeIcon("hubot");
@@ -36,7 +36,7 @@ async function handleChatRequest(
     }
     stream.button({
       command: "workbench.action.openSettings",
-      arguments: ["airgapped.copilot"],
+      arguments: ["enclave.copilot"],
       title: "Open Settings",
     });
     return;

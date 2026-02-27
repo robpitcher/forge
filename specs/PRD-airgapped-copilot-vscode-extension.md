@@ -1,5 +1,5 @@
 # Product Requirements Document
-## Air-Gapped Copilot VS Code Chat Extension — MVP / Proof of Concept
+## Enclave VS Code Chat Extension — MVP / Proof of Concept
 
 **Author:** @robpitcher  
 **Date:** 2026-02-27  
@@ -121,8 +121,8 @@ Forking `microsoft/vscode-copilot-chat` was evaluated and rejected due to extrem
 
 The extension registers a VS Code **Chat Participant** so it appears in the native Copilot Chat panel.
 
-- **Participant ID:** `airgapped.copilot`
-- **Display Name:** `Air-Gapped Copilot` (configurable in future)
+- **Participant ID:** `enclave.copilot`
+- **Display Name:** `Enclave` (configurable in future)
 - **Icon:** A custom icon or VS Code `ThemeIcon` (e.g., `hubot`)
 - **Sticky:** `true` — the participant is the default in the chat panel
 
@@ -130,7 +130,7 @@ The extension registers a VS Code **Chat Participant** so it appears in the nati
 
 - On extension activation, create a `CopilotClient` instance from `@github/copilot-sdk`.
 - The client connects to the Copilot CLI via stdio (the SDK manages the CLI process lifecycle automatically).
-- The Copilot CLI binary must be available on `PATH` or at a path specified in settings (`airgapped.copilot.cliPath`).
+- The Copilot CLI binary must be available on `PATH` or at a path specified in settings (`enclave.copilot.cliPath`).
 - On extension deactivation, gracefully stop the client (`client.stop()`).
 
 ### FR3: BYOK Session Creation
@@ -139,11 +139,11 @@ When the user sends a chat message, the extension creates (or reuses) a session 
 
 | Parameter | Source |
 |-----------|--------|
-| `model` | VS Code setting: `airgapped.copilot.model` |
+| `model` | VS Code setting: `enclave.copilot.model` |
 | `provider.type` | `"openai"` (Azure AI Foundry's OpenAI-compatible endpoint) |
-| `provider.baseUrl` | VS Code setting: `airgapped.copilot.endpoint` |
-| `provider.apiKey` | VS Code setting: `airgapped.copilot.apiKey` (stored as a string; users should use VS Code's secret storage in production) |
-| `provider.wireApi` | VS Code setting: `airgapped.copilot.wireApi` (default: `"completions"`) |
+| `provider.baseUrl` | VS Code setting: `enclave.copilot.endpoint` |
+| `provider.apiKey` | VS Code setting: `enclave.copilot.apiKey` (stored as a string; users should use VS Code's secret storage in production) |
+| `provider.wireApi` | VS Code setting: `enclave.copilot.wireApi` (default: `"completions"`) |
 | `streaming` | `true` |
 
 ### FR4: Streaming Response Rendering
@@ -164,18 +164,18 @@ The extension contributes the following VS Code settings:
 
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
-| `airgapped.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `airgapped.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
-| `airgapped.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
-| `airgapped.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
-| `airgapped.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
+| `enclave.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
+| `enclave.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
+| `enclave.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
+| `enclave.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
+| `enclave.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
 
 ### FR7: Error Handling
 
 | Error Condition | Behavior |
 |-----------------|----------|
-| Missing configuration (endpoint or API key) | Display actionable error in chat: *"Please configure the Azure AI Foundry endpoint in Settings (airgapped.copilot.endpoint)"* with a button to open settings |
-| Copilot CLI not found | Display error: *"Copilot CLI not found. Please install it or set the path in airgapped.copilot.cliPath"* |
+| Missing configuration (endpoint or API key) | Display actionable error in chat: *"Please configure the Azure AI Foundry endpoint in Settings (enclave.copilot.endpoint)"* with a button to open settings |
+| Copilot CLI not found | Display error: *"Copilot CLI not found. Please install it or set the path in enclave.copilot.cliPath"* |
 | Network / connection error to Azure AI Foundry | Display error in chat response stream |
 | Authentication error (invalid API key) | Display error in chat response stream |
 | User cancels request (VS Code cancellation token) | Call `session.abort()` to cancel the in-flight request |
@@ -183,7 +183,7 @@ The extension contributes the following VS Code settings:
 ### FR8: Packaging & Distribution
 
 - The extension is packaged as a `.vsix` file using `vsce package`.
-- The `.vsix` can be sideloaded onto air-gapped VS Code installations via `code --install-extension airgapped-copilot-x.y.z.vsix`.
+- The `.vsix` can be sideloaded onto air-gapped VS Code installations via `code --install-extension enclave-x.y.z.vsix`.
 - The `@github/copilot-sdk` npm package is bundled into the extension (webpack/esbuild).
 - The Copilot CLI binary is **not** bundled in the `.vsix` for MVP — it must be pre-installed on the target machine. (Bundling is a future improvement.)
 
@@ -210,7 +210,7 @@ The extension contributes the following VS Code settings:
 ### Project Structure
 
 ```
-airgapped-copilot/
+enclave/
 ├── .vscode/
 │   └── launch.json              # Extension debugging config
 ├── src/
