@@ -88,7 +88,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleChatMessage(prompt: string): Promise<void> {
     if (this._isProcessing) { return; }
 
-    const config = await getConfigurationAsync(this._secrets);
+    let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
+    try {
+      config = await getConfigurationAsync(this._secrets);
+    } catch {
+      this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
+      return;
+    }
     const validationErrors = validateConfiguration(config);
 
     if (validationErrors.length > 0) {
@@ -205,7 +211,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 <body>
     <div class="container">
         <div class="toolbar">
-            <button id="settingsBtn" class="toolbar-btn" title="Open Enclave Settings">&#9881;</button>
+            <button id="settingsBtn" class="toolbar-btn" title="Open Enclave Settings" aria-label="Open Enclave configuration">&#9881;</button>
         </div>
         <div id="chatMessages"></div>
         <div class="input-area">
