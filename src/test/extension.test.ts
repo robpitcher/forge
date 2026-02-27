@@ -70,7 +70,9 @@ describe("WebviewView chat panel", () => {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
       secrets: {
-        get: vi.fn().mockResolvedValue(undefined),
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "enclave.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+        ),
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
         onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),

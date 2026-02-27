@@ -17,22 +17,20 @@ export function getConfiguration(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration("enclave.copilot");
   return {
     endpoint: config.get<string>("endpoint", ""),
-    apiKey: config.get<string>("apiKey", ""),
+    apiKey: "",
     model: config.get<string>("model", "gpt-4.1"),
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
   };
 }
 
-/** Checks SecretStorage first for the API key, falls back to settings.json. */
+/** Reads API key from SecretStorage and merges with settings. */
 export async function getConfigurationAsync(
   secrets: vscode.SecretStorage
 ): Promise<ExtensionConfig> {
   const config = getConfiguration();
-  const secretApiKey = await secrets.get("enclave.copilot.apiKey");
-  if (secretApiKey) {
-    config.apiKey = secretApiKey;
-  }
+  const apiKey = await secrets.get("enclave.copilot.apiKey");
+  config.apiKey = apiKey ?? "";
   return config;
 }
 
@@ -53,7 +51,7 @@ export function validateConfiguration(
     errors.push({
       field: "enclave.copilot.apiKey",
       message:
-        "Please configure the API key in Settings (enclave.copilot.apiKey)",
+        "Please set your API key via the ⚙️ gear menu → 'Set API Key (secure)'",
     });
   }
 

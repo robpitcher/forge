@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import {
   getConfiguration,
+  getConfigurationAsync,
   validateConfiguration,
   type ExtensionConfig,
 } from "../configuration.js";
@@ -31,10 +32,9 @@ describe("getConfiguration", () => {
     });
   });
 
-  it("returns values from VS Code settings when configured", () => {
+  it("returns values from VS Code settings when configured (apiKey via SecretStorage)", async () => {
     const settings: Record<string, string> = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
-      apiKey: "test-key-123",
       model: "gpt-4o",
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
@@ -46,9 +46,24 @@ describe("getConfiguration", () => {
       get: mockGet,
     } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
 
-    const config = getConfiguration();
+    const mockSecrets = {
+      get: vi.fn().mockImplementation((key: string) =>
+        key === "enclave.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+      ),
+      store: vi.fn(),
+      delete: vi.fn(),
+      onDidChange: vi.fn(),
+    } as unknown as import("vscode").SecretStorage;
 
-    expect(config).toEqual(settings);
+    const config = await getConfigurationAsync(mockSecrets);
+
+    expect(config).toEqual({
+      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      apiKey: "test-key-123",
+      model: "gpt-4o",
+      wireApi: "responses",
+      cliPath: "/usr/local/bin/copilot",
+    });
   });
 });
 
