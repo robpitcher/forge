@@ -6,6 +6,7 @@
   const newConvBtn = document.getElementById("newConvBtn");
 
   let currentAssistantMessage = null;
+  let isStreaming = false;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -17,9 +18,14 @@
     }
   });
 
+  function setInputEnabled(enabled) {
+    sendBtn.disabled = !enabled;
+    userInput.disabled = !enabled;
+  }
+
   function sendMessage() {
     const text = userInput.value.trim();
-    if (!text) return;
+    if (!text || isStreaming) return;
 
     appendMessage("user", text);
     userInput.value = "";
@@ -68,6 +74,8 @@
     switch (message.type) {
       case "streamStart":
         currentAssistantMessage = null;
+        isStreaming = true;
+        setInputEnabled(false);
         break;
 
       case "streamDelta":
@@ -76,16 +84,22 @@
 
       case "streamEnd":
         currentAssistantMessage = null;
+        isStreaming = false;
+        setInputEnabled(true);
         break;
 
       case "error":
         appendMessage("error", `⚠️ ${message.message}`);
         currentAssistantMessage = null;
+        isStreaming = false;
+        setInputEnabled(true);
         break;
 
       case "conversationReset":
         chatMessages.innerHTML = "";
         currentAssistantMessage = null;
+        isStreaming = false;
+        setInputEnabled(true);
         break;
     }
   });

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as crypto from "crypto";
 import { getConfiguration, validateConfiguration } from "./configuration.js";
 import {
   getOrCreateSession,
@@ -25,7 +26,9 @@ export async function deactivate(): Promise<void> {
 
 class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
-  private _conversationId: string = `conv-${Date.now()}`;
+  private _conversationId: string = `conv-${crypto.randomUUID()}`;
+  private _isProcessing = false;
+  private _messageListener?: vscode.Disposable;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -40,7 +43,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-    webviewView.webview.onDidReceiveMessage(this._handleMessage.bind(this));
+
+    this._messageListener?.dispose();
+    this._messageListener = webviewView.webview.onDidReceiveMessage(
+      this._handleMessage.bind(this)
+    );
+    webviewView.onDidDispose(() => {
+      this._messageListener?.dispose();
+      this._messageListener = undefined;
+    });
   }
 
   private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
@@ -48,12 +59,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._handleChatMessage(message.text ?? "");
     } else if (message.command === "newConversation") {
       await destroySession(this._conversationId);
-      this._conversationId = `conv-${Date.now()}`;
+      this._conversationId = `conv-${crypto.randomUUID()}`;
       this._view?.webview.postMessage({ type: "conversationReset" });
     }
   }
 
   private async _handleChatMessage(prompt: string): Promise<void> {
+    if (this._isProcessing) { return; }
+
     const config = getConfiguration();
     const validationErrors = validateConfiguration(config);
 
@@ -77,12 +90,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    this._isProcessing = true;
     try {
       await this._streamResponse(prompt, session);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this._postError(message);
       await destroySession(this._conversationId);
+    } finally {
+      this._isProcessing = false;
     }
   }
 
@@ -144,11 +160,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, "media", "chat.js")
     );
 
+    const nonce = crypto.randomUUID();
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
     <link href="${styleUri}" rel="stylesheet">
     <title>Enclave Chat</title>
 </head>
@@ -163,7 +182,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             </div>
         </div>
     </div>
-    <script src="${scriptUri}"></script>
+    <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }

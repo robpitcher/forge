@@ -22,7 +22,7 @@ var __importMetaResolve = (function() {
       if (_fs.existsSync(base)) {
         var target = subpath.length ? _path.join(base, ...subpath) : base;
         if (!_fs.existsSync(target) && _fs.existsSync(target + ".js")) target += ".js";
-        if (_fs.statSync(target).isDirectory()) target = _path.join(target, "index.js");
+        if (_fs.existsSync(target) && _fs.statSync(target).isDirectory()) target = _path.join(target, "index.js");
         return _url.pathToFileURL(target).href;
       }
       var parent = _path.dirname(dir);
