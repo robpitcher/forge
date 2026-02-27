@@ -103,6 +103,14 @@
         setInputEnabled(true);
         break;
 
+      case "toolConfirmation":
+        renderToolConfirmation(message);
+        break;
+
+      case "toolResult":
+        renderToolResult(message);
+        break;
+
       case "conversationReset":
         chatMessages.innerHTML = "";
         currentAssistantMessage = null;
@@ -111,4 +119,92 @@
         break;
     }
   });
+
+  function renderToolConfirmation(message) {
+    const card = document.createElement("div");
+    card.className = "tool-confirmation";
+    card.dataset.toolId = message.id;
+
+    const header = document.createElement("div");
+    header.className = "tool-name";
+    header.textContent = `🔧 Tool: ${message.tool}`;
+
+    const params = document.createElement("div");
+    params.className = "tool-params";
+    const paramEntries = message.params ? Object.entries(message.params) : [];
+    params.textContent = paramEntries
+      .map(([k, v]) => {
+        const val = typeof v === "string" && v.length > 120 ? v.slice(0, 120) + "…" : v;
+        return `${k}: ${val}`;
+      })
+      .join("\n");
+
+    const actions = document.createElement("div");
+    actions.className = "tool-actions";
+
+    const approveBtn = document.createElement("button");
+    approveBtn.className = "tool-btn-approve";
+    approveBtn.textContent = "Approve";
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.className = "tool-btn-reject";
+    rejectBtn.textContent = "Reject";
+
+    function respond(approved) {
+      vscode.postMessage({ command: "toolResponse", id: message.id, approved });
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+      actions.innerHTML = "";
+      const status = document.createElement("span");
+      status.className = approved ? "tool-status-approved" : "tool-status-rejected";
+      status.textContent = approved ? "Approved ✓" : "Rejected ✗";
+      actions.appendChild(status);
+    }
+
+    approveBtn.addEventListener("click", () => respond(true));
+    rejectBtn.addEventListener("click", () => respond(false));
+
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+
+    card.appendChild(header);
+    card.appendChild(params);
+    card.appendChild(actions);
+    chatMessages.appendChild(card);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function renderToolResult(message) {
+    const result = document.createElement("div");
+    result.className = `tool-result ${message.status === "success" ? "success" : "error"}`;
+
+    const icon = message.status === "success" ? "✅" : "❌";
+    const verb = message.status === "success" ? "completed" : "failed";
+
+    const summary = document.createElement("div");
+    summary.className = "tool-result-summary";
+    summary.textContent = `${icon} ${message.tool} ${verb}`;
+
+    result.appendChild(summary);
+
+    if (message.output) {
+      const toggle = document.createElement("span");
+      toggle.className = "tool-output-toggle";
+      toggle.textContent = " ▶ Details";
+      summary.appendChild(toggle);
+
+      const output = document.createElement("div");
+      output.className = "tool-output";
+      output.textContent = message.output;
+      result.appendChild(output);
+
+      toggle.addEventListener("click", () => {
+        const expanded = output.classList.toggle("expanded");
+        toggle.textContent = expanded ? " ▼ Details" : " ▶ Details";
+      });
+    }
+
+    chatMessages.appendChild(result);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 })();

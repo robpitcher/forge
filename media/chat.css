@@ -99,3 +99,118 @@ button:active {
   background-color: var(--vscode-button-hoverBackground);
   opacity: 0.8;
 }
+
+/* Tool Confirmation Card */
+.tool-confirmation {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background-color: var(--vscode-editor-background);
+}
+
+.tool-confirmation .tool-name {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.tool-confirmation .tool-params {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 12px;
+  opacity: 0.85;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tool-confirmation .tool-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tool-btn-approve {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.tool-btn-approve:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.tool-btn-reject {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.tool-btn-reject:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.tool-btn-approve:disabled,
+.tool-btn-reject:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tool-status-approved {
+  color: var(--vscode-testing-iconPassed, #73c991);
+  font-weight: bold;
+}
+
+.tool-status-rejected {
+  color: var(--vscode-testing-iconFailed, #f48771);
+  font-weight: bold;
+}
+
+/* Tool Result */
+.tool-result {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 3px solid;
+}
+
+.tool-result.success {
+  border-left-color: var(--vscode-testing-iconPassed, #73c991);
+  background-color: var(--vscode-editor-background);
+}
+
+.tool-result.error {
+  border-left-color: var(--vscode-testing-iconFailed, #f48771);
+  background-color: var(--vscode-inputValidation-errorBackground);
+}
+
+.tool-result-summary {
+  font-size: 13px;
+}
+
+.tool-output-toggle {
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.tool-output-toggle:hover {
+  opacity: 1;
+}
+
+.tool-output {
+  display: none;
+  margin-top: 8px;
+  padding: 8px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background-color: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.1));
+  border-radius: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-output.expanded {
+  display: block;
+}
