@@ -410,3 +410,59 @@ All 28 issues have Sprint field values set on Project #8.
 1. **MacReady:** Create Sprint 4 and Sprint 5 in GitHub Projects UI, reassign #28 and #29
 2. **Squad:** Use dependency links to determine work order — start with issues that have no pending dependencies
 3. **Scribe:** Merge this decision into `.squad/decisions.md`
+
+### 2026-02-27T05:20:00Z: User directive — Branching strategy and main branch protection
+**By:** Rob Pitcher (via Copilot)
+**What:**
+1. **NEVER commit directly to `main`.** Pull requests are the only way commits reach `main`.
+2. **Only a human may merge PRs into `main`.** No automated merges to main.
+3. **Branching strategy:**
+   - Short-term work (issues) → own branch off `dev`
+   - When complete → PR into `dev` after appropriate reviews
+   - To release to `main`:
+     a. Create a release branch from `dev` with `rel/` prefix (e.g., `rel/0.2.0`)
+     b. On the `rel/` branch: update `.gitignore` to exclude `.squad/`, untrack and remove `.squad/` files from the branch, commit
+     c. Open a PR from `rel/` branch → `main`
+     d. Human reviews, then squash-merges into `main`
+4. **`.squad/` folder must NOT reach `main`.** It is stripped on the release branch before the PR.
+
+**Why:** User request — captured for team memory. Ensures clean main branch, proper review gates, and keeps squad state out of production.
+
+### 2026-02-27: Release Branch Process Decision
+**By:** Childs (SDK Dev)
+**What:**
+
+Established the release branch process for Enclave. Release branches follow the `rel/X.Y.Z` naming convention, branched from `dev`, targeting `main`.
+
+#### Process
+
+1. **Branch from dev:** `git checkout dev && git pull origin dev && git checkout -b rel/X.Y.Z`
+2. **Strip `.squad/`:** Add `.squad/` to `.gitignore`, then `git rm -r --cached .squad/` to untrack without deleting files on disk
+3. **Keep `.github/agents/`:** Agent configuration files ship to main — needed for GitHub to recognize the Copilot agent
+4. **Commit:** Single commit with `.gitignore` update and `.squad/` deletion
+5. **Push and PR:** Push branch, open PR to `main` with clear description of what's included/excluded
+6. **Human merge:** PR is never auto-merged — Rob reviews and squash-merges manually
+7. **Return to dev:** Always `git checkout dev` after pushing to stay on the working branch
+
+#### Execution Record
+
+- **Branch:** `rel/0.2.0` created from `dev`
+- **Commit:** `chore: strip .squad/ from release branch` — removed 34 `.squad/` files from tracking, updated `.gitignore`
+- **PR:** #30 — "Release v0.2.0 — MVP infrastructure, workflows, and project setup" (base: main, head: rel/0.2.0)
+- **Status:** PR open, awaiting Rob's review
+
+#### Rationale
+
+- `.squad/` contains dev-only team state (agent charters, orchestration logs, decisions, casting, skills). This should not ship to `main` or be visible to end users.
+- Using `git rm --cached` removes files from git tracking on the release branch without deleting them from the local worktree, so squad tooling continues to work on dev.
+- `.gitignore` update prevents accidental re-addition of `.squad/` on the release branch.
+- `.github/agents/` is kept because it configures GitHub's Copilot agent recognition — this is user-facing, not dev tooling.
+
+#### What This Enables
+
+1. Clean `main` branch without dev tooling artifacts
+2. `squad-heartbeat.yml` cron workflow for @copilot auto-assignment
+3. CI and release workflows on main
+4. Repeatable process for future releases (rel/0.3.0, etc.)
+
+**Why:** Implements Rob Pitcher's branching directive for the first release.
