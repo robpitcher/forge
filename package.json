@@ -6,7 +6,7 @@
   "publisher": "robpitcher",
   "repository": {
     "type": "git",
-    "url": "https://github.com/robpitcher/enclave"
+    "url": "https://github.com/robpitcher/forge"
   },
   "license": "MIT",
   "engines": {

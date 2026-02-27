@@ -51,7 +51,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/robpitcher/enclave.git
+   git clone https://github.com/robpitcher/forge.git
    cd enclave
    ```
 
