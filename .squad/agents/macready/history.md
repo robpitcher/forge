@@ -17,6 +17,58 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-02-27: Documentation Delivery — Installation & Configuration Guides
+
+**Work Completed:**
+- Created `docs/installation-guide.md` (Issue #19) — comprehensive CLI installation for air-gapped environments
+- Created `docs/configuration-reference.md` (Issue #20) — complete Azure AI Foundry configuration reference
+- Branch: `squad/19-20-docs`, PR: #45 (open to dev)
+
+**Installation Guide Key Content:**
+- Step-by-step Copilot CLI v0.0.418+ download from GitHub releases (with SHA256 verification instructions)
+- Transfer procedures for disconnected environments (USB, secure portals, approved media)
+- Installation paths: global PATH (Linux/macOS/Windows) vs local `enclave.copilot.cliPath` setting
+- Verification: `copilot --version`, `copilot server`, E2E test in VS Code
+- Troubleshooting table with 5 common issues (CLI not found, permission denied, wrong binary, server hangs, VS Code errors)
+
+**Configuration Reference Key Content:**
+- Settings table: 2 required + 3 optional, with type, default, and purpose
+- **Endpoint URL format** documented: `https://{resource-name}.openai.azure.com/openai/v1/` with component breakdown
+- **API key retrieval**: Step-by-step Azure Portal instructions with example screenshots (conceptual)
+- **Deployment name vs model name distinction** with example table and Azure Portal walkthrough
+- **wireApi setting** explained: `completions` (default, standard OpenAI format) vs `responses` (alternative format), with request JSON examples
+- 5 full example configurations (minimal, custom model, custom CLI path, alternative wire format, Windows)
+- Comprehensive troubleshooting with connection, auth, model, and format issues, plus debug curl commands
+
+**Design Decisions:**
+1. **Audience split**: Installation guide targets platform/DevOps engineers; configuration guide targets both engineers and developers
+2. **Cross-references**: Both docs link to each other for workflow integration (install CLI first, then configure)
+3. **Content sourcing**: All info derived from PRD Table FR6, `package.json` contributes.configuration, `src/configuration.ts`, and real Azure portal patterns
+4. **Security note**: Configuration guide explicitly mentions API key security and defers Managed Identity to Phase 3
+5. **Verification depth**: Installation guide includes curl/terminal verification commands, not just UI steps
+
+**Learnings for Future Documentation:**
+- Air-gapped documentation must cover download + transfer as two separate concerns; single "install" docs miss disconnected workflows
+- Configuration docs should include "deployment name vs model name" as a dedicated section; this is a frequent source of confusion in Azure
+- wireApi setting is not obvious from OpenAI docs; explicit JSON examples (both formats) help practitioners choose correctly
+- Troubleshooting should include curl commands for self-service debugging in air-gapped environments where Copilot support is limited
+- Cross-references between related docs (installation → configuration) improve user workflow
+
+**PR Review Checklist:**
+- [x] Both files created in `docs/` directory
+- [x] Installation guide covers all four steps: download, transfer, install, verify
+- [x] Configuration guide documents all 5 settings from `package.json`
+- [x] Endpoint URL format matches Azure AI Foundry real-world patterns
+- [x] Deployment name vs model name distinction is clear with examples
+- [x] wireApi setting explained with JSON request examples for both formats
+- [x] Troubleshooting sections included in both
+- [x] Commit message includes signed trailer
+- [x] PR body references both issues (#19, #20) and describes content
+
+**Impact on Acceptance Criteria:**
+- Issue #19 AC: ✅ Step-by-step CLI installation documented; ✅ download URL and version (v0.0.418+) documented; ✅ transfer procedure clear (approved media, USB, secure portals); ✅ verification step included (copilot --version, copilot server, E2E test)
+- Issue #20 AC: ✅ Endpoint URL format documented with examples; ✅ API key retrieval steps from Azure portal; ✅ Deployment name vs model name explained; ✅ wireApi setting explained with use cases (completions for standard, responses for alternative endpoints)
+
 ### 2026-02-27 (Evening): PRD Work Decomposition
 
 **Decomposition Strategy:**
@@ -142,3 +194,5 @@
 - @copilot will auto-pick up 8 rerouted issues via heartbeat
 - Squad members continue work on confirmed assignments in dependency order
 - Monitor @copilot PR quality for issues #2, #6, #15, #16, #18, #19, #20, #22
+
+📌 Team update (2026-02-27T14:39:00Z): Round 3 complete. Windows delivered air-gap validation tests (18 tests, #47); MacReady delivered installation and configuration docs (#45); Blair delivered session cleanup implementation (PR #46). All 59 tests passing. All PRs targeting dev. Decisions merged to `.squad/decisions.md`. Orchestration logs written. — Scribe
