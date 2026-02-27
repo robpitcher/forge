@@ -115,12 +115,22 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       await this._streamResponse(prompt, session);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const raw = err instanceof Error ? err.message : String(err);
+      const message = this._rewriteAuthError(raw);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
       this._isProcessing = false;
     }
+  }
+
+  /** Rewrites SDK auth errors to point users at the settings gear. */
+  private _rewriteAuthError(message: string): string {
+    const lower = message.toLowerCase();
+    if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
+      return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
+    }
+    return message;
   }
 
   private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
