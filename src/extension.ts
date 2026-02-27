@@ -94,23 +94,38 @@ function sendMessage(
   stream: vscode.ChatResponseStream
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    session.on(
-      "assistant.message_delta",
-      (event: { delta?: { content?: string } }) => {
-        if (event?.delta?.content) {
-          stream.markdown(event.delta.content);
-        }
+    const messageDeltaHandler = (event: { delta?: { content?: string } }) => {
+      if (event?.delta?.content) {
+        stream.markdown(event.delta.content);
       }
-    );
+    };
 
-    session.on("session.idle", () => {
+    session.on("assistant.message_delta", messageDeltaHandler);
+
+    session.once("session.idle", () => {
+      if (typeof session.off === "function") {
+        session.off("assistant.message_delta", messageDeltaHandler);
+      } else if (typeof session.removeListener === "function") {
+        session.removeListener("assistant.message_delta", messageDeltaHandler);
+      }
       resolve();
     });
 
-    session.on("session.error", (event: { error?: { message?: string } }) => {
-      const message = event?.error?.message ?? "Unknown session error";
-      reject(new Error(message));
-    });
+    session.once(
+      "session.error",
+      (event: { error?: { message?: string } }) => {
+        if (typeof session.off === "function") {
+          session.off("assistant.message_delta", messageDeltaHandler);
+        } else if (typeof session.removeListener === "function") {
+          session.removeListener(
+            "assistant.message_delta",
+            messageDeltaHandler
+          );
+        }
+        const message = event?.error?.message ?? "Unknown session error";
+        reject(new Error(message));
+      }
+    );
 
     session.sendMessage({ role: "user", content: prompt }).catch(reject);
   });
