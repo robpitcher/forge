@@ -8,7 +8,7 @@ import {
 } from "./__mocks__/copilot-sdk.js";
 import {
   getOrCreateClient,
-  removeSession,
+  removeSession as _removeSession,
   stopClient,
   CopilotCliNotFoundError,
 } from "../copilotService.js";
