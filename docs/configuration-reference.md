@@ -79,14 +79,13 @@ https://{resource-name}.openai.azure.com/openai/v1/
 The API key used to authenticate with your Azure AI Foundry endpoint.
 
 **Format:**
-```
-sk-{base64-encoded-key}
-```
+
+Paste the full key value exactly as shown in the Azure Portal for your Azure AI Foundry / Azure OpenAI resource.
 
 **Example:**
 ```json
 {
-  "enclave.copilot.apiKey": "sk-abc123def456ghi789jkl012mno345pqr"
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
 }
 ```
 
@@ -136,7 +135,7 @@ Controls the wire protocol used to communicate with the Azure AI Foundry endpoin
 Uses the OpenAI Completions API format:
 
 ```json
-POST https://your-endpoint.openai.azure.com/openai/v1/completions
+POST https://your-endpoint.openai.azure.com/openai/v1/chat/completions
 {
   "model": "gpt-4.1",
   "messages": [
@@ -153,7 +152,7 @@ POST https://your-endpoint.openai.azure.com/openai/v1/completions
 
 #### `responses`
 
-Uses an alternative JSON-RPC format that is also OpenAI-compatible:
+Uses the Responses API format, a REST API with a different schema that is also OpenAI-compatible:
 
 ```json
 {
@@ -311,8 +310,8 @@ Go to **Azure Portal** (`https://portal.azure.com`) and sign in with your Azure 
 ```
 Keys and endpoint
 Keys
-Key 1: sk-abc123def456ghi789jkl012mno345pqr
-Key 2: sk-xyz789uvw012cde345fgh678ijk901mno
+Key 1: ********************************
+Key 2: ********************************
 
 Endpoint
 https://my-ai-resource.openai.azure.com/openai/v1/
@@ -459,7 +458,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 ```json
 {
   "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-abc123def456ghi789jkl012mno345pqr"
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
 }
 ```
 
@@ -468,7 +467,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 ```json
 {
   "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-abc123def456ghi789jkl012mno345pqr",
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "enclave.copilot.model": "my-company-gpt5-prod"
 }
 ```
@@ -478,7 +477,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 ```json
 {
   "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-abc123def456ghi789jkl012mno345pqr",
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "enclave.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
 }
 ```
@@ -488,7 +487,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 ```json
 {
   "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-abc123def456ghi789jkl012mno345pqr",
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "enclave.copilot.model": "my-deployment",
   "enclave.copilot.wireApi": "responses"
 }
@@ -499,7 +498,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 ```json
 {
   "enclave.copilot.endpoint": "https://research-gpt.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-xyz789uvw012cde345fgh678ijk901mno",
+  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
   "enclave.copilot.model": "research-gpt4-v2",
   "enclave.copilot.wireApi": "completions",
   "enclave.copilot.cliPath": "C:\\Users\\researcher\\tools\\copilot-windows-amd64.exe"

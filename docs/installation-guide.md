@@ -51,10 +51,10 @@ https://github.com/github/copilot-cli/releases/download/v0.0.418/copilot-linux-a
 GitHub provides checksums (SHA256) for each release. After downloading, verify the file's integrity:
 
 ```bash
-# On macOS/Linux, download the checksums file
+# On macOS/Linux, download the checksums file (replace v0.0.418 with your actual downloaded version)
 curl -L https://github.com/github/copilot-cli/releases/download/v0.0.418/checksums.txt -o checksums.txt
 
-# Verify the binary
+# Verify the binary (replace v0.0.418 with your actual downloaded version)
 sha256sum -c checksums.txt --ignore-missing
 # Expected output: copilot-linux-amd64: OK
 
