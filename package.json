@@ -18,19 +18,28 @@
     "Chat"
   ],
   "activationEvents": [
-    "onChatParticipant:enclave.copilot"
+    "onView:enclave.chatView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "chatParticipants": [
-      {
-        "id": "enclave.copilot",
-        "fullName": "Enclave",
-        "name": "copilot",
-        "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
-        "isSticky": true
-      }
-    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "enclave",
+          "title": "Enclave",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "enclave": [
+        {
+          "type": "webview",
+          "id": "enclave.chatView",
+          "name": "AI Chat"
+        }
+      ]
+    },
     "configuration": {
       "title": "Enclave",
       "properties": {
