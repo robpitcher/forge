@@ -248,8 +248,9 @@ describe("multi-turn conversation context (SC4)", () => {
       });
 
       await capturedHandler({ prompt: "hi" }, { id: 42 }, makeStream(), makeToken());
+      await capturedHandler({ prompt: "again" }, { id: 42 }, makeStream(), makeToken());
 
-      expect(mockClient.createSession).toHaveBeenCalledOnce();
+      expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
   });
 
