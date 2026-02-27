@@ -49,7 +49,7 @@ async function handleChatRequest(
 
   const conversationId = getConversationId(context);
 
-  let session;
+  let session: ICopilotSession;
   try {
     session = await getOrCreateSession(conversationId, config);
   } catch (err: unknown) {
