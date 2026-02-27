@@ -86,8 +86,57 @@ export function removeSession(conversationId: string): void {
   sessions.delete(conversationId);
 }
 
-export async function stopClient(): Promise<void> {
+export async function destroySession(conversationId: string): Promise<void> {
+  const session = sessions.get(conversationId);
+  if (!session) {
+    return;
+  }
+
+  try {
+    await session.abort();
+  } catch (err) {
+    // Session may already be ended — log and continue
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`Failed to abort session ${conversationId}: ${message}`);
+  }
+
+  sessions.delete(conversationId);
+}
+
+export async function destroyAllSessions(): Promise<void> {
+  const abortPromises: Promise<void>[] = [];
+
+  for (const [conversationId, session] of sessions.entries()) {
+    if (!session) {
+      console.warn(`Session ${conversationId} is undefined, skipping abort`);
+      continue;
+    }
+    let abortPromise: Promise<void>;
+    try {
+      abortPromise = session.abort();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Failed to abort session ${conversationId}: ${message}`);
+      continue;
+    }
+    abortPromises.push(
+      abortPromise.catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`Failed to abort session ${conversationId}: ${message}`);
+      })
+    );
+  }
+
+  await Promise.all(abortPromises);
   sessions.clear();
+}
+
+function getSessionCount(): number {
+  return sessions.size;
+}
+
+export async function stopClient(): Promise<void> {
+  await destroyAllSessions();
   if (client) {
     try {
       await client.stop();
