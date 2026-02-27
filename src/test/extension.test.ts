@@ -71,7 +71,7 @@ describe("WebviewView chat panel", () => {
       extensionUri: { toString: () => "mock-ext-uri" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
-          key === "enclave.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+          key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
         ),
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
@@ -94,9 +94,9 @@ describe("WebviewView chat panel", () => {
 
   // --- Registration ---
   describe("provider registration", () => {
-    it("registers with correct view ID 'enclave.chatView'", () => {
+    it("registers with correct view ID 'forge.chatView'", () => {
       const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
-      expect(calls[calls.length - 1][0]).toBe("enclave.chatView");
+      expect(calls[calls.length - 1][0]).toBe("forge.chatView");
     });
   });
 
