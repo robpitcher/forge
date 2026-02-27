@@ -55,6 +55,25 @@
 
 ---
 
+### 2026-02-27 (Late): MVP Backlog Triage Completion
+
+**Triage Execution:**
+- Completed triage of all 23 MVP milestone issues
+- 8 issues rerouted to @copilot (Coding Agent): #2, #6, #15, #16, #18, #19, #20, #22
+- 15 issues confirmed with existing squad member assignments (Blair, Childs, Windows, MacReady)
+- Triage decision documented and merged into `.squad/decisions.md` by Scribe
+
+**Routing Rationale:**
+- @copilot routed: scaffolding validation, build/package config, documentation, lint/format boilerplate
+- Squad members retained: core architecture, SDK integration, design judgment, manual E2E testing, investigations
+
+**Next Phase:**
+- @copilot auto-picks up rerouted issues via heartbeat workflow
+- Squad members begin work on confirmed assignments in dependency order
+- MacReady monitors @copilot PR quality and escalates blockers
+
+---
+
 ### 2026-02-27: PRD Decomposition & Code Review
 
 **Architecture:**
@@ -87,3 +106,39 @@
 - `src/copilotService.ts`: CopilotClient lifecycle, BYOK session creation with Azure AI Foundry config
 - `src/configuration.ts`: VS Code settings reader, validation logic for required fields (endpoint, apiKey)
 - `package.json`: Extension manifest, chat participant contribution, settings schema (5 settings: endpoint, apiKey, model, wireApi, cliPath)
+
+---
+
+### 2026-02-27: MVP Backlog Triage Execution
+
+**Triage Summary:**
+- 23 MVP issues triaged: 8 rerouted to @copilot, 15 confirmed with current squad assignments
+- All issues now have MacReady triage comments with routing rationale
+- Label swaps completed: #2, #6, #15, #16, #18, #19, #20, #22 → `squad:copilot`
+
+**@copilot Routing Philosophy:**
+- **Good fit (🟢)**: Scaffolding validation, build/package config, documentation, lint/format boilerplate
+- **Needs review (🟡)**: Medium features where code exists and needs validation (e.g., #6 settings schema)
+- **Not suitable (🔴)**: Core architecture, SDK integration, manual testing, investigations
+
+**Key Learnings:**
+1. **@copilot excels at mechanical work** — config validation, documentation from clear specs, boilerplate tooling
+2. **Squad members own complexity** — VS Code extension API, SDK lifecycle, UX judgment, manual E2E testing
+3. **Issue #6 flagged for review** — settings schema code already exists in `package.json` lines 36-64; @copilot should validate compliance, not rewrite
+4. **Auto-assign is enabled** — @copilot picks up `squad:copilot` labeled issues via heartbeat workflow; no manual assignment needed
+5. **Flexible reassignment** — swapping `squad:*` labels is the standard handoff mechanism
+
+**Triage Execution Pattern:**
+1. Relabel issues first (8 label swaps: old `squad:{member}` → new `squad:copilot`)
+2. Add triage comments to ALL issues (23 total) — both rerouted and confirmed
+3. Write triage decision document to `.squad/decisions/inbox/macready-mvp-triage.md`
+4. Update history with learnings
+
+**GitHub CLI Usage:**
+- `gh issue edit {number} --remove-label "squad:{old}" --add-label "squad:{new}" --repo robpitcher/enclave`
+- `gh issue comment {number} --body "..." --repo robpitcher/enclave`
+
+**Next Steps:**
+- @copilot will auto-pick up 8 rerouted issues via heartbeat
+- Squad members continue work on confirmed assignments in dependency order
+- Monitor @copilot PR quality for issues #2, #6, #15, #16, #18, #19, #20, #22

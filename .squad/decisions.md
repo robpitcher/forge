@@ -225,3 +225,108 @@ Known risks are explicitly listed as issues or documented in decisions:
 - Existing decisions: `.squad/decisions.md` (dated 2026-02-27)
 - Project context: `.squad/agents/macready/history.md`
 - Team roster: `.squad/team.md`
+
+---
+
+# MVP Backlog Triage Decision
+
+**Date:** 2026-02-27  
+**Author:** MacReady (Lead)  
+**Context:** Coordinator completed routing analysis for all 23 MVP issues; MacReady executed triage
+
+---
+
+## Decision
+
+**Triage complete on all 23 MVP milestone issues.** 8 issues rerouted to @copilot (Coding Agent) via label swap; 15 issues confirmed with current squad assignments.
+
+### Rerouted to @copilot (8 issues)
+
+| Issue | Title | Old Label | New Label | Evaluation | Reason |
+|-------|-------|-----------|-----------|------------|--------|
+| #2 | Validate project scaffolding and build pipeline | squad:windows | squad:copilot | 🟢 Good fit | Scaffolding validation, well-defined acceptance criteria |
+| #6 | Implement VS Code settings schema (FR6) | squad:childs | squad:copilot | 🟡 Needs review | Medium feature with clear spec; code exists, needs validation |
+| #15 | Configure esbuild for extension bundling | squad:windows | squad:copilot | 🟢 Good fit | Build configuration, follows established patterns |
+| #16 | Package as .vsix for sideloading (FR8) | squad:windows | squad:copilot | 🟢 Good fit | Packaging task, well-defined acceptance criteria |
+| #18 | Write README with setup and usage instructions | squad:childs | squad:copilot | 🟢 Good fit | Documentation, clear requirements |
+| #19 | Write Copilot CLI installation guide for air-gapped environments | squad:childs | squad:copilot | 🟢 Good fit | Documentation, clear requirements |
+| #20 | Write Azure AI Foundry configuration reference | squad:childs | squad:copilot | 🟢 Good fit | Documentation, clear requirements |
+| #22 | Add ESLint configuration | squad:blair | squad:copilot | 🟢 Good fit | Lint/format config, boilerplate |
+
+### Confirmed Current Assignments (15 issues)
+
+| Issue | Title | Squad Member | Role | @copilot Evaluation |
+|-------|-------|--------------|------|---------------------|
+| #3 | Implement chat participant registration (FR1) | Blair | Core Implementation | 🔴 Core architecture, VS Code API integration |
+| #4 | Implement CopilotClient lifecycle (FR2) | Childs | SDK & Configuration | 🔴 Core SDK integration, architecture decisions |
+| #5 | Implement BYOK session creation (FR3) | Childs | SDK & Configuration | 🔴 Core SDK integration, architecture decisions |
+| #7 | Implement streaming response rendering (FR4) | Blair | Core Implementation | 🔴 Complex SDK/UI integration, design judgment |
+| #8 | Implement error handling (FR7) | Blair | Core Implementation | 🔴 Cross-cutting concern, architectural decisions |
+| #9 | Implement request cancellation (FR7) | Blair | Core Implementation | 🔴 Complex SDK integration, UX judgment |
+| #10 | Test: Happy path — chat send and receive (SC1) | Windows | Build & Test | 🔴 Manual E2E test requiring judgment |
+| #11 | Test: Air-gap validation — no GitHub API calls (SC2, SC3) | Windows | Build & Test | 🔴 Security-sensitive testing, domain knowledge |
+| #12 | Test: Multi-turn conversation context (SC4) | Blair | Core Implementation | 🔴 Manual test requiring extension API knowledge |
+| #13 | Test: Error scenarios (SC5) | Windows | Build & Test | 🔴 Manual test requiring error domain knowledge |
+| #14 | Test: Streaming smoothness (SC7) | Windows | Build & Test | 🔴 Manual test requiring UX judgment |
+| #17 | Test: Sideload .vsix on clean VS Code (SC6) | Windows | Build & Test | 🔴 Manual physical test, can't be automated |
+| #21 | Improve type safety for Copilot SDK interfaces | Blair | Core Implementation | 🔴 Refactoring requiring SDK architectural understanding |
+| #23 | Implement session cleanup on conversation end | Blair | Core Implementation | 🔴 Architecture, session lifecycle design |
+| #24 | Investigate ChatContext conversation ID reliability | MacReady | Lead | 🔴 Investigation, ambiguous requirements |
+
+---
+
+## Rationale
+
+### @copilot Routing Criteria
+
+Issues routed to @copilot meet these criteria:
+1. **Clear acceptance criteria** — well-defined requirements with no ambiguity
+2. **Boilerplate or validation work** — scaffolding checks, config files, documentation
+3. **No architectural decisions** — does not require design judgment or SDK expertise
+4. **Automatable or mechanical** — follows established patterns or templates
+
+**🟢 Good fit** = High confidence @copilot will deliver without review  
+**🟡 Needs review** = Medium confidence; PR review recommended (e.g., #6 validates existing code)
+
+### Squad Member Routing Criteria
+
+Issues kept with squad members require:
+1. **Core architecture** — VS Code extension API, SDK integration patterns
+2. **Design judgment** — UX decisions, error handling strategy, session lifecycle
+3. **Manual testing** — physical validation (sideloading, air-gap), requires human observation
+4. **Investigation** — ambiguous requirements, open questions (e.g., #24 ChatContext ID reliability)
+
+---
+
+## What This Enables
+
+1. **Parallel execution** — @copilot can start on 8 issues immediately via heartbeat workflow
+2. **Reduced cognitive load** — squad members focus on high-value architecture and testing work
+3. **Clear ownership** — each issue has a single owner (via `squad:*` label)
+4. **Flexible reassignment** — swapping labels is the standard mechanism for handoff
+
+---
+
+## Known Risks
+
+1. **Issue #6 (Settings Schema)** — flagged as 🟡; code already exists in `package.json` lines 36-64. @copilot should validate compliance with PRD Table FR6, not rewrite. PR review recommended.
+2. **Auto-assign cadence** — @copilot picks up work via periodic heartbeat. If urgent, manually assign via GitHub UI.
+3. **@copilot context limits** — large issues (e.g., #18 README) may require multiple turns. Monitor for incomplete work.
+
+---
+
+## Next Steps
+
+1. **@copilot**: Auto-assign workflow will pick up 8 rerouted issues based on priority and dependencies
+2. **Squad members**: Begin work on confirmed assignments in dependency order
+3. **MacReady**: Monitor @copilot PR quality; escalate to squad if issues arise
+4. **Scribe**: Merge this decision into `.squad/decisions.md` (append-only)
+
+---
+
+## References
+
+- Coordinator routing analysis: `.squad/decisions/inbox/coordinator-mvp-routing.md` (assumed context)
+- PRD: `specs/PRD-airgapped-copilot-vscode-extension.md`
+- Team roster: `.squad/team.md`
+- Project history: `.squad/agents/macready/history.md`
