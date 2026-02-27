@@ -1,6 +1,6 @@
 {
-  "name": "enclave",
-  "displayName": "Enclave",
+  "name": "forge",
+  "displayName": "Forge",
   "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
   "version": "0.1.0",
   "publisher": "robpitcher",
@@ -18,42 +18,42 @@
     "Chat"
   ],
   "activationEvents": [
-    "onView:enclave.chatView"
+    "onView:forge.chatView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
       "panel": [
         {
-          "id": "enclave",
-          "title": "Enclave",
+          "id": "forge",
+          "title": "Forge",
           "icon": "resources/icon.svg"
         }
       ]
     },
     "views": {
-      "enclave": [
+      "forge": [
         {
           "type": "webview",
-          "id": "enclave.chatView",
+          "id": "forge.chatView",
           "name": "AI Chat"
         }
       ]
     },
     "configuration": {
-      "title": "Enclave",
+      "title": "Forge",
       "properties": {
-        "enclave.copilot.endpoint": {
+        "forge.copilot.endpoint": {
           "type": "string",
           "default": "",
           "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
         },
-        "enclave.copilot.model": {
+        "forge.copilot.model": {
           "type": "string",
           "default": "gpt-4.1",
           "description": "Model deployment name"
         },
-        "enclave.copilot.wireApi": {
+        "forge.copilot.wireApi": {
           "type": "string",
           "default": "completions",
           "enum": [
@@ -62,7 +62,7 @@
           ],
           "description": "API format: 'completions' or 'responses'"
         },
-        "enclave.copilot.cliPath": {
+        "forge.copilot.cliPath": {
           "type": "string",
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"

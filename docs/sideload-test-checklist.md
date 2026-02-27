@@ -1,6 +1,6 @@
 # Sideload Test Checklist
 
-**Purpose:** Manual verification that the Enclave extension can be installed and used on a clean VS Code instance.
+**Purpose:** Manual verification that the Forge extension can be installed and used on a clean VS Code instance.
 
 **Validates:** Success Criterion SC6 — "The extension can be packaged as `.vsix` and sideloaded onto a clean VS Code installation."
 
@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Clean VS Code installation (no prior Enclave installation)
+- Clean VS Code installation (no prior Forge installation)
 - Access to Azure AI Foundry endpoint (URL, API key, model name)
 - Node.js 20.19.0+ and npm installed (for building the `.vsix`)
 
@@ -18,8 +18,8 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/robpitcher/enclave.git
-   cd enclave
+   git clone https://github.com/robpitcher/forge.git
+   cd forge
    git checkout dev
    ```
 
@@ -34,10 +34,10 @@
    ```
 
 4. **Verify .vsix file:**
-   - Check that `enclave-0.1.0.vsix` exists in the project root
+   - Check that `forge-0.1.0.vsix` exists in the project root
    - Verify file size is under 10 MB (should be ~40 KB)
    ```bash
-   ls -lh enclave-0.1.0.vsix
+   ls -lh forge-0.1.0.vsix
    ```
 
 ---
@@ -47,7 +47,7 @@
 1. **Install the extension:**
    - In VS Code, open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
    - Run: `Extensions: Install from VSIX...`
-   - Select `enclave-0.1.0.vsix`
+   - Select `forge-0.1.0.vsix`
    - Wait for installation to complete
 
 2. **Verify installation:**
@@ -56,16 +56,16 @@
 
 3. **Locate the extension:**
    - Open Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-   - Search for "Enclave"
-   - ✅ Extension appears with name "Enclave"
+   - Search for "Forge"
+   - ✅ Extension appears with name "Forge"
    - ✅ Version shows `0.1.0`
 
 ---
 
 ## Activation Test
 
-1. **Open the Enclave sidebar:**
-   - Look for the Enclave icon in the Activity Bar (left sidebar)
+1. **Open the Forge sidebar:**
+   - Look for the Forge icon in the Activity Bar (left sidebar)
    - Click the icon
    - ✅ "AI Chat" panel opens in the sidebar
    - ✅ Extension activates (check in Output > Log (Extension Host) if needed)
@@ -89,12 +89,12 @@
 
 2. **Configure the extension:**
    - Open Settings (`Ctrl+,` / `Cmd+,`)
-   - Search for "Enclave"
+   - Search for "Forge"
    - Set the following:
-     - `Enclave: Copilot Endpoint` — Your Azure AI Foundry endpoint URL
-     - `Enclave: Copilot Api Key` — Your API key
-     - `Enclave: Copilot Model` — Your model deployment name (e.g., `gpt-4.1`)
-     - `Enclave: Copilot Wire Api` — `completions` (default)
+     - `Forge: Copilot Endpoint` — Your Azure AI Foundry endpoint URL
+     - `Forge: Copilot Api Key` — Your API key
+     - `Forge: Copilot Model` — Your model deployment name (e.g., `gpt-4.1`)
+     - `Forge: Copilot Wire Api` — `completions` (default)
    - ✅ All settings save without errors
 
 ---
@@ -102,7 +102,7 @@
 ## Basic Chat Test
 
 1. **Send a message:**
-   - Return to the Enclave sidebar
+   - Return to the Forge sidebar
    - Type "What is TypeScript?" in the input field
    - Click "Send"
 
@@ -145,7 +145,7 @@
 
 1. **Uninstall the extension:**
    - Open Extensions view
-   - Find "Enclave"
+   - Find "Forge"
    - Click the gear icon → "Uninstall"
    - Reload VS Code if prompted
 
@@ -185,4 +185,4 @@
 - **vsix Size:** The packaged extension should be under 10 MB (NFR8). Current size is ~40 KB.
 - **No Internet Required:** All tests should work in an air-gapped environment (except for communication with the configured Azure AI Foundry endpoint).
 - **No GitHub Auth:** The extension does not require GitHub authentication.
-- **Activation Event:** The extension activates when the Enclave sidebar is opened (`onView:enclave.chatView`).
+- **Activation Event:** The extension activates when the Forge sidebar is opened (`onView:forge.chatView`).

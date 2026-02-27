@@ -47,8 +47,8 @@ describe("Error: missing configuration", () => {
       apiKey: "",
     });
     expect(errors).toHaveLength(2);
-    expect(errors[0].field).toBe("enclave.copilot.endpoint");
-    expect(errors[1].field).toBe("enclave.copilot.apiKey");
+    expect(errors[0].field).toBe("forge.copilot.endpoint");
+    expect(errors[1].field).toBe("forge.copilot.apiKey");
   });
 });
 
@@ -114,7 +114,7 @@ describe("Error: WebviewView error paths", () => {
       extensionUri: { toString: () => "mock-ext-uri" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
-          key === "enclave.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
+          key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
         ),
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),

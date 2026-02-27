@@ -4,7 +4,7 @@ This guide explains how to download and install the **Copilot CLI v0.0.418+** in
 
 ## Overview
 
-The Enclave VS Code extension requires the Copilot CLI binary to run. In air-gapped environments, you cannot download the CLI directly on the target machine. Instead, follow this process:
+The Forge VS Code extension requires the Copilot CLI binary to run. In air-gapped environments, you cannot download the CLI directly on the target machine. Instead, follow this process:
 
 1. **Download** the CLI binary on a **connected machine**
 2. **Transfer** it to the **disconnected target machine** via approved media
@@ -132,10 +132,10 @@ Copy-Item .\copilot-windows-amd64.exe "$env:APPDATA\copilot\copilot.exe"
 
 ### 3.4 Specify CLI Path in Settings (Option B: Local Configuration)
 
-Alternatively, configure the path directly in the Enclave extension settings without adding to `$PATH`:
+Alternatively, configure the path directly in the Forge extension settings without adding to `$PATH`:
 
 1. In VS Code, open **Settings** (`Ctrl+,` / `Cmd+,`)
-2. Search for `enclave.copilot.cliPath`
+2. Search for `forge.copilot.cliPath`
 3. Enter the **full path** to the binary:
    ```
    /home/user/copilot-cli/copilot-linux-amd64
@@ -184,8 +184,8 @@ Press `Ctrl+C` to stop the server.
 Once the CLI is verified:
 
 1. Open VS Code
-2. Look for the Enclave icon in the VS Code activity bar (left sidebar)
-3. Click the icon to open the Enclave sidebar
+2. Look for the Forge icon in the VS Code activity bar (left sidebar)
+3. Click the icon to open the Forge sidebar
 4. Type a message (e.g., `hello`), then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit it
 5. If configured correctly, you should see the response stream
 
@@ -195,11 +195,11 @@ Once the CLI is verified:
 
 | Problem | Solution |
 |---------|----------|
-| **`copilot: command not found`** | The binary is not on `$PATH`. Either move it to `/usr/local/bin` (Linux/macOS) or configure `enclave.copilot.cliPath` in settings. |
+| **`copilot: command not found`** | The binary is not on `$PATH`. Either move it to `/usr/local/bin` (Linux/macOS) or configure `forge.copilot.cliPath` in settings. |
 | **`Permission denied` when running copilot** | Run `chmod +x copilot-linux-amd64` to make the binary executable. |
 | **`Wrong binary for this OS`** | Verify you downloaded the correct binary for your operating system (e.g., `linux-amd64` for Linux x86_64, not macOS). |
 | **`copilot server` hangs or crashes** | Check that the CLI version is 0.0.418 or higher. Run `copilot --version` to confirm. |
-| **VS Code shows "Copilot CLI not found" error** | Verify the `copilot` command works in a terminal. If using `enclave.copilot.cliPath`, ensure the path is correct and absolute. |
+| **VS Code shows "Copilot CLI not found" error** | Verify the `copilot` command works in a terminal. If using `forge.copilot.cliPath`, ensure the path is correct and absolute. |
 
 ---
 
@@ -207,8 +207,8 @@ Once the CLI is verified:
 
 1. **Download** the Copilot CLI v0.0.418+ from GitHub on a connected machine
 2. **Transfer** the binary to your air-gapped target machine via approved media
-3. **Make executable** and **add to PATH** (Linux/macOS) or configure in Enclave settings
+3. **Make executable** and **add to PATH** (Linux/macOS) or configure in Forge settings
 4. **Verify** with `copilot --version` and `copilot server`
-5. **Test** the Enclave extension in VS Code
+5. **Test** the Forge extension in VS Code
 
 Once the CLI is installed and verified, proceed to [Configuration Reference](configuration-reference.md) to set up the Azure AI Foundry endpoint.

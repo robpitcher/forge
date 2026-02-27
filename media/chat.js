@@ -57,7 +57,7 @@
 
     const roleLabel = document.createElement("div");
     roleLabel.className = "role-label";
-    roleLabel.textContent = role === "user" ? "You" : role === "assistant" ? "Enclave" : "Error";
+    roleLabel.textContent = role === "user" ? "You" : role === "assistant" ? "Forge" : "Error";
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "message-content";

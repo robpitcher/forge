@@ -1,4 +1,4 @@
-# Enclave
+# Forge
 
 A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without internet connectivity or GitHub authentication.
 
@@ -15,7 +15,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Enclave Sidebar (WebviewView)               │  │
+│  │         Forge Sidebar (WebviewView)                 │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
@@ -73,7 +73,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 5. **Sideload into VS Code:**
    - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Click "..." menu → "Install from VSIX"
-   - Select `enclave-0.1.0.vsix`
+   - Select `forge-0.1.0.vsix`
 
 ---
 
@@ -83,20 +83,20 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 | Setting | Required | Default | Description |
 |---------|----------|---------|-------------|
-| `enclave.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `enclave.copilot.apiKey` | ✓ | — | API key for the Azure endpoint |
-| `enclave.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
-| `enclave.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
-| `enclave.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
+| `forge.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
+| `forge.copilot.apiKey` | ✓ | — | API key for the Azure endpoint |
+| `forge.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
+| `forge.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
+| `forge.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
 
 ### Example Configuration
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "sk-...",
-  "enclave.copilot.model": "gpt-4.1",
-  "enclave.copilot.wireApi": "completions"
+  "forge.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "sk-...",
+  "forge.copilot.model": "gpt-4.1",
+  "forge.copilot.wireApi": "completions"
 }
 ```
 
@@ -106,15 +106,15 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments).
 
-2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Enclave`):
+2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
    | Setting | Description |
    |---------|-------------|
-   | `enclave.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
-   | `enclave.copilot.apiKey` | Your API key |
-   | `enclave.copilot.model` | Model deployment name (default: `gpt-4.1`) |
+   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
+   | `forge.copilot.apiKey` | Your API key |
+   | `forge.copilot.model` | Model deployment name (default: `gpt-4.1`) |
 
-3. **Open the Enclave sidebar:** Click the Enclave icon in the VS Code activity bar (left sidebar)
+3. **Open the Forge sidebar:** Click the Forge icon in the VS Code activity bar (left sidebar)
 
 4. **Send a message:** Type a message in the input field, then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS)
 
@@ -126,7 +126,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Click the Enclave icon in the VS Code activity bar to open the Enclave sidebar
+1. Click the Forge icon in the VS Code activity bar to open the Forge sidebar
 2. Type your message in the input field
 3. Click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit
 
@@ -182,7 +182,7 @@ Runs automated tests with Vitest.
 npm run package
 ```
 
-Creates `enclave-0.1.0.vsix` for sideloading or distribution.
+Creates `forge-0.1.0.vsix` for sideloading or distribution.
 
 ---
 
@@ -193,7 +193,7 @@ Creates `enclave-0.1.0.vsix` for sideloading or distribution.
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Enclave Sidebar (WebviewView)               │  │
+│  │         Forge Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
@@ -227,11 +227,11 @@ Creates `enclave-0.1.0.vsix` for sideloading or distribution.
 
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
-| `enclave.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
-| `enclave.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
-| `enclave.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
-| `enclave.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
-| `enclave.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
+| `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
+| `forge.copilot.apiKey` | `string` | Yes | `""` | API key for the Azure AI Foundry endpoint |
+| `forge.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
+| `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
+| `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
 
 ---
 
@@ -243,7 +243,7 @@ npm run build
 npm run package
 ```
 
-This produces `enclave-0.1.0.vsix` in the project root.
+This produces `forge-0.1.0.vsix` in the project root.
 
 ---
 

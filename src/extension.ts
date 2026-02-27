@@ -16,7 +16,7 @@ import type {
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new ChatViewProvider(context.extensionUri, context.secrets);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("enclave.chatView", provider)
+    vscode.window.registerWebviewViewProvider("forge.chatView", provider)
   );
 }
 
@@ -63,10 +63,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } else if (message.command === "openSettings") {
       const choice = await vscode.window.showQuickPick(
         ["Open Settings", "Set API Key (secure)"],
-        { placeHolder: "Enclave Configuration" }
+        { placeHolder: "Forge Configuration" }
       );
       if (choice === "Open Settings") {
-        await vscode.commands.executeCommand("workbench.action.openSettings", "enclave.copilot");
+        await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
       } else if (choice === "Set API Key (secure)") {
         const value = await vscode.window.showInputBox({
           prompt: "Enter your API key",
@@ -74,7 +74,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           placeHolder: "Paste your Azure AI Foundry API key",
         });
         if (value !== undefined) {
-          await this._secrets.store("enclave.copilot.apiKey", value);
+          await this._secrets.store("forge.copilot.apiKey", value);
           await vscode.window.showInformationMessage("API key stored securely.");
         }
       }
@@ -206,12 +206,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
     <link href="${styleUri}" rel="stylesheet">
-    <title>Enclave Chat</title>
+    <title>Forge Chat</title>
 </head>
 <body>
     <div class="container">
         <div class="toolbar">
-            <button id="settingsBtn" class="toolbar-btn" title="Open Enclave Settings" aria-label="Open Enclave configuration">&#9881;</button>
+            <button id="settingsBtn" class="toolbar-btn" title="Open Forge Settings" aria-label="Open Forge configuration">&#9881;</button>
         </div>
         <div id="chatMessages"></div>
         <div class="input-area">

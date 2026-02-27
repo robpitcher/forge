@@ -47,7 +47,7 @@ export function createMockWebview(): MockWebview {
 export function createMockWebviewView(): MockWebviewView {
   return {
     webview: createMockWebview(),
-    viewType: "enclave.chatView",
+    viewType: "forge.chatView",
     onDidDispose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     onDidChangeVisibility: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     visible: true,

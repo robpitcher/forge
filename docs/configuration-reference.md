@@ -1,6 +1,6 @@
 # Azure AI Foundry Configuration Reference
 
-This guide explains how to configure the Enclave VS Code extension to use your Azure AI Foundry endpoint.
+This guide explains how to configure the Forge VS Code extension to use your Azure AI Foundry endpoint.
 
 ---
 
@@ -20,30 +20,30 @@ This guide explains how to configure the Enclave VS Code extension to use your A
 
 ## Configuration Overview
 
-The Enclave extension communicates with your Azure AI Foundry endpoint using credentials and configuration that you provide via VS Code settings. All configuration is stored locally in VS Code (no data leaves your machine except to your private endpoint).
+The Forge extension communicates with your Azure AI Foundry endpoint using credentials and configuration that you provide via VS Code settings. All configuration is stored locally in VS Code (no data leaves your machine except to your private endpoint).
 
 ### Required Settings
 
-To use Enclave, you must configure two settings in VS Code:
+To use Forge, you must configure two settings in VS Code:
 
 | Setting | Type | Required | Purpose |
 |---------|------|----------|---------|
-| `enclave.copilot.endpoint` | `string` | **Yes** | Azure AI Foundry endpoint URL |
-| `enclave.copilot.apiKey` | `string` | **Yes** | API key for authentication |
+| `forge.copilot.endpoint` | `string` | **Yes** | Azure AI Foundry endpoint URL |
+| `forge.copilot.apiKey` | `string` | **Yes** | API key for authentication |
 
 ### Optional Settings
 
 | Setting | Type | Default | Purpose |
 |---------|------|---------|---------|
-| `enclave.copilot.model` | `string` | `gpt-4.1` | Model deployment name |
-| `enclave.copilot.wireApi` | `string` | `completions` | API format (`completions` or `responses`) |
-| `enclave.copilot.cliPath` | `string` | (empty) | Path to Copilot CLI (if not on `$PATH`) |
+| `forge.copilot.model` | `string` | `gpt-4.1` | Model deployment name |
+| `forge.copilot.wireApi` | `string` | `completions` | API format (`completions` or `responses`) |
+| `forge.copilot.cliPath` | `string` | (empty) | Path to Copilot CLI (if not on `$PATH`) |
 
 ---
 
 ## Settings Reference
 
-### enclave.copilot.endpoint
+### forge.copilot.endpoint
 
 **Type:** `string`  
 **Required:** Yes  
@@ -59,7 +59,7 @@ https://{resource-name}.openai.azure.com/openai/v1/
 **Example:**
 ```json
 {
-  "enclave.copilot.endpoint": "https://my-ai-resource.openai.azure.com/openai/v1/"
+  "forge.copilot.endpoint": "https://my-ai-resource.openai.azure.com/openai/v1/"
 }
 ```
 
@@ -70,7 +70,7 @@ https://{resource-name}.openai.azure.com/openai/v1/
 
 ---
 
-### enclave.copilot.apiKey
+### forge.copilot.apiKey
 
 **Type:** `string`  
 **Required:** Yes  
@@ -85,7 +85,7 @@ Paste the full key value exactly as shown in the Azure Portal for your Azure AI 
 **Example:**
 ```json
 {
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
 }
 ```
 
@@ -96,7 +96,7 @@ Paste the full key value exactly as shown in the Azure Portal for your Azure AI 
 
 ---
 
-### enclave.copilot.model
+### forge.copilot.model
 
 **Type:** `string`  
 **Required:** No  
@@ -107,13 +107,13 @@ The **deployment name** of the model you want to use. This refers to the specifi
 **Examples:**
 ```json
 {
-  "enclave.copilot.model": "gpt-4.1"
+  "forge.copilot.model": "gpt-4.1"
 }
 ```
 
 ```json
 {
-  "enclave.copilot.model": "gpt-5"
+  "forge.copilot.model": "gpt-5"
 }
 ```
 
@@ -121,7 +121,7 @@ The **deployment name** of the model you want to use. This refers to the specifi
 
 ---
 
-### enclave.copilot.wireApi
+### forge.copilot.wireApi
 
 **Type:** `string` (enum)  
 **Required:** No  
@@ -171,7 +171,7 @@ Uses the Responses API format, a REST API with a different schema that is also O
 **Example:**
 ```json
 {
-  "enclave.copilot.wireApi": "completions"
+  "forge.copilot.wireApi": "completions"
 }
 ```
 
@@ -179,7 +179,7 @@ If you are unsure which format to use, start with the default (`completions`).
 
 ---
 
-### enclave.copilot.cliPath
+### forge.copilot.cliPath
 
 **Type:** `string`  
 **Required:** No  
@@ -197,14 +197,14 @@ The absolute path to the Copilot CLI binary. Use this if the CLI is not installe
 Linux/macOS:
 ```json
 {
-  "enclave.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
+  "forge.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
 }
 ```
 
 Windows:
 ```json
 {
-  "enclave.copilot.cliPath": "C:\\Users\\user\\copilot-cli\\copilot-windows-amd64.exe"
+  "forge.copilot.cliPath": "C:\\Users\\user\\copilot-cli\\copilot-windows-amd64.exe"
 }
 ```
 
@@ -219,7 +219,7 @@ Windows:
 
 ### Prerequisites
 
-Before configuring Enclave, ensure you have:
+Before configuring Forge, ensure you have:
 
 1. **An Azure subscription**
 2. **An Azure AI Foundry resource** deployed in your subscription
@@ -317,11 +317,11 @@ Endpoint
 https://my-ai-resource.openai.azure.com/openai/v1/
 ```
 
-### Step 4: Add to Enclave Settings
+### Step 4: Add to Forge Settings
 
 1. Open VS Code
 2. Go to **Settings** (`Ctrl+,` / `Cmd+,`)
-3. Search for `enclave.copilot.apiKey`
+3. Search for `forge.copilot.apiKey`
 4. Paste your API key into the field
 
 ---
@@ -348,7 +348,7 @@ The **name you give** to your specific deployment of that model in Azure.
 
 ### The Configuration Setting
 
-In Enclave, the `enclave.copilot.model` setting should contain the **deployment name**, not the model name.
+In Forge, the `forge.copilot.model` setting should contain the **deployment name**, not the model name.
 
 ### Example
 
@@ -356,7 +356,7 @@ In Enclave, the `enclave.copilot.model` setting should contain the **deployment 
 |------|-------|
 | **Underlying Model** | GPT-4.1 (from OpenAI) |
 | **Your Deployment Name** | `my-company-gpt4-prod` |
-| **Enclave Setting** | `"enclave.copilot.model": "my-company-gpt4-prod"` |
+| **Forge Setting** | `"forge.copilot.model": "my-company-gpt4-prod"` |
 
 ### How to Find Your Deployment Name
 
@@ -364,7 +364,7 @@ In Enclave, the `enclave.copilot.model` setting should contain the **deployment 
 2. Navigate to your Azure AI resource
 3. In the left sidebar, click **"Model deployments"** or **"Deployments"**
 4. See the list of deployments with their names
-5. Use the deployment name (not the model name) in your Enclave configuration
+5. Use the deployment name (not the model name) in your Forge configuration
 
 **Example screenshot (conceptual):**
 ```
@@ -457,8 +457,8 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY"
 }
 ```
 
@@ -466,9 +466,9 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
-  "enclave.copilot.model": "my-company-gpt5-prod"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
+  "forge.copilot.model": "my-company-gpt5-prod"
 }
 ```
 
@@ -476,9 +476,9 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
-  "enclave.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
+  "forge.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
 }
 ```
 
@@ -486,10 +486,10 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
-  "enclave.copilot.model": "my-deployment",
-  "enclave.copilot.wireApi": "responses"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
+  "forge.copilot.model": "my-deployment",
+  "forge.copilot.wireApi": "responses"
 }
 ```
 
@@ -497,11 +497,11 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "enclave.copilot.endpoint": "https://research-gpt.openai.azure.com/openai/v1/",
-  "enclave.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
-  "enclave.copilot.model": "research-gpt4-v2",
-  "enclave.copilot.wireApi": "completions",
-  "enclave.copilot.cliPath": "C:\\Users\\researcher\\tools\\copilot-windows-amd64.exe"
+  "forge.copilot.endpoint": "https://research-gpt.openai.azure.com/openai/v1/",
+  "forge.copilot.apiKey": "YOUR_AZURE_AI_FOUNDRY_API_KEY",
+  "forge.copilot.model": "research-gpt4-v2",
+  "forge.copilot.wireApi": "completions",
+  "forge.copilot.cliPath": "C:\\Users\\researcher\\tools\\copilot-windows-amd64.exe"
 }
 ```
 
@@ -535,7 +535,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 | Problem | Solution |
 |---------|----------|
-| **"Invalid request format"** | Try switching `enclave.copilot.wireApi` to `"responses"`. Check your deployment's API format specification. |
+| **"Invalid request format"** | Try switching `forge.copilot.wireApi` to `"responses"`. Check your deployment's API format specification. |
 
 ### Debug Steps
 
@@ -553,7 +553,7 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 3. Check VS Code logs:
    - Open **Output** panel (`Ctrl+Shift+U`)
-   - Select **"Enclave"** from the dropdown
+   - Select **"Forge"** from the dropdown
    - Look for error messages
 
 4. Verify Copilot CLI:

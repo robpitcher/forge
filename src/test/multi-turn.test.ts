@@ -199,7 +199,7 @@ describe("multi-turn conversation context (SC4)", () => {
         extensionUri: { toString: () => "mock-ext-uri" },
         secrets: {
           get: vi.fn().mockImplementation((key: string) =>
-            key === "enclave.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+            key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
           ),
           store: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
