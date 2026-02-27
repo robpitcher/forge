@@ -246,3 +246,33 @@
 - specs/PRD-airgapped-copilot-vscode-extension.md (7 edits: Executive Summary, Goals, Architecture, FR1, FR7)
 
 📌 Team update (2026-02-27T17:00:00Z): MVP batch completion. Documentation update for WebviewView support (#52) completed in parallel with Windows (#59, #57) and Blair (#56). Session logs written to .squad/orchestration-log/ and .squad/log/. All PRs targeting dev. — completed by MacReady, Scribe orchestration
+
+### 2026-02-28: Phase 2 Issue Rescope — #25 (Tools) and #26 (Context)
+
+**Requested by:** Rob Pitcher
+
+**Work Completed:**
+- Rescoped Issue #25 (Enable Copilot CLI built-in tools) and Issue #26 (Add workspace context and editor selection) for the current WebviewView architecture.
+- Both issues were written when the extension used Chat Participant API. The architecture now uses WebviewViewProvider with custom HTML/CSS/JS chat UI, so both needed significant rework.
+- Decision document written to `.squad/decisions/inbox/macready-phase2-rescope.md`.
+
+**Issue #25 Rescope Summary (Tools):**
+- Not just removing `availableTools: []` — need full tool approval UX.
+- Designed inline confirmation cards in the webview chat stream (tool name, path, action + Approve/Reject buttons).
+- Added `forge.copilot.autoApproveTools` boolean setting (default: false) for trusted environments.
+- Tool results rendered in chat stream after execution.
+- Routing: Childs (primary, SDK events) + Blair (secondary, webview UX).
+
+**Issue #26 Rescope Summary (Context):**
+- No built-in `@workspace` — must build context attachment from scratch.
+- Designed `forge.attachSelection` and `forge.attachFile` commands with webview context chips.
+- Context prepended to prompt string sent to `session.send()` with size truncation.
+- "Attach Selection" button in view/title bar alongside settings gear.
+- Routing: Blair (primary, VS Code API + webview) + Childs (secondary, prompt construction).
+
+**Key Learnings:**
+1. **WebviewView has no built-in context variables** — unlike Chat Participant API which provides `@workspace` and `#selection`, all context capture must be built manually using `vscode.window.activeTextEditor`.
+2. **Tool approval in WebviewView requires custom UI** — Chat Participant API may handle tool confirmations natively, but our webview needs inline confirmation cards rendered in the chat stream with postMessage round-trips.
+3. **Both Phase 2 issues are larger than originally scoped** — the Chat Participant → WebviewView migration means features that would have been "turn on a flag" become "build the UX from scratch."
+4. **SDK tool event model is TBD** — need to verify the exact event names for tool calls from `@github/copilot-sdk` before implementation begins. Childs should investigate SDK docs first.
+5. **Context size management is important** — attaching full files to prompts can blow token limits. Need truncation with user-visible notes.

@@ -1155,3 +1155,290 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 **By:** Rob Pitcher (via Copilot)
 **What:** The Copilot coding agent must always base branches off `dev` and open PRs targeting `dev`. PRs must never target `main` — `main` is the release branch only. PRs #31, #32, #33 were closed because they incorrectly targeted `main`.
 **Why:** User request — branching strategy requires all development work flows through `dev`. Captured for team memory.
+# Decision: Phase 2 Issue Rescope — #25 (Tools) and #26 (Context)
+
+**By:** MacReady
+**Date:** 2026-02-28
+**Requested by:** Rob Pitcher
+
+## Context
+
+Issues #25 and #26 were written when the extension used Chat Participant API. The architecture has since migrated to **WebviewViewProvider** (activity bar sidebar) with custom HTML/CSS/JS chat UI. Both issues need rescoping to reflect the actual codebase.
+
+Key architecture facts at time of rescope:
+- WebviewView registered as `forge.chatView` in activitybar
+- Custom chat UI in `media/chat.js` / `media/chat.css`
+- Messages via `vscode.postMessage()` / `onDidReceiveMessage()`
+- Session management in `src/copilotService.ts` with `availableTools: []`
+- API key in VS Code SecretStorage
+- Build: esbuild, Tests: vitest (67 passing)
+
+---
+
+## Issue #25 — Enable Copilot CLI Built-in Tools (Rescoped)
+
+### Proposed New Issue Body
+
+---
+
+## Summary
+
+Enable Copilot CLI's built-in tools (file system, git, etc.) by removing the `availableTools: []` restriction in session creation. Add **user confirmation before tool execution** and an **auto-approve setting** for trusted environments.
+
+## Background
+
+Currently, `src/copilotService.ts` line 79 passes `availableTools: []` to `copilotClient.createSession()`, which explicitly disables all CLI tools. Removing this (or omitting the key) lets the SDK expose its built-in tools. The SDK emits tool-call events that the extension must intercept, present for approval, and then confirm or reject.
+
+## Architecture
+
+### Current flow (no tools)
+```
+User prompt → session.send({ prompt }) → LLM responds with text → streamDelta events
+```
+
+### New flow (with tools)
+```
+User prompt → session.send({ prompt }) → LLM requests tool call →
+  SDK emits tool event → Extension intercepts →
+  Show confirmation in webview (or auto-approve) →
+  Confirm/reject back to SDK → SDK executes tool → LLM continues
+```
+
+## Implementation Plan
+
+### 1. Enable tools in `copilotService.ts`
+
+- **Remove `availableTools: []`** from the `createSession()` call (line 79). When omitted, the SDK exposes its default built-in tools.
+- Alternatively, pass a curated list if we want to limit which tools are available (e.g., allow file read but not file write initially).
+
+### 2. Handle tool-call events in `extension.ts`
+
+- Subscribe to the SDK's tool-call event on the session (e.g., `session.on("tool.call", ...)` — exact event name TBD from SDK docs).
+- When a tool call is received:
+  - Check the `forge.copilot.autoApproveTools` setting.
+  - If auto-approve is **enabled**: confirm immediately, no user interaction.
+  - If auto-approve is **disabled** (default): send a `toolConfirmation` message to the webview.
+
+### 3. Tool confirmation UX in webview (`media/chat.js`)
+
+- Add a new message type `toolConfirmation` that renders an **inline confirmation card** in the chat stream:
+  ```
+  ┌─────────────────────────────────────┐
+  │ 🔧 Tool: write_file                │
+  │ Path: src/utils.ts                  │
+  │ Action: Write 15 lines              │
+  │                                     │
+  │  [Approve]  [Reject]                │
+  └─────────────────────────────────────┘
+  ```
+- User clicks Approve or Reject → `vscode.postMessage({ command: "toolResponse", id, approved: true/false })`.
+- Extension receives the response in `_handleMessage()` and calls the SDK's confirmation/rejection API on the session.
+- If rejected, the LLM receives the rejection and can adjust its approach.
+
+### 4. Auto-approve setting in `package.json`
+
+Add to `contributes.configuration.properties`:
+```json
+"forge.copilot.autoApproveTools": {
+  "type": "boolean",
+  "default": false,
+  "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments.",
+  "tags": ["security"]
+}
+```
+
+### 5. Tool output rendering
+
+- After a tool executes, render the result in the chat stream (e.g., a collapsible "Tool output" section).
+- Add a new webview message type `toolResult` with tool name, status (success/error), and output summary.
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/copilotService.ts` | Remove `availableTools: []` from `createSession()` |
+| `src/extension.ts` | Subscribe to tool events, implement approval flow, wire `toolResponse` message handler |
+| `media/chat.js` | Handle `toolConfirmation` and `toolResult` message types, render confirmation cards |
+| `media/chat.css` | Styles for tool confirmation card and tool output display |
+| `package.json` | Add `forge.copilot.autoApproveTools` setting |
+| `src/configuration.ts` | Read `autoApproveTools` setting |
+
+## Acceptance Criteria
+
+- [ ] Tools are enabled — the LLM can request file reads, file writes, git operations, etc.
+- [ ] When `autoApproveTools` is `false` (default), a confirmation card appears in the chat before any tool executes.
+- [ ] User can approve or reject each tool call individually from the webview.
+- [ ] When `autoApproveTools` is `true`, tools execute immediately without user interaction.
+- [ ] Tool execution results are displayed in the chat stream.
+- [ ] Rejected tool calls are communicated back to the LLM gracefully.
+- [ ] No regression in existing chat flow (text-only prompts still work as before).
+- [ ] Unit tests cover the approval/rejection flow.
+- [ ] Setting is documented with a security warning about auto-approve.
+
+## Security Considerations
+
+- Auto-approve is **off by default** — users must explicitly opt in.
+- Tool confirmation shows the tool name, target path, and action summary so users can make informed decisions.
+- Consider a future enhancement for per-tool approval rules (e.g., always approve reads, always confirm writes).
+
+## Routing Recommendation
+
+- **Primary: Childs** (`squad:childs`) — SDK integration: removing `availableTools`, subscribing to tool events, wiring confirmation/rejection back to the SDK session.
+- **Secondary: Blair** (`squad:blair`) — Webview UX: confirmation card rendering in `media/chat.js`, CSS styling, message handler wiring in `extension.ts`.
+- **Review: MacReady** — Architecture review of the approval flow and security posture.
+
+---
+
+## Issue #26 — Add Workspace Context and Editor Selection (Rescoped)
+
+### Proposed New Issue Body
+
+---
+
+## Summary
+
+Add the ability to attach **editor selection** and **file references** as context to chat prompts. Since we use a WebviewView (not Chat Participant API), there is no built-in `@workspace` variable — we must build context capture and attachment from scratch using the VS Code Extension API.
+
+## Background
+
+The original issue assumed Chat Participant API, which provides built-in `@workspace` and `#selection` variables. Our architecture uses a custom WebviewView sidebar (`forge.chatView`), so:
+- There is no `@workspace` variable — we need to capture and inject context ourselves.
+- Editor selection must be read via `vscode.window.activeTextEditor.selection` and forwarded to the webview.
+- File content must be resolved and prepended to prompts sent to `CopilotSession`.
+
+## Architecture
+
+### Context flow
+```
+1. User selects code in editor (or clicks "Attach Selection" button)
+2. Extension reads activeTextEditor.selection via VS Code API
+3. Context metadata sent to webview via postMessage
+4. Webview displays context chip(s) in input area
+5. On send, context is included in the message to extension
+6. Extension prepends context to the prompt string sent to session.send()
+```
+
+## Implementation Plan
+
+### 1. Capture editor selection — `src/extension.ts`
+
+- Register a command `forge.attachSelection` that:
+  1. Reads `vscode.window.activeTextEditor` for the active file and selection.
+  2. Extracts: file path (workspace-relative), language ID, selected text, line range.
+  3. Posts a `contextAttached` message to the webview with the context payload.
+- Register a command `forge.attachFile` that:
+  1. Opens a Quick Pick or file picker filtered to workspace files.
+  2. Reads file content (or summary for large files — e.g., first 200 lines).
+  3. Posts a `contextAttached` message to the webview.
+
+### 2. Context attachment UI in webview (`media/chat.js`)
+
+- Add a button row above the text input: **[📎 Attach Selection]** **[📄 Attach File]**
+  - These buttons send `{ command: "attachSelection" }` or `{ command: "attachFile" }` to the extension.
+- When `contextAttached` message is received, render a **context chip** below the buttons:
+  ```
+  ┌──────────────────────────────────┐
+  │ 📄 src/utils.ts:12-28 (ts)  [✕] │
+  └──────────────────────────────────┘
+  ```
+- Multiple context chips can be attached (stacked).
+- Each chip has a remove button (✕) to detach context before sending.
+- Context chips are cleared after the message is sent.
+
+### 3. Include context in prompts — `src/extension.ts`
+
+- When `_handleChatMessage` receives a message, check for attached context.
+- Prepend context to the user's prompt in a structured format:
+  ```
+  [Context: src/utils.ts lines 12-28 (typescript)]
+  ```typescript
+  function calculateSum(a: number, b: number): number {
+    return a + b;
+  }
+  ```
+
+  User's question here...
+  ```
+- This ensures the LLM sees the code context alongside the question.
+- Cap context size to avoid token limits — truncate with a note if context exceeds a threshold (e.g., 8000 chars).
+
+### 4. View/title button for quick attach
+
+Add to `package.json` `menus.view/title`:
+```json
+{
+  "command": "forge.attachSelection",
+  "when": "view == forge.chatView && activeEditor",
+  "group": "navigation"
+}
+```
+This puts an "Attach Selection" icon in the sidebar title bar alongside the existing settings gear.
+
+### 5. Auto-attach active selection (optional enhancement)
+
+- When the user switches to the Forge sidebar while having text selected, optionally auto-suggest attaching it.
+- Controlled by a setting `forge.copilot.autoAttachSelection` (default: `false`).
+- If enabled, the extension listens to `onDidChangeActiveTextEditor` and `onDidChangeTextEditorSelection` and auto-posts context to the webview.
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/extension.ts` | Register `forge.attachSelection` and `forge.attachFile` commands; wire `attachSelection`/`attachFile` message handlers; prepend context to prompts in `_handleChatMessage` |
+| `media/chat.js` | Add attach buttons, context chip rendering, include context in `sendMessage` payload |
+| `media/chat.css` | Styles for attach buttons and context chips |
+| `package.json` | Register `forge.attachSelection` and `forge.attachFile` commands; add view/title menu entry; optionally add `autoAttachSelection` setting |
+| `src/configuration.ts` | Read `autoAttachSelection` setting (if implemented) |
+
+## Acceptance Criteria
+
+- [ ] User can click "Attach Selection" to capture the current editor selection and see it as a chip in the chat input area.
+- [ ] User can click "Attach File" to pick a workspace file and attach it as context.
+- [ ] Attached context is visible in the webview as removable chips showing file name and line range.
+- [ ] Context is prepended to the prompt sent to `CopilotSession.send()`.
+- [ ] Multiple context items can be attached to a single message.
+- [ ] Context chips are cleared after sending the message.
+- [ ] Context is truncated with a note if it exceeds the size threshold.
+- [ ] No regression in existing chat flow (messages without context still work).
+- [ ] "Attach Selection" button in the sidebar title bar works when an editor is active.
+- [ ] Unit tests cover context capture, prompt construction, and truncation.
+
+## Out of Scope (Phase 3+)
+
+- Full workspace indexing / semantic search (RAG)
+- Automatic context from open tabs
+- `@workspace` search across all project files
+- Drag-and-drop file attachment
+
+## Routing Recommendation
+
+- **Primary: Blair** (`squad:blair`) — VS Code Extension API: editor selection capture, command registration, webview UI, message handling.
+- **Secondary: Childs** (`squad:childs`) — Prompt construction: context prepending, size management, ensuring context flows correctly to `CopilotSession`.
+- **Review: MacReady** — Architecture review of the context flow and UX design.
+
+---
+
+## Decision Summary
+
+| Issue | Old Assumption | Actual Architecture | Key Changes |
+|-------|---------------|-------------------|-------------|
+| #25 | Just remove `availableTools: []` | WebviewView needs custom tool confirmation UX | Add inline approval cards, auto-approve setting, tool result rendering |
+| #26 | Chat Participant API provides `@workspace` | No built-in context — must build from scratch | Add attach commands, context chips in webview, prompt prepending |
+
+Both issues are larger than originally scoped. Recommend splitting implementation across Childs (SDK) and Blair (UX) with MacReady review.
+### 2026-02-27T20:48Z: User directive
+**By:** Rob Pitcher (via Copilot)
+**What:** Stop removing .squad/ files during the release process. Release branches should be created directly from dev without deleting .squad/ — the repeated add/remove clutters git history.
+**Why:** User request — captured for team memory
+### 2026-02-27: API Key Storage Migrated to SecretStorage
+
+**By:** Blair
+**What:** The `enclave.copilot.apiKey` setting is now stored via VS Code's SecretStorage API (`context.secrets`) instead of plain-text settings.json. The settings gear button shows a QuickPick menu with "Open Settings" and "Set API Key (secure)" options. The secure option uses a password input box with native masking. `getConfigurationAsync()` in `src/configuration.ts` checks SecretStorage first, falls back to settings.json for backward compatibility.
+
+**Why:** API keys in settings.json are visible in plain text. SecretStorage uses the OS keychain (Credential Manager on Windows, Keychain on macOS, libsecret on Linux) which is the VS Code-recommended approach for secrets.
+
+**Impact:**
+- `src/configuration.ts` now exports `getConfigurationAsync(secrets)` — any code reading config that needs the API key should use this async version.
+- `src/extension.ts` `ChatViewProvider` constructor now requires `context.secrets` as second parameter.
+- All test files calling `activate()` must include a `secrets` mock on the ExtensionContext.
+- The sync `getConfiguration()` still exists for non-secret settings but won't include SecretStorage values.
