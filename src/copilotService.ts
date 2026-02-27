@@ -1,12 +1,8 @@
 import { ExtensionConfig } from "./configuration.js";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CopilotClient = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CopilotSession = any;
+import type { CopilotClient, ICopilotSession, ProviderConfig } from "./types.js";
 
 let client: CopilotClient | undefined;
-const sessions = new Map<string, CopilotSession>();
+const sessions = new Map<string, ICopilotSession>();
 
 export class CopilotCliNotFoundError extends Error {
   constructor(message: string) {
@@ -55,7 +51,7 @@ export async function getOrCreateClient(
 export async function getOrCreateSession(
   conversationId: string,
   config: ExtensionConfig
-): Promise<CopilotSession> {
+): Promise<ICopilotSession> {
   const existing = sessions.get(conversationId);
   if (existing) {
     return existing;
@@ -63,17 +59,19 @@ export async function getOrCreateSession(
 
   const copilotClient = await getOrCreateClient(config);
 
-  const session = await copilotClient.createSession({
+  // Cast: the SDK's runtime session exposes EventEmitter methods not in its type declarations
+  const provider: ProviderConfig = {
+    type: "openai",
+    baseUrl: config.endpoint,
+    apiKey: config.apiKey,
+    wireApi: config.wireApi as ProviderConfig["wireApi"],
+  };
+  const session = (await copilotClient.createSession({
     model: config.model,
-    provider: {
-      type: "openai",
-      baseUrl: config.endpoint,
-      apiKey: config.apiKey,
-      wireApi: config.wireApi,
-    },
+    provider,
     streaming: true,
     availableTools: [],
-  });
+  })) as unknown as ICopilotSession;
 
   sessions.set(conversationId, session);
   return session;
