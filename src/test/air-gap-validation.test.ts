@@ -210,7 +210,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     });
 
     it("session works with GITHUB_TOKEN explicitly unset", async () => {
-      process.env.GITHUB_TOKEN = undefined;
+      delete process.env.GITHUB_TOKEN;
       
       const session = await getOrCreateSession("agv-unset-token", validAzureConfig);
 
