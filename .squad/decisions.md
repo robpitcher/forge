@@ -330,3 +330,83 @@ Issues kept with squad members require:
 - PRD: `specs/PRD-airgapped-copilot-vscode-extension.md`
 - Team roster: `.squad/team.md`
 - Project history: `.squad/agents/macready/history.md`
+
+---
+
+# Dependency Mapping & Sprint Assignment Decision
+
+**Date:** 2026-02-27  
+**Author:** Childs (SDK Dev)  
+**Context:** Rob Pitcher requested dependency links on all 28 issues and Sprint field values on Project #8
+
+---
+
+## Decision
+
+### Job 1: Dependency Links
+
+All 22 issues with upstream dependencies now have a `**Dependencies:**` section prepended to their body. Issues with no dependencies (#2, #25–#29) were left untouched.
+
+| Issue | Depends On |
+|-------|------------|
+| #3 | #2 |
+| #4 | #2 |
+| #5 | #4 |
+| #6 | #2 |
+| #7 | #5 |
+| #8 | #3, #4, #7 |
+| #9 | #7 |
+| #10 | #3, #5, #7 |
+| #11 | #10 |
+| #12 | #10 |
+| #13 | #8 |
+| #14 | #7, #10 |
+| #15 | #2 |
+| #16 | #15 |
+| #17 | #16 |
+| #18 | #3, #6 |
+| #19 | #4 |
+| #20 | #5, #6 |
+| #21 | #4, #5 |
+| #22 | #2 |
+| #23 | #5, #24 |
+| #24 | #5 |
+
+### Job 2: Sprint Assignments
+
+All 28 issues have Sprint field values set on Project #8.
+
+| Sprint | Issues | Phase |
+|--------|--------|-------|
+| Sprint 1 | #2–#24 | MVP |
+| Sprint 2 | #25, #26 | Phase 2 (Built-in tools, @workspace) |
+| Sprint 3 | #27, #28*, #29* | Phase 3+ |
+
+**⚠️ Fallback applied:** Sprint 4 and Sprint 5 could not be created via the GitHub Projects V2 API (iteration creation is not exposed programmatically). Issues #28 (Phase 4 — Slash commands) and #29 (Phase 5 — Bundle CLI) were assigned to Sprint 3 as a temporary fallback. Manual creation of Sprint 4 and Sprint 5 in the GitHub Projects UI is needed, then reassign #28 and #29 accordingly.
+
+---
+
+## Rationale
+
+- **Dependency format** uses `**Dependencies:** #X, #Y` prepended with a horizontal rule separator, keeping existing body content intact.
+- **Sprint 1 contains all MVP work** — this mirrors the PRD critical path where all core functionality, testing, packaging, and documentation must land in the first iteration.
+- **Post-MVP phases get their own sprints** — keeps roadmap items visible but clearly deferred.
+
+---
+
+## API Details
+
+- **Project ID:** `PVT_kwHOANBAvc4BQSxx`
+- **Sprint Field ID:** `PVTIF_lAHOANBAvc4BQSxxzg-dMUk`
+- **Sprint 1 Iteration ID:** `09d998ce`
+- **Sprint 2 Iteration ID:** `3ac56f5d`
+- **Sprint 3 Iteration ID:** `59011026`
+- **Iteration creation:** Not available via GraphQL API; must use GitHub Projects UI
+
+---
+
+## Next Steps
+
+1. **MacReady:** Create Sprint 4 and Sprint 5 in GitHub Projects UI, reassign #28 and #29
+2. **Squad:** Use dependency links to determine work order — start with issues that have no pending dependencies
+3. **Scribe:** Merge this decision into `.squad/decisions.md`

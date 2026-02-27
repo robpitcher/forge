@@ -17,3 +17,7 @@
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
 📌 Team update (2026-02-27T05:03:36Z): MVP triage complete. Documentation issues #17–19 routed to @copilot for initial draft (docs/setup guide); Childs owns #21, #23–24 (deferred features, air-gap guide, config details). Dependency: #19 must complete before #17 final review. — decided by MacReady
+
+📌 Dependency mapping (2026-02-27): Added `**Dependencies:** #X, #Y` sections to all 22 issues with upstream deps. Format: prepend to body with `---` separator. Used `gh issue edit --body` for each. Issues #2, #25–#29 have no MVP dependencies and were left clean.
+
+📌 Sprint field assignment (2026-02-27): Set Sprint iteration field on all 28 project items via GraphQL `updateProjectV2ItemFieldValue` mutation. Project ID: `PVT_kwHOANBAvc4BQSxx`, Sprint Field ID: `PVTIF_lAHOANBAvc4BQSxxzg-dMUk`. Sprint IDs: Sprint 1 = `09d998ce`, Sprint 2 = `3ac56f5d`, Sprint 3 = `59011026`. GitHub Projects V2 API does not support creating new iterations programmatically — must use the web UI for that. Issues #28/#29 parked in Sprint 3 as fallback until Sprint 4/5 are created manually.
