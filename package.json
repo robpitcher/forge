@@ -10,7 +10,8 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.93.0",
+    "node": ">=20.19.0"
   },
   "categories": [
     "AI",
