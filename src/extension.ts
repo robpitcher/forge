@@ -90,38 +90,45 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return new Promise<void>((resolve, reject) => {
       this._view?.webview.postMessage({ type: "streamStart" });
 
-      const messageDeltaHandler = (event: MessageDeltaEvent) => {
-        if (event?.delta?.content) {
-          this._view?.webview.postMessage({
-            type: "streamDelta",
-            content: event.delta.content,
-          });
-        }
+      let settled = false;
+      const cleanup = () => {
+        unsubDelta();
+        unsubIdle();
+        unsubError();
       };
 
-      session.on("assistant.message_delta", messageDeltaHandler);
-
-      session.once("session.idle", () => {
-        if (typeof session.off === "function") {
-          session.off("assistant.message_delta", messageDeltaHandler);
-        } else if (typeof session.removeListener === "function") {
-          session.removeListener("assistant.message_delta", messageDeltaHandler);
+      const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
+        if (event?.data?.deltaContent) {
+          this._view?.webview.postMessage({
+            type: "streamDelta",
+            content: event.data.deltaContent,
+          });
         }
+      });
+
+      const unsubIdle = session.on("session.idle", () => {
+        if (settled) { return; }
+        settled = true;
+        cleanup();
         this._view?.webview.postMessage({ type: "streamEnd" });
         resolve();
       });
 
-      session.once("session.error", (event: SessionErrorEvent) => {
-        if (typeof session.off === "function") {
-          session.off("assistant.message_delta", messageDeltaHandler);
-        } else if (typeof session.removeListener === "function") {
-          session.removeListener("assistant.message_delta", messageDeltaHandler);
-        }
-        const message = event?.error?.message ?? "Unknown session error";
+      const unsubError = session.on("session.error", (event: SessionErrorEvent) => {
+        if (settled) { return; }
+        settled = true;
+        cleanup();
+        const message = event?.data?.message ?? "Unknown session error";
         reject(new Error(message));
       });
 
-      session.sendMessage({ role: "user", content: prompt }).catch(reject);
+      session.send({ prompt }).catch((err) => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(err);
+        }
+      });
     });
   }
 
