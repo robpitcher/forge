@@ -3,6 +3,4 @@ dist/
 *.vsix
 .vscode-test/
 out/
-
-# Squad team state (dev-only, not shipped to main)
 .squad/

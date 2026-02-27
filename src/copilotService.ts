@@ -1,12 +1,8 @@
 import { ExtensionConfig } from "./configuration.js";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CopilotClient = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CopilotSession = any;
+import type { CopilotClient, ICopilotSession, ProviderConfig } from "./types.js";
 
 let client: CopilotClient | undefined;
-const sessions = new Map<string, CopilotSession>();
+const sessions = new Map<string, ICopilotSession>();
 
 export class CopilotCliNotFoundError extends Error {
   constructor(message: string) {
@@ -43,7 +39,7 @@ export async function getOrCreateClient(
       message.toLowerCase().includes("cannot find")
     ) {
       throw new CopilotCliNotFoundError(
-        "Copilot CLI not found. Please install it or set the path in enclave.copilot.cliPath"
+        "Copilot CLI not found. Please install it or set the path in forge.copilot.cliPath"
       );
     }
     throw err;
@@ -55,7 +51,7 @@ export async function getOrCreateClient(
 export async function getOrCreateSession(
   conversationId: string,
   config: ExtensionConfig
-): Promise<CopilotSession> {
+): Promise<ICopilotSession> {
   const existing = sessions.get(conversationId);
   if (existing) {
     return existing;
@@ -63,17 +59,25 @@ export async function getOrCreateSession(
 
   const copilotClient = await getOrCreateClient(config);
 
-  const session = await copilotClient.createSession({
+  const wireApi =
+    config.wireApi === "completions" || config.wireApi === "responses"
+      ? config.wireApi
+      : undefined;
+
+  const isAzure = /\.azure\.com/i.test(config.endpoint);
+  const provider: ProviderConfig = {
+    type: isAzure ? "azure" : "openai",
+    baseUrl: config.endpoint,
+    apiKey: config.apiKey,
+    wireApi,
+    ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
+  };
+  const session = (await copilotClient.createSession({
     model: config.model,
-    provider: {
-      type: "openai",
-      baseUrl: config.endpoint,
-      apiKey: config.apiKey,
-      wireApi: config.wireApi,
-    },
+    provider,
     streaming: true,
     availableTools: [],
-  });
+  })) as unknown as ICopilotSession;
 
   sessions.set(conversationId, session);
   return session;
@@ -83,8 +87,57 @@ export function removeSession(conversationId: string): void {
   sessions.delete(conversationId);
 }
 
-export async function stopClient(): Promise<void> {
+export async function destroySession(conversationId: string): Promise<void> {
+  const session = sessions.get(conversationId);
+  if (!session) {
+    return;
+  }
+
+  try {
+    await session.abort();
+  } catch (err) {
+    // Session may already be ended — log and continue
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`Failed to abort session ${conversationId}: ${message}`);
+  }
+
+  sessions.delete(conversationId);
+}
+
+export async function destroyAllSessions(): Promise<void> {
+  const abortPromises: Promise<void>[] = [];
+
+  for (const [conversationId, session] of sessions.entries()) {
+    if (!session) {
+      console.warn(`Session ${conversationId} is undefined, skipping abort`);
+      continue;
+    }
+    let abortPromise: Promise<void>;
+    try {
+      abortPromise = session.abort();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Failed to abort session ${conversationId}: ${message}`);
+      continue;
+    }
+    abortPromises.push(
+      abortPromise.catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`Failed to abort session ${conversationId}: ${message}`);
+      })
+    );
+  }
+
+  await Promise.all(abortPromises);
   sessions.clear();
+}
+
+function getSessionCount(): number {
+  return sessions.size;
+}
+
+export async function stopClient(): Promise<void> {
+  await destroyAllSessions();
   if (client) {
     try {
       await client.stop();

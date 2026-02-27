@@ -14,14 +14,24 @@ export interface ConfigValidationError {
 }
 
 export function getConfiguration(): ExtensionConfig {
-  const config = vscode.workspace.getConfiguration("enclave.copilot");
+  const config = vscode.workspace.getConfiguration("forge.copilot");
   return {
     endpoint: config.get<string>("endpoint", ""),
-    apiKey: config.get<string>("apiKey", ""),
+    apiKey: "",
     model: config.get<string>("model", "gpt-4.1"),
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
   };
+}
+
+/** Reads API key from SecretStorage and merges with settings. */
+export async function getConfigurationAsync(
+  secrets: vscode.SecretStorage
+): Promise<ExtensionConfig> {
+  const config = getConfiguration();
+  const apiKey = await secrets.get("forge.copilot.apiKey");
+  config.apiKey = apiKey ?? "";
+  return config;
 }
 
 export function validateConfiguration(
@@ -31,17 +41,17 @@ export function validateConfiguration(
 
   if (!config.endpoint) {
     errors.push({
-      field: "enclave.copilot.endpoint",
+      field: "forge.copilot.endpoint",
       message:
-        "Please configure the Azure AI Foundry endpoint in Settings (enclave.copilot.endpoint)",
+        "Please configure the Azure AI Foundry endpoint in Settings (forge.copilot.endpoint)",
     });
   }
 
   if (!config.apiKey) {
     errors.push({
-      field: "enclave.copilot.apiKey",
+      field: "forge.copilot.apiKey",
       message:
-        "Please configure the API key in Settings (enclave.copilot.apiKey)",
+        "Please set your API key via the ⚙️ gear menu → 'Set API Key (secure)'",
     });
   }
 

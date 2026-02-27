@@ -1,129 +1,229 @@
 import * as vscode from "vscode";
-import { getConfiguration, validateConfiguration } from "./configuration.js";
+import * as crypto from "crypto";
+import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
 import {
   getOrCreateSession,
-  removeSession,
+  destroySession,
   stopClient,
   CopilotCliNotFoundError,
 } from "./copilotService.js";
+import type {
+  ICopilotSession,
+  MessageDeltaEvent,
+  SessionErrorEvent,
+} from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const participant = vscode.chat.createChatParticipant(
-    "enclave.copilot",
-    handleChatRequest
+  const provider = new ChatViewProvider(context.extensionUri, context.secrets);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider("forge.chatView", provider)
   );
-  participant.iconPath = new vscode.ThemeIcon("hubot");
-
-  context.subscriptions.push(participant);
 }
 
 export async function deactivate(): Promise<void> {
   await stopClient();
 }
 
-async function handleChatRequest(
-  request: vscode.ChatRequest,
-  context: vscode.ChatContext,
-  stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
-): Promise<void> {
-  const config = getConfiguration();
-  const validationErrors = validateConfiguration(config);
+class ChatViewProvider implements vscode.WebviewViewProvider {
+  private _view?: vscode.WebviewView;
+  private _conversationId: string = `conv-${crypto.randomUUID()}`;
+  private _isProcessing = false;
+  private _messageListener?: vscode.Disposable;
 
-  if (validationErrors.length > 0) {
-    for (const error of validationErrors) {
-      stream.markdown(`⚠️ ${error.message}\n\n`);
-    }
-    stream.button({
-      command: "workbench.action.openSettings",
-      arguments: ["enclave.copilot"],
-      title: "Open Settings",
-    });
-    return;
-  }
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _secrets: vscode.SecretStorage
+  ) {}
 
-  const conversationId = getConversationId(context);
-
-  let session;
-  try {
-    session = await getOrCreateSession(conversationId, config);
-  } catch (err: unknown) {
-    if (err instanceof CopilotCliNotFoundError) {
-      stream.markdown(`⚠️ ${err.message}`);
-    } else {
-      const message = err instanceof Error ? err.message : String(err);
-      stream.markdown(`❌ Failed to start Copilot service: ${message}`);
-    }
-    return;
-  }
-
-  const abortListener = token.onCancellationRequested(() => {
-    try {
-      session.abort();
-    } catch {
-      // ignore abort errors
-    }
-  });
-
-  try {
-    await sendMessage(request.prompt, session, stream);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    stream.markdown(`❌ Error: ${message}`);
-    removeSession(conversationId);
-  } finally {
-    abortListener.dispose();
-  }
-}
-
-function getConversationId(context: vscode.ChatContext): string {
-  const ctxWithId = context as unknown as { id?: unknown };
-  if (typeof ctxWithId.id === "string" && ctxWithId.id.length > 0) {
-    return ctxWithId.id;
-  }
-  return `conversation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function sendMessage(
-  prompt: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  session: any,
-  stream: vscode.ChatResponseStream
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const messageDeltaHandler = (event: { delta?: { content?: string } }) => {
-      if (event?.delta?.content) {
-        stream.markdown(event.delta.content);
-      }
+  public resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ): void {
+    this._view = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this._extensionUri],
     };
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    session.on("assistant.message_delta", messageDeltaHandler);
-
-    session.once("session.idle", () => {
-      if (typeof session.off === "function") {
-        session.off("assistant.message_delta", messageDeltaHandler);
-      } else if (typeof session.removeListener === "function") {
-        session.removeListener("assistant.message_delta", messageDeltaHandler);
-      }
-      resolve();
+    this._messageListener?.dispose();
+    this._messageListener = webviewView.webview.onDidReceiveMessage(
+      this._handleMessage.bind(this)
+    );
+    webviewView.onDidDispose(() => {
+      this._messageListener?.dispose();
+      this._messageListener = undefined;
     });
+  }
 
-    session.once(
-      "session.error",
-      (event: { error?: { message?: string } }) => {
-        if (typeof session.off === "function") {
-          session.off("assistant.message_delta", messageDeltaHandler);
-        } else if (typeof session.removeListener === "function") {
-          session.removeListener(
-            "assistant.message_delta",
-            messageDeltaHandler
-          );
+  private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
+    if (message.command === "sendMessage") {
+      await this._handleChatMessage(message.text ?? "");
+    } else if (message.command === "openSettings") {
+      const choice = await vscode.window.showQuickPick(
+        ["Open Settings", "Set API Key (secure)"],
+        { placeHolder: "Forge Configuration" }
+      );
+      if (choice === "Open Settings") {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
+      } else if (choice === "Set API Key (secure)") {
+        const value = await vscode.window.showInputBox({
+          prompt: "Enter your API key",
+          password: true,
+          placeHolder: "Paste your Azure AI Foundry API key",
+        });
+        if (value !== undefined) {
+          await this._secrets.store("forge.copilot.apiKey", value);
+          await vscode.window.showInformationMessage("API key stored securely.");
         }
-        const message = event?.error?.message ?? "Unknown session error";
-        reject(new Error(message));
       }
+    } else if (message.command === "newConversation") {
+      await destroySession(this._conversationId);
+      this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._view?.webview.postMessage({ type: "conversationReset" });
+    }
+  }
+
+  private async _handleChatMessage(prompt: string): Promise<void> {
+    if (this._isProcessing) { return; }
+
+    let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
+    try {
+      config = await getConfigurationAsync(this._secrets);
+    } catch {
+      this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
+      return;
+    }
+    const validationErrors = validateConfiguration(config);
+
+    if (validationErrors.length > 0) {
+      for (const error of validationErrors) {
+        this._postError(error.message);
+      }
+      return;
+    }
+
+    let session: ICopilotSession;
+    try {
+      session = await getOrCreateSession(this._conversationId, config);
+    } catch (err: unknown) {
+      if (err instanceof CopilotCliNotFoundError) {
+        this._postError(err.message);
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        this._postError(`Failed to start Copilot service: ${message}`);
+      }
+      return;
+    }
+
+    this._isProcessing = true;
+    try {
+      await this._streamResponse(prompt, session);
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const message = this._rewriteAuthError(raw);
+      this._postError(message);
+      await destroySession(this._conversationId);
+    } finally {
+      this._isProcessing = false;
+    }
+  }
+
+  /** Rewrites SDK auth errors to point users at the settings gear. */
+  private _rewriteAuthError(message: string): string {
+    const lower = message.toLowerCase();
+    if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
+      return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
+    }
+    return message;
+  }
+
+  private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this._view?.webview.postMessage({ type: "streamStart" });
+
+      let settled = false;
+      const cleanup = () => {
+        unsubDelta();
+        unsubIdle();
+        unsubError();
+      };
+
+      const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
+        if (event?.data?.deltaContent) {
+          this._view?.webview.postMessage({
+            type: "streamDelta",
+            content: event.data.deltaContent,
+          });
+        }
+      });
+
+      const unsubIdle = session.on("session.idle", () => {
+        if (settled) { return; }
+        settled = true;
+        cleanup();
+        this._view?.webview.postMessage({ type: "streamEnd" });
+        resolve();
+      });
+
+      const unsubError = session.on("session.error", (event: SessionErrorEvent) => {
+        if (settled) { return; }
+        settled = true;
+        cleanup();
+        const message = event?.data?.message ?? "Unknown session error";
+        reject(new Error(message));
+      });
+
+      session.send({ prompt }).catch((err) => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(err);
+        }
+      });
+    });
+  }
+
+  private _postError(message: string): void {
+    this._view?.webview.postMessage({ type: "error", message });
+  }
+
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "chat.css")
+    );
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "chat.js")
     );
 
-    session.sendMessage({ role: "user", content: prompt }).catch(reject);
-  });
+    const nonce = crypto.randomUUID();
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link href="${styleUri}" rel="stylesheet">
+    <title>Forge Chat</title>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <button id="settingsBtn" class="toolbar-btn" title="Open Forge Settings" aria-label="Open Forge configuration">&#9881;</button>
+        </div>
+        <div id="chatMessages"></div>
+        <div class="input-area">
+            <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
+            <div class="button-row">
+                <button id="sendBtn">Send</button>
+                <button id="newConvBtn">New Conversation</button>
+            </div>
+        </div>
+    </div>
+    <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
+  }
 }

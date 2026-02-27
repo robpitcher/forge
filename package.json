@@ -1,6 +1,6 @@
 {
-  "name": "enclave",
-  "displayName": "Enclave",
+  "name": "forge",
+  "displayName": "Forge",
   "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
   "version": "0.1.0",
   "publisher": "robpitcher",
@@ -10,45 +10,50 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.93.0",
+    "node": ">=20.19.0"
   },
   "categories": [
     "AI",
     "Chat"
   ],
   "activationEvents": [
-    "onChatParticipant:enclave.copilot"
+    "onView:forge.chatView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "chatParticipants": [
-      {
-        "id": "enclave.copilot",
-        "fullName": "Enclave",
-        "name": "copilot",
-        "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
-        "isSticky": true
-      }
-    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "forge",
+          "title": "Forge",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "forge": [
+        {
+          "type": "webview",
+          "id": "forge.chatView",
+          "name": "AI Chat"
+        }
+      ]
+    },
     "configuration": {
-      "title": "Enclave",
+      "title": "Forge",
       "properties": {
-        "enclave.copilot.endpoint": {
+        "forge.copilot.endpoint": {
           "type": "string",
           "default": "",
           "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
         },
-        "enclave.copilot.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API key for the Azure AI Foundry endpoint"
-        },
-        "enclave.copilot.model": {
+        "forge.copilot.model": {
           "type": "string",
           "default": "gpt-4.1",
           "description": "Model deployment name"
         },
-        "enclave.copilot.wireApi": {
+        "forge.copilot.wireApi": {
           "type": "string",
           "default": "completions",
           "enum": [
@@ -57,7 +62,7 @@
           ],
           "description": "API format: 'completions' or 'responses'"
         },
-        "enclave.copilot.cliPath": {
+        "forge.copilot.cliPath": {
           "type": "string",
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"
@@ -69,15 +74,22 @@
     "@github/copilot-sdk": "0.1.26"
   },
   "devDependencies": {
+    "@types/node": "^25.3.2",
     "@types/vscode": "^1.93.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
     "@vscode/vsce": "3.7.1",
     "esbuild": "0.27.3",
-    "typescript": "^5.0.0"
+    "eslint": "^10.0.2",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   },
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "package": "vsce package",
-    "lint": "tsc --noEmit"
+    "package": "npm run build -- --production && vsce package",
+    "lint": "eslint src/",
+    "lint:types": "tsc --noEmit",
+    "test": "vitest run"
   }
 }
