@@ -10,9 +10,11 @@
 
 ## 1. Executive Summary
 
-Build a VS Code extension that provides a Copilot-like chat experience for **air-gapped environments** — no GitHub authentication, no internet access to GitHub services. The extension uses the **GitHub Copilot SDK** (`@github/copilot-sdk`) in **BYOK (Bring Your Own Key) mode** to route all model inference to a private **Azure AI Foundry** endpoint. The Copilot CLI runs locally as the agent runtime, providing tool execution, session management, and streaming — while the VS Code Chat Participant API provides the native chat panel UI.
+Build a VS Code extension that provides a Copilot-like chat experience for **air-gapped environments** — no GitHub authentication, no internet access to GitHub services. The extension uses the **GitHub Copilot SDK** (`@github/copilot-sdk`) in **BYOK (Bring Your Own Key) mode** to route all model inference to a private **Azure AI Foundry** endpoint. The Copilot CLI runs locally as the agent runtime, providing tool execution, session management, and streaming — while a custom **WebviewView sidebar** provides the chat UI.
 
 This MVP is a **proof of concept** to validate that the architecture works end-to-end in a disconnected environment before investing in additional features.
+
+> **Note (Architecture Update):** The initial design used VS Code Chat Participant API for native chat panel integration. This was replaced with a standalone WebviewView sidebar (FR1 updated) for better control over the UI and independence from Chat Participant API availability.
 
 ---
 
@@ -38,7 +40,7 @@ Forking `microsoft/vscode-copilot-chat` was evaluated and rejected due to extrem
 | G1 | Users can open a chat panel in VS Code and converse with an AI model — identical UX to the native Copilot Chat sidebar |
 | G2 | All model inference is routed exclusively to a configured Azure AI Foundry endpoint (private network) |
 | G3 | Zero GitHub authentication — the extension works without any GitHub account, token, or internet connectivity to GitHub |
-| G4 | Streaming responses — tokens appear incrementally in the chat panel as they are generated |
+| G4 | Streaming responses — tokens appear incrementally in the sidebar as they are generated |
 | G5 | Configurable via VS Code settings — endpoint URL, API key (or Managed Identity bearer token), and model name |
 | G6 | Basic error handling — connection failures, auth errors, and model errors display user-friendly messages in the chat panel |
 | G7 | Extension is distributable as a `.vsix` file for sideloading onto air-gapped machines |
@@ -76,7 +78,7 @@ Forking `microsoft/vscode-copilot-chat` was evaluated and rejected due to extrem
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Chat Panel (VS Code Chat API)               │  │
+│  │         Enclave Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
@@ -117,14 +119,15 @@ Forking `microsoft/vscode-copilot-chat` was evaluated and rejected due to extrem
 
 ## 6. Functional Requirements
 
-### FR1: Chat Participant Registration
+### FR1: WebviewView Sidebar Registration
 
-The extension registers a VS Code **Chat Participant** so it appears in the native Copilot Chat panel.
+The extension registers a VS Code **WebviewView** in the activity bar as a custom sidebar view.
 
-- **Participant ID:** `enclave.copilot`
-- **Display Name:** `Enclave` (configurable in future)
-- **Icon:** A custom icon or VS Code `ThemeIcon` (e.g., `hubot`)
-- **Sticky:** `true` — the participant is the default in the chat panel
+- **View ID:** `enclave.chatView`
+- **View Container ID:** `enclave`
+- **Display Name:** `AI Chat` (in the sidebar)
+- **Icon:** A custom SVG icon in the activity bar (configured in `package.json`)
+- **Type:** Webview with custom HTML/CSS/JS chat UI
 
 ### FR2: Copilot SDK Client Lifecycle
 
@@ -174,10 +177,10 @@ The extension contributes the following VS Code settings:
 
 | Error Condition | Behavior |
 |-----------------|----------|
-| Missing configuration (endpoint or API key) | Display actionable error in chat: *"Please configure the Azure AI Foundry endpoint in Settings (enclave.copilot.endpoint)"* with a button to open settings |
+| Missing configuration (endpoint or API key) | Display actionable error in sidebar: *"Please configure the Azure AI Foundry endpoint in Settings (enclave.copilot.endpoint)"* with a button to open settings |
 | Copilot CLI not found | Display error: *"Copilot CLI not found. Please install it or set the path in enclave.copilot.cliPath"* |
-| Network / connection error to Azure AI Foundry | Display error in chat response stream |
-| Authentication error (invalid API key) | Display error in chat response stream |
+| Network / connection error to Azure AI Foundry | Display error in sidebar response stream |
+| Authentication error (invalid API key) | Display error in sidebar response stream |
 | User cancels request (VS Code cancellation token) | Call `session.abort()` to cancel the in-flight request |
 
 ### FR8: Packaging & Distribution
