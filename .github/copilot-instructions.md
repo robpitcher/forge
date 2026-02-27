@@ -1,8 +1,19 @@
-# Copilot Coding Agent — Squad Instructions
+# Copilot Coding Agent — Repository Instructions
+
+## Branching Strategy
+
+**⚠️ CRITICAL: The default branch for all development work is `dev`, NOT `main`.**
+
+- **Always base your branches off `dev`.**
+- **Always open PRs targeting `dev`.**
+- `main` is the release branch — only release PRs merge into `main`.
+- If you need to create a branch, check out from `origin/dev` first.
+
+## Squad Integration
 
 You are working on a project that uses **Squad**, an AI team framework. When picking up issues autonomously, follow these guidelines.
 
-## Team Context
+### Team Context
 
 Before starting work on any issue:
 
@@ -10,7 +21,7 @@ Before starting work on any issue:
 2. Read `.squad/routing.md` for work routing rules.
 3. If the issue has a `squad:{member}` label, read that member's charter at `.squad/agents/{member}/charter.md` to understand their domain expertise and coding style — work in their voice.
 
-## Capability Self-Check
+### Capability Self-Check
 
 Before starting work, check your capability profile in `.squad/team.md` under the **Coding Agent → Capabilities** section.
 
@@ -21,15 +32,7 @@ Before starting work, check your capability profile in `.squad/team.md` under th
   🤖 This issue doesn't match my capability profile (reason: {why}). Suggesting reassignment to a squad member.
   ```
 
-## Branching Strategy
-
-**⚠️ CRITICAL: The default branch for all development work is `dev`, NOT `main`.**
-
-- **Always base your branches off `dev`.**
-- **Always open PRs targeting `dev`.**
-- `main` is the release branch — only release PRs merge into `main`.
-
-## Branch Naming
+### Branch Naming
 
 Use the squad branch convention, branching from `dev`:
 ```
@@ -37,7 +40,7 @@ squad/{issue-number}-{kebab-case-slug}
 ```
 Example: `squad/42-fix-login-validation`
 
-## PR Guidelines
+### PR Guidelines
 
 When opening a PR:
 - **Target branch: `dev`** (never `main`)
@@ -46,7 +49,7 @@ When opening a PR:
 - If this is a 🟡 needs-review task, add to the PR description: `⚠️ This task was flagged as "needs review" — please have a squad member review before merging.`
 - Follow any project conventions in `.squad/decisions.md`
 
-## Decisions
+### Decisions
 
 If you make a decision that affects other team members, write it to:
 ```
