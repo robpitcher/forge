@@ -40,8 +40,8 @@ describe("Error: missing configuration", () => {
       apiKey: "",
     });
     expect(errors).toHaveLength(2);
-    expect(errors[0].field).toContain("endpoint");
-    expect(errors[1].field).toContain("apiKey");
+    expect(errors[0].field).toBe("enclave.copilot.endpoint");
+    expect(errors[1].field).toBe("enclave.copilot.apiKey");
   });
 });
 
