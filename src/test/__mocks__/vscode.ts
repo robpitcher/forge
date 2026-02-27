@@ -15,6 +15,13 @@ export const chat = {
 
 export const window = {
   registerWebviewViewProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  showQuickPick: vi.fn().mockResolvedValue(undefined),
+  showInputBox: vi.fn().mockResolvedValue(undefined),
+  showInformationMessage: vi.fn().mockResolvedValue(undefined),
+};
+
+export const commands = {
+  executeCommand: vi.fn().mockResolvedValue(undefined),
 };
 
 export class ThemeIcon {

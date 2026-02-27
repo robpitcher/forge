@@ -102,7 +102,7 @@ describe("Error: WebviewView error paths", () => {
   };
   let mockView: MockWebviewView;
 
-  function setupProvider(settings: Record<string, string>) {
+  function setupProvider(settings: Record<string, string>, secretApiKey?: string) {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn(
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
@@ -112,6 +112,14 @@ describe("Error: WebviewView error paths", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      secrets: {
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "enclave.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
+        ),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 
@@ -141,11 +149,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts error when endpoint is missing", async () => {
     setupProvider({
       endpoint: "",
-      apiKey: "key-123",
+      apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
-    });
+    }, "key-123");
 
     simulateUserMessage(mockView, "hello");
 
@@ -189,11 +197,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts CLI-not-found error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
-      apiKey: "key-123",
+      apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
-    });
+    }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("spawn copilot ENOENT"));
 
@@ -217,11 +225,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts general startup error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
-      apiKey: "key-123",
+      apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
-    });
+    }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("Permission denied"));
 
@@ -248,11 +256,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on sendMessage rejection", async () => {
     setupProvider({
       endpoint: "https://example.com",
-      apiKey: "key-123",
+      apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
-    });
+    }, "key-123");
 
     mockSession.send.mockRejectedValueOnce(
       new Error("Network timeout")
@@ -291,11 +299,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on session.error event", async () => {
     setupProvider({
       endpoint: "https://example.com",
-      apiKey: "key-123",
+      apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
-    });
+    }, "key-123");
 
     mockSession.send.mockImplementation(async () => {
       mockSession._emit("session.error", {

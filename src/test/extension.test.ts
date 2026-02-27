@@ -69,6 +69,14 @@ describe("WebviewView chat panel", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      secrets: {
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "enclave.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+        ),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 

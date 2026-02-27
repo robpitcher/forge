@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { getConfiguration, validateConfiguration } from "./configuration.js";
+import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
 import {
   getOrCreateSession,
   destroySession,
@@ -14,7 +14,7 @@ import type {
 } from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri);
+  const provider = new ChatViewProvider(context.extensionUri, context.secrets);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("enclave.chatView", provider)
   );
@@ -30,7 +30,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _secrets: vscode.SecretStorage
+  ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -57,6 +60,24 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
     if (message.command === "sendMessage") {
       await this._handleChatMessage(message.text ?? "");
+    } else if (message.command === "openSettings") {
+      const choice = await vscode.window.showQuickPick(
+        ["Open Settings", "Set API Key (secure)"],
+        { placeHolder: "Enclave Configuration" }
+      );
+      if (choice === "Open Settings") {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "enclave.copilot");
+      } else if (choice === "Set API Key (secure)") {
+        const value = await vscode.window.showInputBox({
+          prompt: "Enter your API key",
+          password: true,
+          placeHolder: "Paste your Azure AI Foundry API key",
+        });
+        if (value !== undefined) {
+          await this._secrets.store("enclave.copilot.apiKey", value);
+          await vscode.window.showInformationMessage("API key stored securely.");
+        }
+      }
     } else if (message.command === "newConversation") {
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
@@ -67,7 +88,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleChatMessage(prompt: string): Promise<void> {
     if (this._isProcessing) { return; }
 
-    const config = getConfiguration();
+    let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
+    try {
+      config = await getConfigurationAsync(this._secrets);
+    } catch {
+      this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
+      return;
+    }
     const validationErrors = validateConfiguration(config);
 
     if (validationErrors.length > 0) {
@@ -94,12 +121,22 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       await this._streamResponse(prompt, session);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const raw = err instanceof Error ? err.message : String(err);
+      const message = this._rewriteAuthError(raw);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
       this._isProcessing = false;
     }
+  }
+
+  /** Rewrites SDK auth errors to point users at the settings gear. */
+  private _rewriteAuthError(message: string): string {
+    const lower = message.toLowerCase();
+    if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
+      return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
+    }
+    return message;
   }
 
   private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
@@ -173,6 +210,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="container">
+        <div class="toolbar">
+            <button id="settingsBtn" class="toolbar-btn" title="Open Enclave Settings" aria-label="Open Enclave configuration">&#9881;</button>
+        </div>
         <div id="chatMessages"></div>
         <div class="input-area">
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
