@@ -59,12 +59,17 @@ export async function getOrCreateSession(
 
   const copilotClient = await getOrCreateClient(config);
 
+  const wireApi =
+    config.wireApi === "completions" || config.wireApi === "responses"
+      ? config.wireApi
+      : undefined;
+
   // Cast: the SDK's runtime session exposes EventEmitter methods not in its type declarations
   const provider: ProviderConfig = {
     type: "openai",
     baseUrl: config.endpoint,
     apiKey: config.apiKey,
-    wireApi: config.wireApi as ProviderConfig["wireApi"],
+    wireApi,
   };
   const session = (await copilotClient.createSession({
     model: config.model,
