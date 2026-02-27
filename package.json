@@ -11,7 +11,9 @@
     "AI",
     "Chat"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onChatParticipant:airgapped.copilot"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
