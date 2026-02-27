@@ -6,6 +6,11 @@ import {
   stopClient,
   CopilotCliNotFoundError,
 } from "./copilotService.js";
+import type {
+  ICopilotSession,
+  MessageDeltaEvent,
+  SessionErrorEvent,
+} from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   const participant = vscode.chat.createChatParticipant(
@@ -44,7 +49,7 @@ async function handleChatRequest(
 
   const conversationId = getConversationId(context);
 
-  let session;
+  let session: ICopilotSession;
   try {
     session = await getOrCreateSession(conversationId, config);
   } catch (err: unknown) {
@@ -86,12 +91,11 @@ function getConversationId(context: vscode.ChatContext): string {
 
 function sendMessage(
   prompt: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  session: any,
+  session: ICopilotSession,
   stream: vscode.ChatResponseStream
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const messageDeltaHandler = (event: { delta?: { content?: string } }) => {
+    const messageDeltaHandler = (event: MessageDeltaEvent) => {
       if (event?.delta?.content) {
         stream.markdown(event.delta.content);
       }
@@ -110,7 +114,7 @@ function sendMessage(
 
     session.once(
       "session.error",
-      (event: { error?: { message?: string } }) => {
+      (event: SessionErrorEvent) => {
         if (typeof session.off === "function") {
           session.off("assistant.message_delta", messageDeltaHandler);
         } else if (typeof session.removeListener === "function") {
