@@ -64,12 +64,13 @@ export async function getOrCreateSession(
       ? config.wireApi
       : undefined;
 
-  // Cast: the SDK's runtime session exposes EventEmitter methods not in its type declarations
+  const isAzure = /\.azure\.com/i.test(config.endpoint);
   const provider: ProviderConfig = {
-    type: "openai",
+    type: isAzure ? "azure" : "openai",
     baseUrl: config.endpoint,
     apiKey: config.apiKey,
     wireApi,
+    ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
   };
   const session = (await copilotClient.createSession({
     model: config.model,

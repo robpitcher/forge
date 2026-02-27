@@ -29,6 +29,9 @@ export interface ProviderConfig {
   wireApi?: "completions" | "responses";
   baseUrl: string;
   apiKey?: string;
+  azure?: {
+    apiVersion?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
