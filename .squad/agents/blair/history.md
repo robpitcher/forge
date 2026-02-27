@@ -18,3 +18,5 @@
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
 📌 Team update (2026-02-27T04:19:00Z): 28 GitHub issues (#2–#29) created and linked to project board #8 (Enclave). PRD fully decomposed with dependencies, priorities, milestones, and squad routing. Ready for pickup. — decided by MacReady & Childs. Project: https://github.com/robpitcher/enclave/projects/8
+
+📌 Team update (2026-02-27T05:03:36Z): MVP triage complete. 8 issues routed to @copilot (scaffolding, build, packaging, docs, lint); core implementation remains with squad members. Core issues #3–5, #7–14 assigned to Blair for parallel pickup. E2E testing issues #9–10, #13 blocked on #2. — decided by MacReady

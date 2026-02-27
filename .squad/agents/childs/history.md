@@ -15,3 +15,5 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+📌 Team update (2026-02-27T05:03:36Z): MVP triage complete. Documentation issues #17–19 routed to @copilot for initial draft (docs/setup guide); Childs owns #21, #23–24 (deferred features, air-gap guide, config details). Dependency: #19 must complete before #17 final review. — decided by MacReady

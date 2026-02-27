@@ -21,7 +21,7 @@
 
 ## Coding Agent
 
-<!-- copilot-auto-assign: false -->
+<!-- copilot-auto-assign: true -->
 
 | Name | Role | Charter | Status |
 |------|------|---------|--------|
