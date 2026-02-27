@@ -1,6 +1,7 @@
 import * as esbuild from "esbuild";
 
 const watch = process.argv.includes("--watch");
+const production = process.argv.includes("--production");
 
 const buildOptions = {
   entryPoints: ["src/extension.ts"],
@@ -9,8 +10,8 @@ const buildOptions = {
   platform: "node",
   format: "cjs",
   external: ["vscode"],
-  minify: false,
-  sourcemap: true,
+  minify: production,
+  sourcemap: !production,
 };
 
 if (watch) {
