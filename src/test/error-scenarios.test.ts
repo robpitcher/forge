@@ -254,7 +254,7 @@ describe("Error: WebviewView error paths", () => {
       cliPath: "",
     });
 
-    mockSession.sendMessage.mockRejectedValueOnce(
+    mockSession.send.mockRejectedValueOnce(
       new Error("Network timeout")
     );
 
@@ -275,7 +275,7 @@ describe("Error: WebviewView error paths", () => {
 
     // Verify session was removed: next request should create a new session
     const newSession = createMockSession();
-    newSession.sendMessage.mockImplementation(async () => {
+    newSession.send.mockImplementation(async () => {
       newSession._emit("session.idle");
     });
     mockClient.createSession.mockResolvedValueOnce(newSession);
@@ -297,9 +297,9 @@ describe("Error: WebviewView error paths", () => {
       cliPath: "",
     });
 
-    mockSession.sendMessage.mockImplementation(async () => {
+    mockSession.send.mockImplementation(async () => {
       mockSession._emit("session.error", {
-        error: { message: "Connection reset by peer" },
+        data: { message: "Connection reset by peer" },
       });
     });
 
@@ -320,7 +320,7 @@ describe("Error: WebviewView error paths", () => {
 
     // Verify session was removed: next request should create a new session
     const newSession = createMockSession();
-    newSession.sendMessage.mockImplementation(async () => {
+    newSession.send.mockImplementation(async () => {
       newSession._emit("session.idle");
     });
     mockClient.createSession.mockResolvedValueOnce(newSession);

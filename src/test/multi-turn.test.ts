@@ -91,16 +91,16 @@ describe("multi-turn conversation context (SC4)", () => {
       const resultA = await getOrCreateSession("conv-A", validConfig);
       const resultB = await getOrCreateSession("conv-B", validConfig);
 
-      await resultA.sendMessage({ role: "user", content: "message A" });
-      await resultB.sendMessage({ role: "user", content: "message B" });
+      await resultA.send({ prompt: "message A" });
+      await resultB.send({ prompt: "message B" });
 
-      expect(sessionA.sendMessage).toHaveBeenCalledWith({
-        role: "user",
-        content: "message A",
+      expect(sessionA.send).toHaveBeenCalledWith({
+        
+        prompt: "message A",
       });
-      expect(sessionB.sendMessage).toHaveBeenCalledWith({
-        role: "user",
-        content: "message B",
+      expect(sessionB.send).toHaveBeenCalledWith({
+        
+        prompt: "message B",
       });
     });
   });
@@ -109,31 +109,31 @@ describe("multi-turn conversation context (SC4)", () => {
     it("accepts multiple sendMessage calls on the same session", async () => {
       const session = await getOrCreateSession("conv-multi", validConfig);
 
-      await session.sendMessage({ role: "user", content: "first message" });
-      await session.sendMessage({ role: "user", content: "second message" });
-      await session.sendMessage({ role: "user", content: "third message" });
+      await session.send({ prompt: "first message" });
+      await session.send({ prompt: "second message" });
+      await session.send({ prompt: "third message" });
 
-      expect(session.sendMessage).toHaveBeenCalledTimes(3);
-      expect(session.sendMessage).toHaveBeenNthCalledWith(1, {
-        role: "user",
-        content: "first message",
+      expect(session.send).toHaveBeenCalledTimes(3);
+      expect(session.send).toHaveBeenNthCalledWith(1, {
+        
+        prompt: "first message",
       });
-      expect(session.sendMessage).toHaveBeenNthCalledWith(2, {
-        role: "user",
-        content: "second message",
+      expect(session.send).toHaveBeenNthCalledWith(2, {
+        
+        prompt: "second message",
       });
-      expect(session.sendMessage).toHaveBeenNthCalledWith(3, {
-        role: "user",
-        content: "third message",
+      expect(session.send).toHaveBeenNthCalledWith(3, {
+        
+        prompt: "third message",
       });
     });
 
     it("returns the same session after intermediate messages", async () => {
       const session1 = await getOrCreateSession("conv-persist", validConfig);
-      await session1.sendMessage({ role: "user", content: "turn 1" });
+      await session1.send({ prompt: "turn 1" });
 
       const session2 = await getOrCreateSession("conv-persist", validConfig);
-      await session2.sendMessage({ role: "user", content: "turn 2" });
+      await session2.send({ prompt: "turn 2" });
 
       expect(session1).toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledOnce();
@@ -216,18 +216,18 @@ describe("multi-turn conversation context (SC4)", () => {
     });
 
     it("same provider instance reuses conversation ID across messages", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
       simulateUserMessage(mockView, "first message");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(1);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
       });
 
       simulateUserMessage(mockView, "second message");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(2);
+        expect(mockSession.send).toHaveBeenCalledTimes(2);
       });
 
       // Session created only once = same conversation ID reused
@@ -235,13 +235,13 @@ describe("multi-turn conversation context (SC4)", () => {
     });
 
     it("newConversation command generates new conversation ID", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
       simulateUserMessage(mockView, "first message");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(1);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
       });
 
       // New conversation resets the ID
@@ -253,7 +253,7 @@ describe("multi-turn conversation context (SC4)", () => {
 
       // New session should be created for the next message
       const newSession = createMockSession();
-      newSession.sendMessage.mockImplementation(async () => {
+      newSession.send.mockImplementation(async () => {
         newSession._emit("session.idle");
       });
       mockClient.createSession.mockResolvedValueOnce(newSession);
@@ -265,36 +265,36 @@ describe("multi-turn conversation context (SC4)", () => {
     });
 
     it("session is reused for messages within same conversation", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
       simulateUserMessage(mockView, "message 1");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(1);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
       });
 
       simulateUserMessage(mockView, "message 2");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(2);
+        expect(mockSession.send).toHaveBeenCalledTimes(2);
       });
 
       simulateUserMessage(mockView, "message 3");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(3);
+        expect(mockSession.send).toHaveBeenCalledTimes(3);
       });
 
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
 
     it("new session created after newConversation command", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
       simulateUserMessage(mockView, "before reset");
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalledTimes(1);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
       });
 
       simulateNewConversation(mockView);
@@ -306,7 +306,7 @@ describe("multi-turn conversation context (SC4)", () => {
       });
 
       const freshSession = createMockSession();
-      freshSession.sendMessage.mockImplementation(async () => {
+      freshSession.send.mockImplementation(async () => {
         freshSession._emit("session.idle");
       });
       mockClient.createSession.mockResolvedValueOnce(freshSession);

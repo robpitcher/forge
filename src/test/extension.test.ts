@@ -116,12 +116,12 @@ describe("WebviewView chat panel", () => {
   // --- Streaming message protocol ---
   describe("sendMessage command", () => {
     it("sends streamStart → streamDelta → streamEnd in order", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("assistant.message_delta", {
-          delta: { content: "Hello " },
+          data: { deltaContent: "Hello " },
         });
         mockSession._emit("assistant.message_delta", {
-          delta: { content: "there!" },
+          data: { deltaContent: "there!" },
         });
         mockSession._emit("session.idle");
       });
@@ -146,19 +146,18 @@ describe("WebviewView chat panel", () => {
     });
 
     it("creates a session and sends user prompt", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.idle");
       });
 
       simulateUserMessage(mockView, "hello");
 
       await vi.waitFor(() => {
-        expect(mockSession.sendMessage).toHaveBeenCalled();
+        expect(mockSession.send).toHaveBeenCalled();
       });
 
-      expect(mockSession.sendMessage).toHaveBeenCalledWith({
-        role: "user",
-        content: "hello",
+      expect(mockSession.send).toHaveBeenCalledWith({
+        prompt: "hello",
       });
     });
   });
@@ -224,9 +223,9 @@ describe("WebviewView chat panel", () => {
   // --- Session errors ---
   describe("session error events", () => {
     it("posts error message and removes session on session.error", async () => {
-      mockSession.sendMessage.mockImplementation(async () => {
+      mockSession.send.mockImplementation(async () => {
         mockSession._emit("session.error", {
-          error: { message: "Connection reset by peer" },
+          data: { message: "Connection reset by peer" },
         });
       });
 

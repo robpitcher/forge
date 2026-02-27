@@ -76,10 +76,11 @@ describe("copilotService", () => {
       expect(mockClient.createSession).toHaveBeenCalledWith({
         model: "gpt-4.1",
         provider: {
-          type: "openai",
+          type: "azure",
           baseUrl: validConfig.endpoint,
           apiKey: validConfig.apiKey,
           wireApi: validConfig.wireApi,
+          azure: { apiVersion: "2024-10-21" },
         },
         streaming: true,
         availableTools: [],

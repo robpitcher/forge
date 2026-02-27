@@ -6,19 +6,9 @@ export function createMockSession() {
   return {
     on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
       emitter.on(event, handler);
+      return () => { emitter.off(event, handler); };
     }),
-    once: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-      emitter.once(event, handler);
-    }),
-    off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-      emitter.off(event, handler);
-    }),
-    removeListener: vi.fn(
-      (event: string, handler: (...args: unknown[]) => void) => {
-        emitter.removeListener(event, handler);
-      }
-    ),
-    sendMessage: vi.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue("msg-1"),
     abort: vi.fn().mockResolvedValue(undefined),
     _emit: (event: string, data?: unknown) => emitter.emit(event, data),
   };
