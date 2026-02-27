@@ -2,7 +2,7 @@ body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
-  background-color: var(--vscode-editor-background);
+  background-color: var(--vscode-sideBar-background, var(--vscode-panel-background));
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -32,7 +32,7 @@ body {
 }
 
 .message.assistant {
-  background-color: var(--vscode-editor-background);
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
   border: 1px solid var(--vscode-panel-border);
 }
 
