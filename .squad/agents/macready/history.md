@@ -195,4 +195,52 @@
 - Squad members continue work on confirmed assignments in dependency order
 - Monitor @copilot PR quality for issues #2, #6, #15, #16, #18, #19, #20, #22
 
-📌 Team update (2026-02-27T14:39:00Z): Round 3 complete. Windows delivered air-gap validation tests (18 tests, #47); MacReady delivered installation and configuration docs (#45); Blair delivered session cleanup implementation (PR #46). All 59 tests passing. All PRs targeting dev. Decisions merged to `.squad/decisions.md`. Orchestration logs written. — Scribe
+### 2026-02-27 (Evening): Architecture Documentation Update — WebviewView Sidebar
+
+**Issue:** #52 — Update documentation for standalone WebviewView architecture (priority P1, should-have for MVP)
+
+**Work Completed:**
+- **README.md** (multiple edits)
+  * Updated introduction: "sidebar chat interface" instead of "local Copilot Chat"
+  * Fixed first architecture diagram: Chat Panel → Enclave Sidebar (WebviewView), updated streaming flow
+  * Quick Start (step 3): Click Enclave icon instead of Ctrl+L / @copilot workflow
+  * Quick Start (step 4-5): Removed @copilot references, emphasize sidebar chat
+  * Usage section: Removed all @copilot mentions, sidebar-native interaction
+  * Example prompts: Removed @copilot prefix
+  * Added F5 debug launch to Watch mode section
+  * Fixed second architecture diagram similarly
+  * Updated source files description: WebviewViewProvider instead of chat participant
+
+- **docs/installation-guide.md** (1 section)
+  * Step 4.3 (Test the Extension): Click sidebar icon instead of "Open Copilot Chat" and @copilot prefix
+
+- **specs/PRD-airgapped-copilot-vscode-extension.md** (7 key updates)
+  * Executive Summary: Added architecture evolution note explaining migration from Chat Participant to WebviewView
+  * Goal G1: "open a sidebar" with WebviewView instead of "chat panel" with Chat Participant API
+  * Goal G4: Streaming tokens appear in "sidebar" not "chat panel"
+  * Goal G6: Errors display in "sidebar" not "chat panel"
+  * Architecture diagram: Chat Panel → Enclave Sidebar (WebviewView)
+  * FR1: Complete rewrite from "Chat Participant Registration" → "WebviewView Sidebar Registration"
+    - Explains view container, view IDs, display name, icon config in package.json
+  * FR7 error table: Changed error display from "chat" to "sidebar" for all error conditions
+
+**Branch & PR:**
+- Branch: `squad/52-docs-update-clean` (created fresh from `dev`)
+- Will push and create PR targeting `dev`
+
+**Scope Clarifications:**
+- Configuration reference (docs/configuration-reference.md) had no Chat Participant references — no changes needed
+- Historical context in PRD (later sections mentioning Chat Participant API design notes) left intact for historical record
+- Focus: User-facing docs (README, installation guide, current requirements in PRD)
+
+**Acceptance Criteria (from issue #52):**
+- ✅ No references to Chat Participant API in user-facing documentation
+- ✅ No `@enclave` or `@copilot` references in normal workflows
+- ✅ README shows sidebar usage (click icon, type, press Enter)
+- ✅ Installation guide reflects sidebar testing  (click icon instead of Ctrl+L)
+- ✅ PRD updated with architecture change (FR1 fully rewritten, Executive Summary note added)
+
+**Files Modified:**
+- README.md (11 edits: intro, 2 architecture diagrams, Quick Start, Usage, source files, Watch mode)
+- docs/installation-guide.md (1 edit: step 4.3 testing)
+- specs/PRD-airgapped-copilot-vscode-extension.md (7 edits: Executive Summary, Goals, Architecture, FR1, FR7)

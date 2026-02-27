@@ -184,9 +184,10 @@ Press `Ctrl+C` to stop the server.
 Once the CLI is verified:
 
 1. Open VS Code
-2. Open Copilot Chat (`Ctrl+L` / `Cmd+L`)
-3. Type a message (e.g., `@copilot hello`)
-4. If configured correctly, you should see the response stream
+2. Look for the Enclave icon in the VS Code activity bar (left sidebar)
+3. Click the icon to open the Enclave sidebar
+4. Type a message (e.g., `hello`) and press Enter
+5. If configured correctly, you should see the response stream
 
 ---
 

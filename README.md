@@ -1,6 +1,6 @@
 # Enclave
 
-A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides local Copilot Chat without internet connectivity or GitHub authentication.
+A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without internet connectivity or GitHub authentication.
 
 The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode to route all model inference to a private **Azure AI Foundry** endpoint.
 
@@ -114,11 +114,11 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
    | `enclave.copilot.apiKey` | Your API key |
    | `enclave.copilot.model` | Model deployment name (default: `gpt-4.1`) |
 
-3. **Open Copilot Chat:** Press `Ctrl+L` / `Cmd+L` or use the Copilot Chat view in the sidebar
+3. **Open the Enclave sidebar:** Click the Enclave icon in the VS Code activity bar (left sidebar)
 
-4. **Activate Enclave:** Type `@copilot` followed by your message
+4. **Activate Enclave:** Start typing a message and press Enter
 
-5. **Multi-turn conversations:** Follow-up questions automatically reuse the same session context
+5. **Multi-turn conversations:** The chat maintains session context within the same the same session context
 
 ---
 
@@ -132,7 +132,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Example prompts
 
-- `@copilot Explain how this function works`
+- ` Explain how this function works`
 - `@copilot Write a unit test for this code`
 - `@copilot What are the performance implications?`
 
