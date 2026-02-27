@@ -3,6 +3,7 @@ import { getConfiguration, validateConfiguration } from "./configuration.js";
 import {
   getOrCreateSession,
   removeSession,
+  destroySession,
   stopClient,
   CopilotCliNotFoundError,
 } from "./copilotService.js";
@@ -23,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export async function deactivate(): Promise<void> {
+  // stopClient now calls destroyAllSessions internally before stopping the client
   await stopClient();
 }
 
@@ -75,7 +77,7 @@ async function handleChatRequest(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     stream.markdown(`❌ Error: ${message}`);
-    removeSession(conversationId);
+    await destroySession(conversationId);
   } finally {
     abortListener.dispose();
   }

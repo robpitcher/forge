@@ -19,7 +19,7 @@ export function createMockSession() {
       }
     ),
     sendMessage: vi.fn().mockResolvedValue(undefined),
-    abort: vi.fn(),
+    abort: vi.fn().mockResolvedValue(undefined),
     _emit: (event: string, data?: unknown) => emitter.emit(event, data),
   };
 }
