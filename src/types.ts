@@ -29,6 +29,9 @@ export interface ProviderConfig {
   wireApi?: "completions" | "responses";
   baseUrl: string;
   apiKey?: string;
+  azure?: {
+    apiVersion?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -37,12 +40,14 @@ export interface ProviderConfig {
 
 /** Payload for `assistant.message_delta` events. */
 export interface MessageDeltaEvent {
-  delta?: { content?: string };
+  type: "assistant.message_delta";
+  data: { deltaContent: string; messageId?: string };
 }
 
 /** Payload for `session.error` events. */
 export interface SessionErrorEvent {
-  error?: { message?: string };
+  type: "session.error";
+  data: { message: string; stack?: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -52,32 +57,31 @@ export interface SessionErrorEvent {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type EventCallback = (...args: any[]) => void;
 
+/** Function returned by session.on() to unsubscribe the handler. */
+export type Unsubscribe = () => void;
+
 /**
  * Structural interface for a Copilot SDK session.
  *
- * The SDK's runtime CopilotSession exposes EventEmitter-pattern helpers
- * (`sendMessage`, `off`, `once`, `removeListener`) that are not present in the
- * published type declarations.  This interface captures the contract that the
- * extension actually relies on.
+ * The SDK's CopilotSession uses a custom event system — not EventEmitter.
+ * `on()` returns an unsubscribe function; there is no `once()` or `off()`.
+ * Messages are sent via `send({ prompt })`, not `sendMessage()`.
  */
 export interface ICopilotSession {
-  sendMessage(message: { role: string; content: string }): Promise<unknown>;
+  send(options: { prompt: string }): Promise<string>;
   abort(): Promise<void>;
 
   on(
     event: "assistant.message_delta",
     handler: (event: MessageDeltaEvent) => void,
-  ): void;
-  on(event: string, handler: EventCallback): void;
-
-  off?(event: string, handler: EventCallback): void;
-
-  once(event: "session.idle", handler: () => void): void;
-  once(
+  ): Unsubscribe;
+  on(
+    event: "session.idle",
+    handler: (event: { type: "session.idle" }) => void,
+  ): Unsubscribe;
+  on(
     event: "session.error",
     handler: (event: SessionErrorEvent) => void,
-  ): void;
-  once(event: string, handler: EventCallback): void;
-
-  removeListener?(event: string, handler: EventCallback): void;
+  ): Unsubscribe;
+  on(event: string, handler: EventCallback): Unsubscribe;
 }
