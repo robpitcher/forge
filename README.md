@@ -22,7 +22,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to chat panel    │  │
+│  │   Creates session → Streams deltas to sidebar    │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
@@ -200,7 +200,7 @@ Creates `enclave-0.1.0.vsix` for sideloading or distribution.
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to chat panel    │  │
+│  │   Creates session → Streams deltas to sidebar    │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
