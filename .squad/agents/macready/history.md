@@ -244,3 +244,5 @@
 - README.md (11 edits: intro, 2 architecture diagrams, Quick Start, Usage, source files, Watch mode)
 - docs/installation-guide.md (1 edit: step 4.3 testing)
 - specs/PRD-airgapped-copilot-vscode-extension.md (7 edits: Executive Summary, Goals, Architecture, FR1, FR7)
+
+📌 Team update (2026-02-27T17:00:00Z): MVP batch completion. Documentation update for WebviewView support (#52) completed in parallel with Windows (#59, #57) and Blair (#56). Session logs written to .squad/orchestration-log/ and .squad/log/. All PRs targeting dev. — completed by MacReady, Scribe orchestration

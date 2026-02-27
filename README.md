@@ -15,14 +15,14 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Chat Panel (VS Code Chat API)               │  │
+│  │         Enclave Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to chat panel    │  │
+│  │   Creates session → Streams deltas to sidebar    │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
@@ -118,7 +118,7 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 4. **Activate Enclave:** Start typing a message and press Enter
 
-5. **Multi-turn conversations:** The chat maintains session context within the same the same session context
+5. **Multi-turn conversations:** The chat maintains session context within the same session
 
 ---
 
@@ -126,19 +126,19 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Open Copilot Chat in VS Code (`Ctrl+L` / `Cmd+L`)
-2. Type `@copilot` followed by your message
+1. Click the Enclave icon in the VS Code activity bar (left sidebar)
+2. Type your message in the chat input field
 3. Press Enter to send
 
 ### Example prompts
 
-- ` Explain how this function works`
-- `@copilot Write a unit test for this code`
-- `@copilot What are the performance implications?`
+- `Explain how this function works`
+- `Write a unit test for this code`
+- `What are the performance implications?`
 
 ### Stop generation
 
-Click the stop button in the chat panel to cancel in-flight requests.
+Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
 ---
 
@@ -193,14 +193,14 @@ Creates `enclave-0.1.0.vsix` for sideloading or distribution.
 │                      VS Code                              │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │         Chat Panel (VS Code Chat API)               │  │
+│  │         Enclave Sidebar (WebviewView)               │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │                                    │
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to chat panel    │  │
+│  │   Creates session → Streams deltas to sidebar    │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
