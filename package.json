@@ -77,7 +77,7 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "package": "node esbuild.config.mjs --production && vsce package",
+    "package": "npm run build -- --production && vsce package",
     "lint": "tsc --noEmit"
   }
 }
