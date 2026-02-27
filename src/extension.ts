@@ -81,6 +81,22 @@ async function handleChatRequest(
   }
 }
 
+/**
+ * Derives a stable conversation ID for session reuse.
+ *
+ * VS Code's ChatContext interface does not document an `id` property in the official
+ * type definitions (@types/vscode). However, VS Code may provide `context.id` at
+ * runtime for multi-turn conversation tracking.
+ *
+ * Strategy: Defensively attempt to use `context.id` if it is a valid non-empty
+ * string. If unavailable, undefined, or invalid, generate a unique fallback ID
+ * using timestamp + random component. This ensures session reuse when VS Code
+ * provides an ID, but falls back gracefully if not.
+ *
+ * Note: If VS Code does not provide `context.id`, multi-turn context is lost
+ * (new session per message). Real VS Code 1.93+ testing is required to confirm
+ * behavior. See: https://github.com/robpitcher/enclave/issues/24
+ */
 function getConversationId(context: vscode.ChatContext): string {
   const ctxWithId = context as unknown as { id?: unknown };
   if (typeof ctxWithId.id === "string" && ctxWithId.id.length > 0) {
