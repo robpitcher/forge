@@ -57,6 +57,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
     if (message.command === "sendMessage") {
       await this._handleChatMessage(message.text ?? "");
+    } else if (message.command === "openSettings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "enclave.copilot");
     } else if (message.command === "newConversation") {
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
@@ -173,6 +175,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="container">
+        <div class="toolbar">
+            <button id="settingsBtn" class="toolbar-btn" title="Open Enclave Settings">&#9881;</button>
+        </div>
         <div id="chatMessages"></div>
         <div class="input-area">
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
