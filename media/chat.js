@@ -4,16 +4,12 @@
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
   const newConvBtn = document.getElementById("newConvBtn");
-  const settingsBtn = document.getElementById("settingsBtn");
 
   let currentAssistantMessage = null;
   let isStreaming = false;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
-  settingsBtn.addEventListener("click", () => {
-    vscode.postMessage({ command: "openSettings" });
-  });
 
   userInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {

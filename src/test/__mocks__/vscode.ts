@@ -22,6 +22,7 @@ export const window = {
 
 export const commands = {
   executeCommand: vi.fn().mockResolvedValue(undefined),
+  registerCommand: vi.fn().mockReturnValue({ dispose: vi.fn() }),
 };
 
 export class ThemeIcon {

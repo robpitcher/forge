@@ -40,6 +40,22 @@
         }
       ]
     },
+    "commands": [
+      {
+        "command": "forge.openSettings",
+        "title": "Forge Settings",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "forge.openSettings",
+          "when": "view == forge.chatView",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Forge",
       "properties": {

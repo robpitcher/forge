@@ -16,7 +16,10 @@ import type {
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new ChatViewProvider(context.extensionUri, context.secrets);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("forge.chatView", provider)
+    vscode.window.registerWebviewViewProvider("forge.chatView", provider),
+    vscode.commands.registerCommand("forge.openSettings", () =>
+      provider.openSettings()
+    )
   );
 }
 
@@ -57,27 +60,31 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  public async openSettings(): Promise<void> {
+    const choice = await vscode.window.showQuickPick(
+      ["Open Settings", "Set API Key (secure)"],
+      { placeHolder: "Forge Configuration" }
+    );
+    if (choice === "Open Settings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
+    } else if (choice === "Set API Key (secure)") {
+      const value = await vscode.window.showInputBox({
+        prompt: "Enter your API key",
+        password: true,
+        placeHolder: "Paste your Azure AI Foundry API key",
+      });
+      if (value !== undefined) {
+        await this._secrets.store("forge.copilot.apiKey", value);
+        await vscode.window.showInformationMessage("API key stored securely.");
+      }
+    }
+  }
+
   private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
     if (message.command === "sendMessage") {
       await this._handleChatMessage(message.text ?? "");
     } else if (message.command === "openSettings") {
-      const choice = await vscode.window.showQuickPick(
-        ["Open Settings", "Set API Key (secure)"],
-        { placeHolder: "Forge Configuration" }
-      );
-      if (choice === "Open Settings") {
-        await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
-      } else if (choice === "Set API Key (secure)") {
-        const value = await vscode.window.showInputBox({
-          prompt: "Enter your API key",
-          password: true,
-          placeHolder: "Paste your Azure AI Foundry API key",
-        });
-        if (value !== undefined) {
-          await this._secrets.store("forge.copilot.apiKey", value);
-          await vscode.window.showInformationMessage("API key stored securely.");
-        }
-      }
+      await this.openSettings();
     } else if (message.command === "newConversation") {
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
@@ -210,9 +217,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="container">
-        <div class="toolbar">
-            <button id="settingsBtn" class="toolbar-btn" title="Open Forge Settings" aria-label="Open Forge configuration">&#9881;</button>
-        </div>
         <div id="chatMessages"></div>
         <div class="input-area">
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
