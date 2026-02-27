@@ -111,18 +111,27 @@ export async function destroyAllSessions(): Promise<void> {
       console.warn(`Session ${conversationId} is undefined, skipping abort`);
       continue;
     }
-    const abortPromise = session.abort().catch((err) => {
+    let abortPromise: Promise<void>;
+    try {
+      abortPromise = session.abort();
+    } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`Failed to abort session ${conversationId}: ${message}`);
-    });
-    abortPromises.push(abortPromise);
+      continue;
+    }
+    abortPromises.push(
+      abortPromise.catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`Failed to abort session ${conversationId}: ${message}`);
+      })
+    );
   }
 
   await Promise.all(abortPromises);
   sessions.clear();
 }
 
-export function getSessionCount(): number {
+function getSessionCount(): number {
   return sessions.size;
 }
 
