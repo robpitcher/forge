@@ -1,6 +1,8 @@
 # Enclave
 
-A VS Code extension that provides a Copilot-like chat experience for **air-gapped environments** — no GitHub authentication, no internet access to GitHub services required. The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint.
+A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides local Copilot Chat without internet connectivity or GitHub authentication.
+
+The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode to route all model inference to a private **Azure AI Foundry** endpoint.
 
 > 📄 See [specs/PRD-airgapped-copilot-vscode-extension.md](specs/PRD-airgapped-copilot-vscode-extension.md) for the full Product Requirements Document.
 
@@ -38,9 +40,65 @@ A VS Code extension that provides a Copilot-like chat experience for **air-gappe
 
 ## Prerequisites
 
-- **VS Code** 1.93.0 or later
-- **Copilot CLI** v0.0.418 or later — must be installed and available on `PATH` (or configured via `enclave.copilot.cliPath`)
-- **Azure AI Foundry endpoint** — a running Azure AI Foundry deployment with a known endpoint URL and API key
+- **VS Code** 1.93 or later
+- **Node.js** 18+ (for development/build)
+- **Copilot CLI** v0.0.418+ ([installation guide](https://github.com/github/copilot-cli) or air-gapped distribution)
+- **Azure AI Foundry** endpoint (OpenAI-compatible API)
+
+---
+
+## Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/robpitcher/enclave.git
+   cd enclave
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Build the extension:**
+   ```bash
+   npm run build
+   ```
+
+4. **Package as `.vsix` (for sideloading):**
+   ```bash
+   npm run package
+   ```
+
+5. **Sideload into VS Code:**
+   - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+   - Click "..." menu → "Install from VSIX"
+   - Select `enclave-0.1.0.vsix`
+
+---
+
+## Configuration
+
+Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
+
+| Setting | Required | Default | Description |
+|---------|----------|---------|-------------|
+| `enclave.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
+| `enclave.copilot.apiKey` | ✓ | — | API key for the Azure endpoint |
+| `enclave.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
+| `enclave.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
+| `enclave.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
+
+### Example Configuration
+
+```json
+{
+  "enclave.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
+  "enclave.copilot.apiKey": "sk-...",
+  "enclave.copilot.model": "gpt-4.1",
+  "enclave.copilot.wireApi": "completions"
+}
+```
 
 ---
 
@@ -56,12 +114,112 @@ A VS Code extension that provides a Copilot-like chat experience for **air-gappe
    | `enclave.copilot.apiKey` | Your API key |
    | `enclave.copilot.model` | Model deployment name (default: `gpt-4.1`) |
 
-3. **Sideload the `.vsix`**:
-   ```sh
-   code --install-extension enclave-0.1.0.vsix
-   ```
+3. **Open Copilot Chat:** Press `Ctrl+L` / `Cmd+L` or use the Copilot Chat view in the sidebar
 
-4. **Open the Chat panel** in VS Code and start chatting with `@copilot`.
+4. **Activate Enclave:** Type `@copilot` followed by your message
+
+5. **Multi-turn conversations:** Follow-up questions automatically reuse the same session context
+
+---
+
+## Usage
+
+### Start a chat
+
+1. Open Copilot Chat in VS Code (`Ctrl+L` / `Cmd+L`)
+2. Type `@copilot` followed by your message
+3. Press Enter to send
+
+### Example prompts
+
+- `@copilot Explain how this function works`
+- `@copilot Write a unit test for this code`
+- `@copilot What are the performance implications?`
+
+### Stop generation
+
+Click the stop button in the chat panel to cancel in-flight requests.
+
+---
+
+## Development
+
+### Build
+
+```bash
+npm run build
+```
+
+Bundles the extension and SDK into `dist/extension.js`.
+
+### Watch mode
+
+```bash
+npm run watch
+```
+
+Rebuilds on file changes.
+
+### Linting
+
+```bash
+npm run lint
+```
+
+Type-checks code with TypeScript.
+
+### Testing
+
+```bash
+npm run test
+```
+
+Runs automated tests with Vitest.
+
+### Package for distribution
+
+```bash
+npm run package
+```
+
+Creates `enclave-0.1.0.vsix` for sideloading or distribution.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                      VS Code                              │
+│                                                           │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │         Chat Panel (VS Code Chat API)               │  │
+│  │   User types prompt → sees streamed markdown reply  │  │
+│  └────────────────────┬────────────────────────────────┘  │
+│                       │                                    │
+│  ┌────────────────────▼────────────────────────────────┐  │
+│  │         Extension Host (our extension)              │  │
+│  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
+│  │   Creates session → Streams deltas to chat panel    │  │
+│  └────────────────────┬────────────────────────────────┘  │
+│                       │ JSON-RPC (stdio)                   │
+│  ┌────────────────────▼────────────────────────────────┐  │
+│  │         Copilot CLI (server mode, local process)    │  │
+│  └────────────────────┬────────────────────────────────┘  │
+└───────────────────────┼──────────────────────────────────┘
+                        │ HTTPS (private network)
+                        ▼
+┌──────────────────────────────────────────────────────────┐
+│           Azure AI Foundry (Private Endpoint)             │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Source files
+
+- **`src/extension.ts`** — VS Code extension activation, chat participant registration, request handler, streaming response logic, and user cancellation
+- **`src/copilotService.ts`** — CopilotClient lifecycle management, BYOK session creation with Azure AI Foundry configuration, session reuse map
+- **`src/configuration.ts`** — VS Code settings reader and validation for required fields
+- **`src/types.ts`** — TypeScript type definitions for SDK interfaces
 
 ---
 
