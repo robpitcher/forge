@@ -140,7 +140,13 @@ describe("Error: handleChatRequest error paths", () => {
 
   // (6) Config validation displayed
   it("shows validation errors with settings button when config is missing", async () => {
-    activateExtension({ endpoint: "", apiKey: "", model: "gpt-4.1", wireApi: "completions", cliPath: "" });
+    activateExtension({
+      endpoint: "",
+      apiKey: "",
+      model: "gpt-4.1",
+      wireApi: "completions",
+      cliPath: "",
+    });
 
     const stream = makeStream();
     const token = makeToken();
