@@ -12,11 +12,18 @@
   newConvBtn.addEventListener("click", newConversation);
 
   userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendMessage();
     }
   });
+
+  userInput.addEventListener("input", autoResizeTextarea);
+
+  function autoResizeTextarea() {
+    userInput.style.height = "auto";
+    userInput.style.height = userInput.scrollHeight + "px";
+  }
 
   function setInputEnabled(enabled) {
     sendBtn.disabled = !enabled;
@@ -29,6 +36,7 @@
 
     appendMessage("user", text);
     userInput.value = "";
+    autoResizeTextarea();
 
     vscode.postMessage({ command: "sendMessage", text });
   }
