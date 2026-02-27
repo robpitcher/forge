@@ -23,7 +23,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "forge",
           "title": "Forge",
