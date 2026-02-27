@@ -70,7 +70,7 @@ export interface ICopilotSession {
   ): void;
   on(event: string, handler: EventCallback): void;
 
-  off(event: string, handler: EventCallback): void;
+  off?(event: string, handler: EventCallback): void;
 
   once(event: "session.idle", handler: () => void): void;
   once(
@@ -79,5 +79,5 @@ export interface ICopilotSession {
   ): void;
   once(event: string, handler: EventCallback): void;
 
-  removeListener(event: string, handler: EventCallback): void;
+  removeListener?(event: string, handler: EventCallback): void;
 }
