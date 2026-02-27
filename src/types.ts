@@ -1,7 +1,8 @@
 /**
  * Type definitions for the Copilot SDK interfaces used by this extension.
  *
- * SessionConfig and ProviderConfig are re-exported directly from the SDK.
+ * SessionConfig and related event types are re-exported directly from the SDK.
+ * ProviderConfig is defined locally based on the shape of SessionConfig.provider.
  * ICopilotSession is a structural interface because the SDK class type does
  * not surface the EventEmitter-style methods available at runtime.
  */
