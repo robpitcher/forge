@@ -3,6 +3,35 @@ import * as esbuild from "esbuild";
 const watch = process.argv.includes("--watch");
 const production = process.argv.includes("--production");
 
+// Shim for import.meta.resolve which is ESM-only. esbuild's CJS conversion
+// replaces import.meta with a plain object, dropping the resolve() method.
+// This polyfill walks node_modules like Node would, bypassing exports-map
+// restrictions that prevent require.resolve() from finding ESM-only exports.
+const importMetaResolveShim = `
+var __importMetaResolve = (function() {
+  var _path = require("node:path");
+  var _url = require("node:url");
+  var _fs = require("node:fs");
+  return function(specifier) {
+    var parts = specifier.split("/");
+    var pkgName = parts[0].startsWith("@") ? parts.slice(0,2).join("/") : parts[0];
+    var subpath = parts.slice(pkgName.split("/").length);
+    var dir = __dirname;
+    while (true) {
+      var base = _path.join(dir, "node_modules", pkgName);
+      if (_fs.existsSync(base)) {
+        var target = subpath.length ? _path.join(base, ...subpath) : base;
+        if (!_fs.existsSync(target) && _fs.existsSync(target + ".js")) target += ".js";
+        if (_fs.statSync(target).isDirectory()) target = _path.join(target, "index.js");
+        return _url.pathToFileURL(target).href;
+      }
+      var parent = _path.dirname(dir);
+      if (parent === dir) throw new Error("Cannot resolve module: " + specifier);
+      dir = parent;
+    }
+  };
+})();`;
+
 const buildOptions = {
   entryPoints: ["src/extension.ts"],
   bundle: true,
@@ -12,6 +41,8 @@ const buildOptions = {
   external: ["vscode"],
   minify: production,
   sourcemap: !production,
+  banner: { js: importMetaResolveShim },
+  define: { "import.meta.resolve": "__importMetaResolve" },
 };
 
 if (watch) {
