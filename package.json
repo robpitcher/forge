@@ -1,0 +1,76 @@
+{
+  "name": "airgapped-copilot",
+  "displayName": "Air-Gapped Copilot",
+  "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+  "version": "0.1.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "airgapped.copilot",
+        "fullName": "Air-Gapped Copilot",
+        "name": "copilot",
+        "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+        "isSticky": true
+      }
+    ],
+    "configuration": {
+      "title": "Air-Gapped Copilot",
+      "properties": {
+        "airgapped.copilot.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
+        },
+        "airgapped.copilot.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the Azure AI Foundry endpoint"
+        },
+        "airgapped.copilot.model": {
+          "type": "string",
+          "default": "gpt-4.1",
+          "description": "Model deployment name"
+        },
+        "airgapped.copilot.wireApi": {
+          "type": "string",
+          "default": "completions",
+          "enum": [
+            "completions",
+            "responses"
+          ],
+          "description": "API format: 'completions' or 'responses'"
+        },
+        "airgapped.copilot.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Copilot CLI binary (if not on PATH)"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "0.1.26"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.93.0",
+    "@vscode/vsce": "3.7.1",
+    "esbuild": "0.27.3",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "vsce package",
+    "lint": "tsc --noEmit"
+  }
+}
