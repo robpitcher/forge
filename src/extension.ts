@@ -77,12 +77,9 @@ async function handleChatRequest(
 }
 
 function getConversationId(context: vscode.ChatContext): string {
-  if (
-    context.history.length > 0 &&
-    "id" in context &&
-    typeof (context as unknown as Record<string, unknown>).id === "string"
-  ) {
-    return (context as unknown as Record<string, unknown>).id as string;
+  const ctxWithId = context as unknown as { id?: unknown };
+  if (typeof ctxWithId.id === "string" && ctxWithId.id.length > 0) {
+    return ctxWithId.id;
   }
   return `conversation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
