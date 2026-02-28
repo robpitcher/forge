@@ -276,3 +276,30 @@
 3. **Both Phase 2 issues are larger than originally scoped** — the Chat Participant → WebviewView migration means features that would have been "turn on a flag" become "build the UX from scratch."
 4. **SDK tool event model is TBD** — need to verify the exact event names for tool calls from `@github/copilot-sdk` before implementation begins. Childs should investigate SDK docs first.
 5. **Context size management is important** — attaching full files to prompts can blow token limits. Need truncation with user-visible notes.
+
+### 2026-02-28: Design Review — #27 DefaultAzureCredential Auth
+
+**Ceremony:** Design Review (pre-implementation)
+**Issue:** #27 — Phase 3a DefaultAzureCredential auth support
+
+**Key Architecture Decisions:**
+1. New `src/auth/credentialProvider.ts` module with `CredentialProvider` interface (`getToken(): Promise<string>`), two implementations (`EntraIdCredentialProvider`, `ApiKeyCredentialProvider`), and factory function.
+2. `getOrCreateSession()` signature changes to accept `authToken: string` — caller resolves token before calling. Keeps copilotService free of auth concerns.
+3. Dynamic `import("@azure/identity")` in the factory to avoid loading the package in apiKey mode.
+4. `forge.copilot.authMethod` enum setting with `"entraId"` (default) and `"apiKey"` values.
+5. Validation skips API key check when `authMethod === "entraId"` — Entra failures surface at token acquisition time.
+
+**File Ownership (for parallel implementation):**
+- Childs: `src/auth/credentialProvider.ts` (new), `src/copilotService.ts` (session auth wiring)
+- Blair: `package.json` (setting + dep), `src/configuration.ts` (authMethod field + validation), `src/extension.ts` (caller wiring)
+- Windows: Tests for both auth paths, VSIX size validation
+- Docs: README, config reference, installation guide updates
+
+**Risks Flagged:**
+1. `@azure/identity` bundle size may push VSIX past 10MB limit — measure after adding dep
+2. Air-gapped Entra ID requires IMDS (Managed Identity) or pre-auth; document limitation
+3. Token expiry mid-session acceptable for Phase 3a; defer session recreation to Phase 3b
+4. `DefaultAzureCredential` error messages are verbose — need user-friendly wrapping
+5. Breaking signature change on `getOrCreateSession()` requires coordinated work
+
+**Decision document:** `.squad/decisions/inbox/macready-entra-auth-design.md`
