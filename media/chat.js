@@ -217,7 +217,7 @@
     result.appendChild(summary);
 
     if (message.output) {
-      const toggle = document.createElement("span");
+      const toggle = document.createElement("button");
       toggle.className = "tool-output-toggle";
       toggle.textContent = " ▶ Details";
       summary.appendChild(toggle);

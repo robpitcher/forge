@@ -116,7 +116,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         );
         return;
       }
-      this._pendingPermissions.delete(id);
       resolver(approved === true);
     }
   }

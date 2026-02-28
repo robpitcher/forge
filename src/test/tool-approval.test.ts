@@ -152,39 +152,186 @@ describe("Tool approval flow (#25)", () => {
   // 2. Tool event handling — permission requests
   // =========================================================================
   describe("tool permission request handling", () => {
-    it.todo(
-      "sends toolConfirmation to webview when permission request received and autoApproveTools is false"
-      // Expected: when the SDK's onPermissionRequest callback fires with a
-      // PermissionRequest { kind: "shell", toolCallId: "tc-1", ... },
-      // the extension posts { type: "toolConfirmation", toolCallId: "tc-1",
-      // toolName: "shell", ... } to the webview.
-    );
+    it("permission handler posts toolConfirmation to webview when autoApproveTools is false", async () => {
+      // 1. Don't immediately emit session.idle — keep session alive
+      mockSession.send.mockImplementation(async () => {});
 
-    it.todo(
-      "auto-approves tool when autoApproveTools is true (no webview message)"
-      // Expected: when autoApproveTools config is true, the onPermissionRequest
-      // handler immediately returns { kind: "approved" } without posting
-      // a toolConfirmation message to the webview.
-    );
+      // 2. Trigger session creation
+      simulateUserMessage(mockView, "hello");
+
+      // 3. Wait for createSession to be called
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalled();
+      }, { timeout: 10000 });
+
+      // 4. Extract the handler
+      const sessionArgs = mockClient.createSession.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handler = sessionArgs.onPermissionRequest as (request: unknown, invocation: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+
+      // 5. Note how many messages were posted before we invoke the handler
+      const beforeCount = getPostedMessages(mockView).length;
+
+      // 6. Invoke handler — DO NOT await yet! It returns a pending promise.
+      const resultPromise = handler(
+        { kind: "shell", toolCallId: "tc-1" },
+        { sessionId: "s1" }
+      );
+
+      // 7. Give a tiny delay for any synchronous postMessage calls to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // 8. Check if toolConfirmation was posted
+      const msgs = getPostedMessages(mockView);
+      const newMsgs = msgs.slice(beforeCount);
+      const confirmations = newMsgs.filter((m: unknown) => (m as { type: string }).type === "toolConfirmation");
+      
+      expect(confirmations).toHaveLength(1);
+      expect(confirmations[0]).toMatchObject({
+        type: "toolConfirmation",
+        id: "tc-1",
+        tool: "shell",
+      });
+
+      // 9. Simulate webview responding with approval
+      await new Promise(resolve => setTimeout(() => {
+        simulateWebviewMessage(mockView, { command: "toolResponse", id: "tc-1", approved: true });
+        resolve(undefined);
+      }, 0));
+
+      // 10. NOW await the result
+      const result = await resultPromise;
+      expect(result).toEqual({ kind: "approved" });
+    }, 15000);
+
+    it("auto-approves tool when autoApproveTools is true (no webview message)", async () => {
+      // Setup with autoApproveTools enabled
+      setupConfig({ autoApproveTools: true });
+
+      // Re-activate with new config
+      const mockExtContext = {
+        subscriptions: [] as { dispose: () => void }[],
+        extensionUri: { toString: () => "mock-ext-uri" },
+        secrets: {
+          get: vi.fn().mockImplementation((key: string) =>
+            key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+          ),
+          store: vi.fn().mockResolvedValue(undefined),
+          delete: vi.fn().mockResolvedValue(undefined),
+          onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
+      };
+      activate(mockExtContext as unknown as import("vscode").ExtensionContext);
+
+      const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+      capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+      mockView = resolveProvider();
+
+      mockSession.send.mockImplementation(async () => {
+        // Don't emit session.idle — let the test control the flow
+      });
+
+      // Trigger session creation
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalled();
+      });
+
+      // Extract the permission handler
+      const sessionArgs = mockClient.createSession.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(sessionArgs.onPermissionRequest).toBeDefined();
+      const handler = sessionArgs.onPermissionRequest as (request: unknown, invocation: unknown) => Promise<unknown>;
+
+      // Clear any messages posted during setup
+      const initialMessageCount = getPostedMessages(mockView).length;
+
+      // Trigger permission request
+      const result = await handler(
+        { kind: "shell", toolCallId: "tc-2" },
+        { sessionId: "s1" }
+      );
+
+      // Verify NO new toolConfirmation was posted
+      const finalMessages = getPostedMessages(mockView);
+      const newMessages = finalMessages.slice(initialMessageCount);
+      const confirmations = newMessages.filter((m: unknown) => (m as { type: string }).type === "toolConfirmation");
+      expect(confirmations).toHaveLength(0);
+
+      // Verify handler immediately returned approved
+      expect(result).toEqual({ kind: "approved" });
+    });
   });
 
   // =========================================================================
   // 3. Tool response handling — user approves/denies in webview
   // =========================================================================
   describe("tool response from webview", () => {
-    it.todo(
-      "calls SDK confirmation with approved when webview sends toolResponse approved=true"
-      // Expected: webview posts { command: "toolResponse", toolCallId: "tc-1",
-      // approved: true } → extension resolves the pending permission request
-      // with { kind: "approved" }.
-    );
+    it("resolves with approved when webview sends toolResponse approved=true", async () => {
+      // 1. Keep session alive
+      mockSession.send.mockImplementation(async () => {});
 
-    it.todo(
-      "calls SDK rejection when webview sends toolResponse approved=false"
-      // Expected: webview posts { command: "toolResponse", toolCallId: "tc-1",
-      // approved: false } → extension resolves with
-      // { kind: "denied-interactively-by-user" }.
-    );
+      // 2. Trigger session creation
+      simulateUserMessage(mockView, "hello");
+
+      // 3. Wait for createSession to be called
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalled();
+      }, { timeout: 10000 });
+
+      // 4. Extract the handler
+      const sessionArgs = mockClient.createSession.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handler = sessionArgs.onPermissionRequest as (request: unknown, invocation: unknown) => Promise<unknown>;
+
+      // 5. Invoke handler without awaiting
+      const resultPromise = handler(
+        { kind: "shell", toolCallId: "tc-2" },
+        { sessionId: "s1" }
+      );
+
+      // 6. Give tiny delay for postMessage
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // 7. Simulate webview responding with approval
+      simulateWebviewMessage(mockView, { command: "toolResponse", id: "tc-2", approved: true });
+
+      // 8. Await the result
+      const result = await resultPromise;
+      expect(result).toEqual({ kind: "approved" });
+    }, 15000);
+
+    it("resolves with denied-interactively-by-user when webview sends toolResponse approved=false", async () => {
+      // 1. Keep session alive
+      mockSession.send.mockImplementation(async () => {});
+
+      // 2. Trigger session creation
+      simulateUserMessage(mockView, "hello");
+
+      // 3. Wait for createSession to be called
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalled();
+      }, { timeout: 10000 });
+
+      // 4. Extract the handler
+      const sessionArgs = mockClient.createSession.mock.calls[0]?.[0] as Record<string, unknown>;
+      const handler = sessionArgs.onPermissionRequest as (request: unknown, invocation: unknown) => Promise<unknown>;
+
+      // 5. Invoke handler without awaiting
+      const resultPromise = handler(
+        { kind: "bash", toolCallId: "tc-3" },
+        { sessionId: "s1" }
+      );
+
+      // 6. Give tiny delay for postMessage
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // 7. Simulate webview responding with denial
+      simulateWebviewMessage(mockView, { command: "toolResponse", id: "tc-3", approved: false });
+
+      // 8. Await the result
+      const result = await resultPromise;
+      expect(result).toEqual({ kind: "denied-interactively-by-user" });
+    }, 15000);
   });
 
   // =========================================================================
