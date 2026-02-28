@@ -131,11 +131,40 @@
 
     const params = document.createElement("div");
     params.className = "tool-params";
+
+    function formatParamValue(value) {
+      if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+      }
+      if (typeof value === "string") {
+        return value.length > 120 ? value.slice(0, 120) + "…" : value;
+      }
+      try {
+        const seen = new WeakSet();
+        const json = JSON.stringify(
+          value,
+          (key, val) => {
+            if (typeof val === "object" && val !== null) {
+              if (seen.has(val)) {
+                return "[Circular]";
+              }
+              seen.add(val);
+            }
+            return val;
+          },
+          2
+        );
+        const maxLen = 200;
+        return json.length > maxLen ? json.slice(0, maxLen) + "…" : json;
+      } catch (e) {
+        return String(value);
+      }
+    }
+
     const paramEntries = message.params ? Object.entries(message.params) : [];
     params.textContent = paramEntries
       .map(([k, v]) => {
-        const val = typeof v === "string" && v.length > 120 ? v.slice(0, 120) + "…" : v;
-        return `${k}: ${val}`;
+        return `${k}: ${formatParamValue(v)}`;
       })
       .join("\n");
 
