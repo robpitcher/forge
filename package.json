@@ -61,11 +61,6 @@
           "command": "forge.openSettings",
           "when": "view == forge.chatView",
           "group": "navigation"
-        },
-        {
-          "command": "forge.attachSelection",
-          "when": "view == forge.chatView",
-          "group": "navigation"
         }
       ]
     },
