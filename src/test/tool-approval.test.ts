@@ -36,6 +36,10 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -388,9 +392,9 @@ describe("Tool approval flow (#25)", () => {
         expect(messages.length).toBeGreaterThanOrEqual(3);
       });
 
-      const types = getPostedMessages(mockView).map(
-        (m: unknown) => (m as { type: string }).type
-      );
+      const types = getPostedMessages(mockView)
+        .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+        .map((m: unknown) => (m as { type: string }).type);
       expect(types[0]).toBe("streamStart");
       expect(types).toContain("streamDelta");
       expect(types[types.length - 1]).toBe("streamEnd");

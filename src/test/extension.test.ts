@@ -23,6 +23,10 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
 describe("WebviewView chat panel", () => {
   let mockSession: ReturnType<typeof createMockSession>;
   let mockClient: MockClient;
@@ -143,7 +147,9 @@ describe("WebviewView chat panel", () => {
       });
 
       const messages = getPostedMessages(mockView);
-      const types = messages.map((m: unknown) => (m as { type: string }).type);
+      const types = messages
+        .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+        .map((m: unknown) => (m as { type: string }).type);
 
       expect(types[0]).toBe("streamStart");
       expect(types[types.length - 1]).toBe("streamEnd");

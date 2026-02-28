@@ -8,6 +8,7 @@ import {
   stopClient,
   CopilotCliNotFoundError,
 } from "./copilotService.js";
+import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
@@ -21,7 +22,29 @@ import type {
 
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new ChatViewProvider(context.extensionUri, context.secrets);
+  
+  // Status bar item for auth status
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+  statusBarItem.command = "forge.openSettings";
+  statusBarItem.show();
+  
+  // Initial auth status update
+  updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
+    // Silent failure on initial check — user will see the error when they try to use the extension
+  });
+  
+  // Listen for config changes
+  const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration("forge.copilot")) {
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
+        // Silent failure on config change
+      });
+    }
+  });
+  
   context.subscriptions.push(
+    statusBarItem,
+    configListener,
     vscode.window.registerWebviewViewProvider("forge.chatView", provider),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
@@ -77,6 +100,32 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 }
 
+async function updateAuthStatus(
+  statusBarItem: vscode.StatusBarItem,
+  provider: ChatViewProvider,
+  secrets: vscode.SecretStorage
+): Promise<void> {
+  const config = await getConfigurationAsync(secrets);
+  const status = await checkAuthStatus(config, secrets);
+  
+  switch (status.state) {
+    case "authenticated":
+      statusBarItem.text = "$(pass) Forge: Authenticated";
+      statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      break;
+    case "notAuthenticated":
+      statusBarItem.text = "$(lock) Forge: Not Authenticated";
+      statusBarItem.tooltip = status.reason ?? "Not authenticated";
+      break;
+    case "error":
+      statusBarItem.text = "$(warning) Forge: Auth Error";
+      statusBarItem.tooltip = status.message;
+      break;
+  }
+  
+  provider.postAuthStatus(status);
+}
+
 export async function deactivate(): Promise<void> {
   await stopClient();
 }
@@ -96,6 +145,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
+  }
+
+  public postAuthStatus(status: AuthStatus): void {
+    this._view?.webview.postMessage({ type: "authStatus", status });
   }
 
   public resolveWebviewView(
@@ -118,6 +171,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
+    
+    // Send initial auth status
+    getConfigurationAsync(this._secrets)
+      .then((config) => checkAuthStatus(config, this._secrets))
+      .then((status) => this.postAuthStatus(status))
+      .catch(() => {
+        // Silent failure — status bar will show the error
+      });
   }
 
   public async openSettings(): Promise<void> {

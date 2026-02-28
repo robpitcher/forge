@@ -114,6 +114,10 @@
     const message = event.data;
 
     switch (message.type) {
+      case "authStatus":
+        updateAuthBanner(message.status);
+        break;
+
       case "streamStart":
         currentAssistantMessage = null;
         isStreaming = true;
@@ -322,5 +326,51 @@
 
     chatMessages.appendChild(result);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateAuthBanner(status) {
+    let banner = document.getElementById("authBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "authBanner";
+      banner.className = "auth-banner";
+      chatMessages.insertBefore(banner, chatMessages.firstChild);
+    }
+    
+    // Clear existing content
+    banner.innerHTML = "";
+    
+    if (status.state === "authenticated") {
+      banner.className = "auth-banner authenticated";
+      const methodLabel = status.method === "entraId" ? "Entra ID" : "API Key";
+      banner.textContent = `✅ Authenticated via ${methodLabel}`;
+      
+      // Auto-dismiss after 3 seconds
+      setTimeout(() => {
+        if (banner.parentNode) {
+          banner.remove();
+        }
+      }, 3000);
+    } else if (status.state === "notAuthenticated") {
+      banner.className = "auth-banner not-authenticated";
+      banner.textContent = "🔒 Not authenticated — ";
+      
+      const settingsBtn = document.createElement("button");
+      settingsBtn.textContent = "Open Settings";
+      settingsBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "openSettings" });
+      });
+      banner.appendChild(settingsBtn);
+    } else if (status.state === "error") {
+      banner.className = "auth-banner error";
+      banner.textContent = `⚠️ Auth error: ${status.message} — `;
+      
+      const settingsBtn = document.createElement("button");
+      settingsBtn.textContent = "Open Settings";
+      settingsBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "openSettings" });
+      });
+      banner.appendChild(settingsBtn);
+    }
   }
 })();

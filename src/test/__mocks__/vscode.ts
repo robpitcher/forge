@@ -1,9 +1,15 @@
 import { vi } from "vitest";
 
+export const StatusBarAlignment = {
+  Left: 1,
+  Right: 2,
+};
+
 export const workspace = {
   getConfiguration: vi.fn().mockReturnValue({
     get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
   }),
+  onDidChangeConfiguration: vi.fn().mockReturnValue({ dispose: vi.fn() }),
 };
 
 export const chat = {
@@ -18,6 +24,14 @@ export const window = {
   showQuickPick: vi.fn().mockResolvedValue(undefined),
   showInputBox: vi.fn().mockResolvedValue(undefined),
   showInformationMessage: vi.fn().mockResolvedValue(undefined),
+  createStatusBarItem: vi.fn().mockReturnValue({
+    text: "",
+    tooltip: "",
+    command: "",
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  }),
 };
 
 export const commands = {

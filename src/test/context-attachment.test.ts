@@ -31,6 +31,10 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -292,9 +296,9 @@ describe("Context attachment (#26)", () => {
       expect(types).toContain("streamEnd");
     });
 
-    const types = getPostedMessages(mockView).map(
-      (m: unknown) => (m as { type: string }).type
-    );
+    const types = getPostedMessages(mockView)
+      .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+      .map((m: unknown) => (m as { type: string }).type);
     expect(types[0]).toBe("streamStart");
     expect(types).toContain("streamDelta");
     expect(types[types.length - 1]).toBe("streamEnd");

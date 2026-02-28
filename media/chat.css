@@ -279,3 +279,44 @@ button:active {
 .context-chip .remove-btn:hover {
   opacity: 1;
 }
+
+/* Auth Banner */
+.auth-banner {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  border-left: 3px solid;
+}
+
+.auth-banner.authenticated {
+  border-left-color: var(--vscode-testing-iconPassed, #73c991);
+  background-color: var(--vscode-editor-background);
+  opacity: 1;
+  transition: opacity 0.5s ease-out;
+}
+
+.auth-banner.not-authenticated {
+  border-left-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+  background-color: var(--vscode-inputValidation-warningBackground);
+}
+
+.auth-banner.error {
+  border-left-color: var(--vscode-inputValidation-errorBorder);
+  background-color: var(--vscode-inputValidation-errorBackground);
+  color: var(--vscode-errorForeground);
+}
+
+.auth-banner button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-banner button:hover {
+  opacity: 0.8;
+}
