@@ -1336,3 +1336,47 @@ const AZURE_COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.def
 5. **Provider type detection.** Current code uses regex `/\.azure\.com/i` to detect Azure endpoints. This should also set `type: "azure"` when using Entra ID, since bearer tokens with Azure OpenAI require the Azure provider type. **Mitigation:** The existing logic already handles this. Just verify it still works when `apiKey` field is omitted from ProviderConfig (SDK might require it even if empty).
 
 6. **Breaking change to `getOrCreateSession()` signature.** Adding `authToken` parameter changes the contract. All callers in `extension.ts` must be updated. **Mitigation:** This is a coordinated change — Blair updates the caller, Childs updates the function. Low risk if done in same PR or coordinated branches.
+
+### 2026-02-28: Auth Status UX — Status Bar & Webview Banner
+**By:** Blair  
+**Issue:** #80  
+**Date:** 2026-02-28
+
+Implemented dual-location auth status display: VS Code status bar item (left alignment) and webview banner at top of chat. Both update on activation, config changes, and webview resolve using `checkAuthStatus()` from Childs' `authStatusProvider.ts`.
+
+#### Status Bar Item
+- Position: `StatusBarAlignment.Left`
+- Icons: `$(pass)` authenticated, `$(lock)` not authenticated, `$(warning)` error
+- Tooltip: Shows auth method (Entra ID / API Key) or error message
+- Command: `forge.openSettings` (reuses existing command)
+- Lifecycle: Created in `activate()`, pushed to `context.subscriptions` for disposal
+
+#### Webview Banner
+- Location: Top of `#chatMessages` (inserted before first child)
+- States:
+  - **Authenticated:** ✅ green border, auto-dismiss after 3 seconds
+  - **Not Authenticated:** 🔒 yellow border, "Open Settings" button
+  - **Error:** ⚠️ red border, error message + "Open Settings" button
+- Message type: `{ type: "authStatus", status: AuthStatus }`
+
+#### Update Triggers
+1. Extension activation — initial check
+2. Config changes — `onDidChangeConfiguration` listener for `forge.copilot.*`
+3. Webview resolve — sends initial status to newly opened webview
+
+#### Architecture Decisions
+1. **Status bar over command palette:** Status bar is always visible, no user action required.
+2. **Auto-dismiss on authenticated:** Reduces noise after successful auth.
+3. **Persistent error states:** Ensures users see auth issues.
+4. **Separate status bar + webview updates:** Status bar is global; webview banner is contextual.
+5. **Silent error handling on config changes:** No error dialogs; user sees status reflected in bar/banner.
+
+#### Extension Points for Future Work
+- **Sign-in button:** Add VS Code Authentication API integration with "Sign In" button in error state.
+- **Retry button:** Add "Retry" button on error state that re-checks auth without opening settings.
+- **Richer tooltips:** Status bar tooltip could show tenant ID (Entra ID) or key prefix (API Key).
+
+#### Files Modified
+- `src/extension.ts` — Status bar item, `updateAuthStatus()`, `postAuthStatus()`, config listener
+- `media/chat.js` — `authStatus` message handler, `updateAuthBanner()` function
+- `media/chat.css` — `.auth-banner` and state-specific styles
