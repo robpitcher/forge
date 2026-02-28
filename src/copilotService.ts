@@ -1,5 +1,5 @@
 import { ExtensionConfig } from "./configuration.js";
-import type { CopilotClient, ICopilotSession, ProviderConfig } from "./types.js";
+import type { CopilotClient, ICopilotSession, PermissionHandler, ProviderConfig } from "./types.js";
 
 let client: CopilotClient | undefined;
 const sessions = new Map<string, ICopilotSession>();
@@ -50,7 +50,8 @@ export async function getOrCreateClient(
 
 export async function getOrCreateSession(
   conversationId: string,
-  config: ExtensionConfig
+  config: ExtensionConfig,
+  onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
   const existing = sessions.get(conversationId);
   if (existing) {
@@ -76,7 +77,7 @@ export async function getOrCreateSession(
     model: config.model,
     provider,
     streaming: true,
-    availableTools: [],
+    ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 
   sessions.set(conversationId, session);

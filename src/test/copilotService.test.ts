@@ -83,7 +83,6 @@ describe("copilotService", () => {
           azure: { apiVersion: "2024-10-21" },
         },
         streaming: true,
-        availableTools: [],
       });
     });
 

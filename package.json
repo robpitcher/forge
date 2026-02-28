@@ -82,6 +82,11 @@
           "type": "string",
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"
+        },
+        "forge.copilot.autoApproveTools": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
         }
       }
     }

@@ -1442,3 +1442,56 @@ Both issues are larger than originally scoped. Recommend splitting implementatio
 - `src/extension.ts` `ChatViewProvider` constructor now requires `context.secrets` as second parameter.
 - All test files calling `activate()` must include a `secrets` mock on the ExtensionContext.
 - The sync `getConfiguration()` still exists for non-secret settings but won't include SecretStorage values.
+
+### 2026-02-28: Tool Confirmation UX Message Contract
+
+**By:** Blair
+**What:** The webview tool confirmation/result protocol is implemented in `media/chat.js` and `media/chat.css`. The message contract between extension.ts and the webview is:
+
+- **Extension → Webview:** `{ type: "toolConfirmation", id: string, tool: string, params: object }` — renders inline approval card
+- **Extension → Webview:** `{ type: "toolResult", id: string, tool: string, status: "success"|"error", output?: string }` — renders compact result indicator
+- **Webview → Extension:** `{ command: "toolResponse", id: string, approved: boolean }` — user's approval/rejection response
+
+Childs should wire `_handleMessage` in extension.ts to handle the `toolResponse` command, and post `toolConfirmation`/`toolResult` messages to the webview during tool execution flow.
+
+**Context:** Issue #25 — Enable Copilot CLI built-in tools
+
+### 2026-02-28: SDK Tool Event API — Actual Shape
+
+**Author:** Childs (SDK Dev)
+**Date:** 2026-02-28
+**Context:** Issue #25 — Enable Copilot CLI built-in tools
+
+## Finding
+
+The @github/copilot-sdk (v0.1.26) does NOT use a "tool confirmation event" pattern for approvals. The actual API:
+
+### Permission Handling
+- **`onPermissionRequest`** callback in `SessionConfig` — called when the CLI needs permission for shell, write, read, MCP, or URL operations.
+- Input: `PermissionRequest { kind: "shell"|"write"|"mcp"|"read"|"url", toolCallId?: string, [key: string]: unknown }`
+- Output: `PermissionRequestResult { kind: "approved"|"denied-by-rules"|"denied-no-approval-rule-and-could-not-request-from-user"|"denied-interactively-by-user" }`
+- The SDK also exports `approveAll` as a convenience handler.
+
+### Tool Execution Events (session events, subscribe via `session.on()`)
+- `tool.execution_start` — `{ toolCallId, toolName, arguments?, mcpServerName?, parentToolCallId? }`
+- `tool.execution_complete` — `{ toolCallId, success, result?: { content }, error?: { message }, parentToolCallId? }`
+- `tool.execution_partial_result` — streaming partial output
+- `tool.execution_progress` — progress messages
+- `tool.user_requested` — when user explicitly requests a tool
+
+### Adapted Message Protocol
+The `toolConfirmation` message uses `request.kind` (e.g., "shell", "write") as the `tool` field, since the permission request fires before `tool.execution_start` and has no `toolName`. The `params` field contains the full `PermissionRequest` object for the webview to display relevant details.
+
+The `toolResult` message uses `toolName` from `tool.execution_start`, tracked via a `toolCallId → toolName` map.
+
+### Enabling Tools
+Removing `availableTools: []` from `createSession()` exposes the CLI's default built-in tools. No explicit tool list needed.
+
+## Decision
+Implemented using `onPermissionRequest` for approval flow and session events for execution notifications. This matches the SDK's actual architecture rather than the assumed event-based confirmation pattern.
+
+### 2026-02-28: User Directive — Auto-Approve Persistence
+
+**By:** Rob Pitcher (via Copilot)
+**What:** The `autoApproveTools` setting for issue #25 should use standard VS Code settings persistence (contributes.configuration in package.json, read via getConfiguration). Permanent until toggled off, scoped per VS Code's user/workspace model.
+**Why:** User confirmed this is the easiest approach and the right UX — users already understand VS Code settings.
