@@ -1,0 +1,277 @@
+/**
+ * Tool Approval Flow Tests — Issue #25
+ *
+ * Tests the built-in tool enablement and permission approval flow.
+ * Written BEFORE implementation lands. Tests that depend on unimplemented
+ * code use `.todo()` so they can be enabled incrementally.
+ *
+ * Expected flow:
+ *   1. Session created WITHOUT `availableTools: []` (tools enabled)
+ *   2. SDK emits permission request → extension forwards to webview as `toolConfirmation`
+ *   3. User approves/denies in webview → extension calls SDK confirmation API
+ *   4. SDK emits `tool.execution_complete` → extension posts `toolResult` to webview
+ *   5. `autoApproveTools` config bypasses the webview prompt
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as vscode from "vscode";
+import {
+  createMockSession,
+  createMockClient,
+  setMockClient,
+  type MockClient,
+} from "./__mocks__/copilot-sdk.js";
+import { stopClient } from "../copilotService.js";
+import { activate } from "../extension.js";
+import {
+  createMockWebviewView,
+  createMockResolveContext,
+  createMockCancellationToken,
+  simulateUserMessage,
+  getPostedMessages,
+  getPostedMessagesOfType,
+  type MockWebviewView,
+} from "./webview-test-helpers.js";
+
+vi.mock("@github/copilot-sdk", () =>
+  import("./__mocks__/copilot-sdk.js")
+);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function setupConfig(overrides: Record<string, unknown> = {}) {
+  const settings: Record<string, unknown> = {
+    endpoint: "https://myresource.openai.azure.com/openai/v1/",
+    apiKey: "test-key-123",
+    model: "gpt-4.1",
+    wireApi: "completions",
+    cliPath: "",
+    autoApproveTools: false,
+    ...overrides,
+  };
+  vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+    get: vi.fn(
+      (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
+    ),
+  } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+}
+
+/** Sends a webview message (simulating the webview posting back). */
+function simulateWebviewMessage(view: MockWebviewView, message: Record<string, unknown>) {
+  for (const handler of view.webview._messageHandlers) {
+    handler(message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Test suite
+// ---------------------------------------------------------------------------
+
+describe("Tool approval flow (#25)", () => {
+  let mockSession: ReturnType<typeof createMockSession>;
+  let mockClient: MockClient;
+  let capturedProvider: {
+    resolveWebviewView: (view: unknown, context: unknown, token: unknown) => void;
+  };
+  let mockView: MockWebviewView;
+
+  function resolveProvider(): MockWebviewView {
+    const view = createMockWebviewView();
+    capturedProvider.resolveWebviewView(
+      view,
+      createMockResolveContext(),
+      createMockCancellationToken()
+    );
+    return view;
+  }
+
+  beforeEach(() => {
+    mockSession = createMockSession();
+    mockClient = createMockClient(mockSession);
+    setMockClient(mockClient);
+    setupConfig();
+
+    const mockExtContext = {
+      subscriptions: [] as { dispose: () => void }[],
+      extensionUri: { toString: () => "mock-ext-uri" },
+      secrets: {
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
+        ),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+    };
+    activate(mockExtContext as unknown as import("vscode").ExtensionContext);
+
+    const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+    capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+    mockView = resolveProvider();
+  });
+
+  afterEach(async () => {
+    await stopClient();
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
+  });
+
+  // =========================================================================
+  // 1. Tools are enabled (availableTools restriction removed)
+  // =========================================================================
+  describe("tools enabled in session config", () => {
+    // BLOCKED: Childs is removing `availableTools: []` from copilotService.ts.
+    // Enable this test once that change lands.
+    it.todo(
+      "does not pass availableTools:[] when creating a session"
+      // Expected: createSession is called WITHOUT `availableTools: []`,
+      // allowing the SDK to use its full built-in tool set.
+      // Verify: sessionArgs.availableTools is either undefined or non-empty.
+    );
+
+    it("createSession is called with expected config shape", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        expect(mockSession.send).toHaveBeenCalled();
+      });
+
+      const sessionArgs = mockClient.createSession.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+      expect(sessionArgs).toBeDefined();
+      expect(sessionArgs).toHaveProperty("model");
+      expect(sessionArgs).toHaveProperty("provider");
+      expect(sessionArgs).toHaveProperty("streaming", true);
+    });
+  });
+
+  // =========================================================================
+  // 2. Tool event handling — permission requests
+  // =========================================================================
+  describe("tool permission request handling", () => {
+    it.todo(
+      "sends toolConfirmation to webview when permission request received and autoApproveTools is false"
+      // Expected: when the SDK's onPermissionRequest callback fires with a
+      // PermissionRequest { kind: "shell", toolCallId: "tc-1", ... },
+      // the extension posts { type: "toolConfirmation", toolCallId: "tc-1",
+      // toolName: "shell", ... } to the webview.
+    );
+
+    it.todo(
+      "auto-approves tool when autoApproveTools is true (no webview message)"
+      // Expected: when autoApproveTools config is true, the onPermissionRequest
+      // handler immediately returns { kind: "approved" } without posting
+      // a toolConfirmation message to the webview.
+    );
+  });
+
+  // =========================================================================
+  // 3. Tool response handling — user approves/denies in webview
+  // =========================================================================
+  describe("tool response from webview", () => {
+    it.todo(
+      "calls SDK confirmation with approved when webview sends toolResponse approved=true"
+      // Expected: webview posts { command: "toolResponse", toolCallId: "tc-1",
+      // approved: true } → extension resolves the pending permission request
+      // with { kind: "approved" }.
+    );
+
+    it.todo(
+      "calls SDK rejection when webview sends toolResponse approved=false"
+      // Expected: webview posts { command: "toolResponse", toolCallId: "tc-1",
+      // approved: false } → extension resolves with
+      // { kind: "denied-interactively-by-user" }.
+    );
+  });
+
+  // =========================================================================
+  // 4. Tool result rendering
+  // =========================================================================
+  describe("tool result rendering", () => {
+    it.todo(
+      "posts toolResult with success status after tool.execution_complete with success=true"
+      // Expected: SDK emits tool.execution_complete event with
+      // { data: { toolCallId: "tc-1", success: true, result: { content: "..." } } }
+      // → extension posts { type: "toolResult", toolCallId: "tc-1",
+      // success: true, content: "..." } to webview.
+    );
+
+    it.todo(
+      "posts toolResult with error status after tool.execution_complete with success=false"
+      // Expected: SDK emits tool.execution_complete with
+      // { data: { toolCallId: "tc-1", success: false, error: { message: "denied" } } }
+      // → extension posts { type: "toolResult", toolCallId: "tc-1",
+      // success: false, error: "denied" } to webview.
+    );
+  });
+
+  // =========================================================================
+  // 5. Edge cases
+  // =========================================================================
+  describe("edge cases", () => {
+    it.todo(
+      "handles toolResponse for unknown/expired tool call ID gracefully"
+      // Expected: webview posts { command: "toolResponse", toolCallId: "unknown-id",
+      // approved: true } → extension does not throw, logs a warning or no-ops.
+    );
+
+    it.todo(
+      "tracks multiple concurrent tool calls independently"
+      // Expected: two permission requests (tc-1, tc-2) arrive before user responds.
+      // User approves tc-1 and denies tc-2. Each resolves independently with
+      // the correct result. No cross-contamination.
+    );
+
+    it("existing text-only chat flow still works (regression)", async () => {
+      // This test verifies the basic streaming flow is unbroken by tool changes.
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "response text" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const messages = getPostedMessages(mockView);
+        expect(messages.length).toBeGreaterThanOrEqual(3);
+      });
+
+      const types = getPostedMessages(mockView).map(
+        (m: unknown) => (m as { type: string }).type
+      );
+      expect(types[0]).toBe("streamStart");
+      expect(types).toContain("streamDelta");
+      expect(types[types.length - 1]).toBe("streamEnd");
+
+      const deltas = getPostedMessagesOfType(mockView, "streamDelta");
+      expect(deltas).toContainEqual({
+        type: "streamDelta",
+        content: "response text",
+      });
+    });
+  });
+
+  // =========================================================================
+  // 6. Configuration
+  // =========================================================================
+  describe("autoApproveTools configuration", () => {
+    it("defaults autoApproveTools to false", () => {
+      // Read config with no overrides — should default to false
+      const config = vscode.workspace.getConfiguration("forge.copilot");
+      const value = config.get("autoApproveTools", false);
+      expect(value).toBe(false);
+    });
+
+    it("reads autoApproveTools from VS Code configuration", () => {
+      setupConfig({ autoApproveTools: true });
+      const config = vscode.workspace.getConfiguration("forge.copilot");
+      const value = config.get("autoApproveTools", false);
+      expect(value).toBe(true);
+    });
+  });
+});
