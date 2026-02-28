@@ -255,12 +255,33 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         params: request,
       });
 
+      // Auto-deny after a short timeout to avoid hanging indefinitely
+      const timeoutMs = 120_000; // 2 minutes
+
       return new Promise<PermissionRequestResult>((resolve) => {
-        this._pendingPermissions.set(toolCallId, (approved: boolean) => {
+        const timeoutHandle = setTimeout(() => {
+          // If still pending when the timeout fires, deny the request
+          const resolver = this._pendingPermissions.get(toolCallId);
+          if (resolver) {
+            resolver(false);
+          }
+        }, timeoutMs);
+
+        const resolver = (approved: boolean) => {
+          // If this entry was already resolved/removed, do nothing
+          if (!this._pendingPermissions.has(toolCallId)) {
+            return;
+          }
+
+          this._pendingPermissions.delete(toolCallId);
+          clearTimeout(timeoutHandle);
+
           resolve({
             kind: approved ? "approved" : "denied-interactively-by-user",
           });
-        });
+        };
+
+        this._pendingPermissions.set(toolCallId, resolver);
       });
     };
   }
