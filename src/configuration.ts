@@ -6,7 +6,7 @@ export interface ExtensionConfig {
   model: string;
   wireApi: string;
   cliPath: string;
-  autoApproveTools: boolean;
+  autoApproveTools?: boolean;
 }
 
 export interface ConfigValidationError {
