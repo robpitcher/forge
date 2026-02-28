@@ -20,6 +20,7 @@ vi.mock("@github/copilot-sdk", () =>
 const validAzureConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-azure-key-123",
+  authMethod: "apiKey",
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
@@ -56,7 +57,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("creates session without requiring GITHUB_TOKEN env var", async () => {
       expect(process.env.GITHUB_TOKEN).toBeUndefined();
 
-      const session = await getOrCreateSession("agv-no-token", validAzureConfig);
+      const session = await getOrCreateSession("agv-no-token", validAzureConfig, "test-azure-key-123");
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledOnce();
@@ -79,7 +80,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
 
   describe("No GitHub API in provider config", () => {
     it("uses only user-configured Azure endpoint, never github.com", async () => {
-      await getOrCreateSession("agv-endpoint", validAzureConfig);
+      await getOrCreateSession("agv-endpoint", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -93,7 +94,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     });
 
     it("configures provider type as 'azure' for Azure endpoints", async () => {
-      await getOrCreateSession("agv-azure-type", validAzureConfig);
+      await getOrCreateSession("agv-azure-type", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -104,7 +105,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     });
 
     it("configures Azure-specific API version for Azure endpoints", async () => {
-      await getOrCreateSession("agv-azure-version", validAzureConfig);
+      await getOrCreateSession("agv-azure-version", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -116,7 +117,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     });
 
     it("uses apiKey from user settings, not GitHub token", async () => {
-      await getOrCreateSession("agv-apikey", validAzureConfig);
+      await getOrCreateSession("agv-apikey", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -129,7 +130,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
 
   describe("Provider isolation (BYOK)", () => {
     it("creates self-contained provider config with only user settings", async () => {
-      await getOrCreateSession("agv-self-contained", validAzureConfig);
+      await getOrCreateSession("agv-self-contained", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -155,12 +156,13 @@ describe("Air-gap validation (SC2, SC3)", () => {
       const customConfig: ExtensionConfig = {
         endpoint: "https://custom.azure.com/v2/",
         apiKey: "custom-key-456",
+        authMethod: "apiKey",
         model: "gpt-4o",
         wireApi: "responses",
         cliPath: "/custom/cli",
       };
 
-      await getOrCreateSession("agv-custom-cfg", customConfig);
+      await getOrCreateSession("agv-custom-cfg", customConfig, "custom-key-456");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -177,7 +179,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("does not require internet access except to configured endpoint", async () => {
       // This test verifies that the provider config points only to the user endpoint
       // In a real air-gap environment, only this endpoint would be accessible
-      await getOrCreateSession("agv-internet", validAzureConfig);
+      await getOrCreateSession("agv-internet", validAzureConfig, "test-azure-key-123");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -196,7 +198,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("creates session with only Azure config, no GitHub credentials", async () => {
       expect(process.env.GITHUB_TOKEN).toBeUndefined();
 
-      const session = await getOrCreateSession("agv-no-github", validAzureConfig);
+      const session = await getOrCreateSession("agv-no-github", validAzureConfig, "test-azure-key-123");
 
       expect(session).toBeDefined();
       
@@ -212,7 +214,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("session works with GITHUB_TOKEN explicitly unset", async () => {
       delete process.env.GITHUB_TOKEN;
       
-      const session = await getOrCreateSession("agv-unset-token", validAzureConfig);
+      const session = await getOrCreateSession("agv-unset-token", validAzureConfig, "test-azure-key-123");
 
       expect(session).toBeDefined();
       
@@ -225,12 +227,13 @@ describe("Air-gap validation (SC2, SC3)", () => {
       const genericConfig: ExtensionConfig = {
         endpoint: "https://private.llm.internal/v1/",
         apiKey: "private-key-789",
+        authMethod: "apiKey",
         model: "custom-model",
         wireApi: "completions",
         cliPath: "",
       };
 
-      await getOrCreateSession("agv-generic-endpoint", genericConfig);
+      await getOrCreateSession("agv-generic-endpoint", genericConfig, "private-key-789");
 
       const callIdx = mockClient.createSession.mock.calls.length - 1;
       const sessionConfig = mockClient.createSession.mock.calls[callIdx][0] as {
@@ -249,9 +252,9 @@ describe("Air-gap validation (SC2, SC3)", () => {
       expect(process.env.GITHUB_TOKEN).toBeUndefined();
 
       // Create multiple sessions across different conversations
-      await getOrCreateSession("agv-multi-1", validAzureConfig);
-      await getOrCreateSession("agv-multi-2", validAzureConfig);
-      await getOrCreateSession("agv-multi-3", validAzureConfig);
+      await getOrCreateSession("agv-multi-1", validAzureConfig, "test-azure-key-123");
+      await getOrCreateSession("agv-multi-2", validAzureConfig, "test-azure-key-123");
+      await getOrCreateSession("agv-multi-3", validAzureConfig, "test-azure-key-123");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(3);
 

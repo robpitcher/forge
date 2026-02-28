@@ -21,9 +21,22 @@ vi.mock("@github/copilot-sdk", () =>
 const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
+  authMethod: "apiKey",
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
+};
+
+// Configs for #27 auth method tests
+const apiKeyConfig: ExtensionConfig = {
+  ...validConfig,
+  authMethod: "apiKey",
+};
+
+const entraIdConfig: ExtensionConfig = {
+  ...validConfig,
+  apiKey: "",
+  authMethod: "entraId",
 };
 
 describe("copilotService", () => {
@@ -70,7 +83,7 @@ describe("copilotService", () => {
 
   describe("getOrCreateSession", () => {
     it("creates a session with correct config", async () => {
-      const session = await getOrCreateSession("conv-1", validConfig);
+      const session = await getOrCreateSession("conv-1", validConfig, "test-key-123");
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledWith({
@@ -78,7 +91,7 @@ describe("copilotService", () => {
         provider: {
           type: "azure",
           baseUrl: validConfig.endpoint,
-          apiKey: validConfig.apiKey,
+          apiKey: "test-key-123",
           wireApi: validConfig.wireApi,
           azure: { apiVersion: "2024-10-21" },
         },
@@ -87,26 +100,75 @@ describe("copilotService", () => {
     });
 
     it("reuses existing session for same conversationId", async () => {
-      const session1 = await getOrCreateSession("conv-1", validConfig);
-      const session2 = await getOrCreateSession("conv-1", validConfig);
+      const session1 = await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      const session2 = await getOrCreateSession("conv-1", validConfig, "test-key-123");
 
       expect(session1).toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
 
     it("creates separate sessions for different conversationIds", async () => {
-      await getOrCreateSession("conv-1", validConfig);
-      await getOrCreateSession("conv-2", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-2", validConfig, "test-key-123");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+    });
+
+    // --- #27 auth method tests ---
+    // These tests validate the authToken parameter and ProviderConfig wiring.
+    // They will pass once Childs updates getOrCreateSession to accept authToken.
+
+    it("passes bearerToken on ProviderConfig when authMethod is 'entraId'", async () => {
+      await getOrCreateSession("conv-entra", entraIdConfig, "entra-bearer-token-xyz");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.objectContaining({
+            bearerToken: "entra-bearer-token-xyz",
+          }),
+        }),
+      );
+      // Should NOT have apiKey set when using entraId
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.provider.apiKey).toBeUndefined();
+    });
+
+    it("passes apiKey on ProviderConfig when authMethod is 'apiKey'", async () => {
+      await getOrCreateSession("conv-apikey", apiKeyConfig, "my-api-key-secret");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.objectContaining({
+            apiKey: "my-api-key-secret",
+          }),
+        }),
+      );
+      // Should NOT have bearerToken set when using apiKey
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.provider.bearerToken).toBeUndefined();
+    });
+
+    it("sets azure provider config correctly with entraId auth", async () => {
+      await getOrCreateSession("conv-entra-azure", entraIdConfig, "azure-token");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: expect.objectContaining({
+            type: "azure",
+            baseUrl: entraIdConfig.endpoint,
+            bearerToken: "azure-token",
+            azure: { apiVersion: "2024-10-21" },
+          }),
+        }),
+      );
     });
   });
 
   describe("removeSession", () => {
     it("removes a session so next call creates a new one", async () => {
-      await getOrCreateSession("conv-1", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
       removeSession("conv-1");
-      await getOrCreateSession("conv-1", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
@@ -114,7 +176,7 @@ describe("copilotService", () => {
 
   describe("stopClient", () => {
     it("stops client and clears sessions", async () => {
-      await getOrCreateSession("conv-1", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
 
       await stopClient();
 
@@ -130,7 +192,7 @@ describe("copilotService", () => {
     });
 
     it("clears sessions so they are recreated", async () => {
-      await getOrCreateSession("conv-1", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
       await stopClient();
 
       // Re-setup mock for new client
@@ -138,7 +200,7 @@ describe("copilotService", () => {
       const newMockClient = createMockClient(newMockSession);
       setMockClient(newMockClient);
 
-      await getOrCreateSession("conv-1", validConfig);
+      await getOrCreateSession("conv-1", validConfig, "test-key-123");
       expect(newMockClient.createSession).toHaveBeenCalledOnce();
     });
   });
