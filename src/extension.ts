@@ -97,13 +97,27 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._conversationId = `conv-${crypto.randomUUID()}`;
       this._view?.webview.postMessage({ type: "conversationReset" });
     } else if (message.command === "toolResponse") {
-      const id = message.id as string;
-      const approved = message.approved as boolean;
-      const resolver = this._pendingPermissions.get(id);
-      if (resolver) {
-        this._pendingPermissions.delete(id);
-        resolver(approved);
+      const { id, approved } = message;
+      if (typeof id !== "string" || id.length === 0) {
+        console.warn("[forge] Received toolResponse with invalid id:", id);
+        return;
       }
+      if (typeof approved !== "boolean") {
+        console.warn(
+          "[forge] Received toolResponse with non-boolean approved value; defaulting to deny.",
+          approved
+        );
+      }
+      const resolver = this._pendingPermissions.get(id);
+      if (!resolver) {
+        console.warn(
+          "[forge] No pending permission request found for toolResponse id:",
+          id
+        );
+        return;
+      }
+      this._pendingPermissions.delete(id);
+      resolver(approved === true);
     }
   }
 
