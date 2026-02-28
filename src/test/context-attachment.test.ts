@@ -4,9 +4,9 @@
  * Tests the @workspace context feature: attaching selections and files
  * to chat messages so they're included in the prompt sent to the SDK.
  *
- * Blair is adding commands/webview UI. Childs is implementing
- * `_buildPromptWithContext`. Tests that depend on unimplemented code
- * use `.todo()` so they can be enabled once the feature lands.
+ * These tests exercise the implemented context attachment behavior,
+ * including `_buildPromptWithContext`, using active `it(...)` tests
+ * rather than `.todo()` placeholders.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as vscode from "vscode";

@@ -32,13 +32,19 @@ export function activate(context: vscode.ExtensionContext): void {
       const content = editor.document.getText(selection);
       if (!content) { return; }
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+      const startLine = selection.start.line + 1;
+      let endLine = selection.end.line + 1;
+      if (selection.end.character === 0 && selection.end.line > selection.start.line) {
+        // Selection ends at the start of the next line; make endLine inclusive.
+        endLine = selection.end.line;
+      }
       const ctx: ContextItem = {
         type: "selection",
         filePath,
         languageId: editor.document.languageId,
         content,
-        startLine: selection.start.line + 1,
-        endLine: selection.end.line + 1,
+        startLine,
+        endLine,
       };
       provider.postContextAttached(ctx);
     }),
@@ -135,10 +141,17 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleMessage(message: { command: string; [key: string]: unknown }): Promise<void> {
     if (message.command === "sendMessage") {
-      const context = Array.isArray(message.context)
-        ? (message.context as ContextItem[])
-        : undefined;
-      await this._handleChatMessage((message.text as string) ?? "", context);
+      const rawContext = Array.isArray(message.context) ? message.context : undefined;
+      const context = rawContext?.filter(
+        (item: unknown): item is ContextItem =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as Record<string, unknown>).type === "string" &&
+          typeof (item as Record<string, unknown>).content === "string" &&
+          typeof (item as Record<string, unknown>).filePath === "string" &&
+          typeof (item as Record<string, unknown>).languageId === "string"
+      );
+      await this._handleChatMessage((message.text as string) ?? "", context && context.length > 0 ? context : undefined);
     } else if (message.command === "attachSelection") {
       await vscode.commands.executeCommand("forge.attachSelection");
     } else if (message.command === "attachFile") {
@@ -157,13 +170,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       const content = editor.document.getText(selection);
       if (!content) { return; }
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+      const startLine = selection.start.line + 1;
+      let endLine = selection.end.line + 1;
+      if (selection.end.character === 0 && selection.end.line > selection.start.line) {
+        // Selection ends at the start of the next line; make endLine inclusive.
+        endLine = selection.end.line;
+      }
       const ctx: ContextItem = {
         type: "selection",
         filePath,
         languageId: editor.document.languageId,
         content,
-        startLine: selection.start.line + 1,
-        endLine: selection.end.line + 1,
+        startLine,
+        endLine,
       };
       this._view?.webview.postMessage({ type: "contextAttached", context: ctx, autoAttached: true });
     } else if (message.command === "toolResponse") {
@@ -257,6 +276,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const budget = ChatViewProvider._CONTEXT_CHAR_BUDGET;
     const truncationNote = "\n...[truncated — context exceeds 8000 char limit]";
+    const separator = "\n\n";
     let usedChars = 0;
     const blocks: string[] = [];
 
@@ -270,15 +290,17 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
       // Build the full block to measure its length
       const fullBlock = `${header}\n${fence}\n${item.content}\n${fenceClose}`;
+      // Account for the "\n\n" separator that joins blocks (and precedes the prompt)
+      const separatorCost = blocks.length === 0 ? separator.length : separator.length * 2;
 
-      if (usedChars + fullBlock.length <= budget) {
+      if (usedChars + fullBlock.length + separatorCost <= budget) {
         blocks.push(fullBlock);
-        usedChars += fullBlock.length;
+        usedChars += fullBlock.length + separatorCost;
       } else {
         // Truncate this item's content to fit within the remaining budget
         const shell = `${header}\n${fence}\n`;
         const tail = `\n${fenceClose}${truncationNote}`;
-        const available = budget - usedChars - shell.length - tail.length;
+        const available = budget - usedChars - shell.length - tail.length - separatorCost;
 
         if (available > 0) {
           blocks.push(`${shell}${item.content.slice(0, available)}${tail}`);
@@ -290,7 +312,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    return blocks.join("\n\n") + "\n\n" + prompt;
+    return blocks.join(separator) + separator + prompt;
   }
 
   /** Rewrites SDK auth errors to point users at the settings gear. */
