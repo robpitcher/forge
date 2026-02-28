@@ -80,6 +80,20 @@ export interface ToolExecutionCompleteEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Context items attached to prompts (workspace context)
+// ---------------------------------------------------------------------------
+
+/** A piece of workspace context (file or selection) to prepend to a prompt. */
+export interface ContextItem {
+  type: "selection" | "file";
+  filePath: string;
+  languageId: string;
+  content: string;
+  startLine?: number;
+  endLine?: number;
+}
+
+// ---------------------------------------------------------------------------
 // CopilotSession structural interface
 // ---------------------------------------------------------------------------
 
