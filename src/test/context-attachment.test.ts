@@ -114,32 +114,45 @@ describe("Context attachment (#26)", () => {
   // =========================================================================
   // 1. Context commands registered
   // =========================================================================
-  it.todo(
-    "registers forge.attachSelection and forge.attachFile commands"
-    // Expected: after activate(), vscode.commands.registerCommand has been
-    // called with "forge.attachSelection" and "forge.attachFile".
-    // Hard to test with current mock setup — enable once command
-    // registration is implemented by Blair.
-  );
+  it("registers forge.attachSelection and forge.attachFile commands", () => {
+    const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
+    const registered = calls.map((c) => c[0]);
+    expect(registered).toContain("forge.attachSelection");
+    expect(registered).toContain("forge.attachFile");
+  });
 
   // =========================================================================
   // 2. Context included in prompt
   // =========================================================================
-  // BLOCKED: _buildPromptWithContext not yet implemented by Childs.
-  // Enable once the method exists in extension.ts.
-  it.todo(
-    "includes context items in the prompt sent to session.send"
-    // Expected flow:
-    // 1. simulateWebviewMessage with { command: "sendMessage", text: "explain this",
-    //    context: [{ type: "selection", filePath: "src/utils.ts",
-    //    languageId: "typescript", content: "const x = 1;",
-    //    startLine: 5, endLine: 5 }] }
-    // 2. Wait for mockSession.send to be called
-    // 3. The prompt arg should contain:
-    //    - "--- Context: src/utils.ts:5-5 (typescript) ---"
-    //    - "const x = 1;"
-    //    - "explain this" (user's text, at the end)
-  );
+  it("includes context items in the prompt sent to session.send", async () => {
+    mockSession.send.mockImplementation(async () => {
+      mockSession._emit("session.idle");
+    });
+
+    simulateWebviewMessage(mockView, {
+      command: "sendMessage",
+      text: "explain this",
+      context: [
+        {
+          type: "selection",
+          filePath: "src/utils.ts",
+          languageId: "typescript",
+          content: "const x = 1;",
+          startLine: 5,
+          endLine: 5,
+        },
+      ],
+    });
+
+    await vi.waitFor(() => {
+      expect(mockSession.send).toHaveBeenCalled();
+    });
+
+    const sendArgs = mockSession.send.mock.calls[0][0] as { prompt: string };
+    expect(sendArgs.prompt).toContain("--- Context: src/utils.ts:5-5 (typescript) ---");
+    expect(sendArgs.prompt).toContain("const x = 1;");
+    expect(sendArgs.prompt).toMatch(/explain this$/);
+  });
 
   // =========================================================================
   // 3. Message without context still works (regression)
@@ -163,41 +176,78 @@ describe("Context attachment (#26)", () => {
   // =========================================================================
   // 4. Multiple context items
   // =========================================================================
-  // BLOCKED: _buildPromptWithContext not yet implemented by Childs.
-  it.todo(
-    "includes multiple context items in the prompt"
-    // Expected flow:
-    // 1. simulateWebviewMessage with { command: "sendMessage", text: "review",
-    //    context: [
-    //      { type: "selection", filePath: "src/a.ts", languageId: "typescript",
-    //        content: "const a = 1;", startLine: 1, endLine: 1 },
-    //      { type: "file", filePath: "src/b.ts", languageId: "typescript",
-    //        content: "export function b() {}" }
-    //    ]}
-    // 2. Wait for mockSession.send to be called
-    // 3. The prompt should contain both:
-    //    - "--- Context: src/a.ts:1-1 (typescript) ---"
-    //    - "--- Context: src/b.ts"
-    //    - Both content strings
-    //    - "review" at the end
-  );
+  it("includes multiple context items in the prompt", async () => {
+    mockSession.send.mockImplementation(async () => {
+      mockSession._emit("session.idle");
+    });
+
+    simulateWebviewMessage(mockView, {
+      command: "sendMessage",
+      text: "review",
+      context: [
+        {
+          type: "selection",
+          filePath: "src/a.ts",
+          languageId: "typescript",
+          content: "const a = 1;",
+          startLine: 1,
+          endLine: 1,
+        },
+        {
+          type: "file",
+          filePath: "src/b.ts",
+          languageId: "typescript",
+          content: "export function b() {}",
+        },
+      ],
+    });
+
+    await vi.waitFor(() => {
+      expect(mockSession.send).toHaveBeenCalled();
+    });
+
+    const sendArgs = mockSession.send.mock.calls[0][0] as { prompt: string };
+    expect(sendArgs.prompt).toContain("--- Context: src/a.ts:1-1 (typescript) ---");
+    expect(sendArgs.prompt).toContain("--- Context: src/b.ts (typescript) ---");
+    expect(sendArgs.prompt).toContain("const a = 1;");
+    expect(sendArgs.prompt).toContain("export function b() {}");
+    expect(sendArgs.prompt).toMatch(/review$/);
+  });
 
   // =========================================================================
   // 5. Context truncation
   // =========================================================================
-  // BLOCKED: truncation logic not yet implemented by Childs.
-  it.todo(
-    "truncates context items longer than 8000 characters"
-    // Expected flow:
-    // 1. Generate a long string: "x".repeat(10000)
-    // 2. simulateWebviewMessage with { command: "sendMessage", text: "explain",
-    //    context: [{ type: "selection", filePath: "big.ts",
-    //    languageId: "typescript", content: longString,
-    //    startLine: 1, endLine: 100 }] }
-    // 3. Wait for mockSession.send to be called
-    // 4. The prompt should contain "[truncated" somewhere,
-    //    and the content length should be capped.
-  );
+  it("truncates context items longer than 8000 characters", async () => {
+    mockSession.send.mockImplementation(async () => {
+      mockSession._emit("session.idle");
+    });
+
+    const longString = "x".repeat(10_000);
+    simulateWebviewMessage(mockView, {
+      command: "sendMessage",
+      text: "explain",
+      context: [
+        {
+          type: "selection",
+          filePath: "big.ts",
+          languageId: "typescript",
+          content: longString,
+          startLine: 1,
+          endLine: 100,
+        },
+      ],
+    });
+
+    await vi.waitFor(() => {
+      expect(mockSession.send).toHaveBeenCalled();
+    });
+
+    const sendArgs = mockSession.send.mock.calls[0][0] as { prompt: string };
+    expect(sendArgs.prompt).toContain("[truncated");
+    // Context portion (before user prompt) should not exceed ~8000 chars
+    const contextPart = sendArgs.prompt.split("explain")[0];
+    expect(contextPart.length).toBeLessThanOrEqual(8200); // some slack for headers
+  });
 
   // =========================================================================
   // 6. Empty context array treated as no context
