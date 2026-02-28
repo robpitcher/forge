@@ -11,6 +11,10 @@ import type {
   ICopilotSession,
   MessageDeltaEvent,
   SessionErrorEvent,
+  PermissionRequest,
+  PermissionRequestResult,
+  ToolExecutionStartEvent,
+  ToolExecutionCompleteEvent,
 } from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -32,6 +36,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _conversationId: string = `conv-${crypto.randomUUID()}`;
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
+  private _pendingPermissions = new Map<string, (approved: boolean) => void>();
+  private _toolNames = new Map<string, string>();
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -80,15 +86,24 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _handleMessage(message: { command: string; text?: string }): Promise<void> {
+  private async _handleMessage(message: { command: string; [key: string]: unknown }): Promise<void> {
     if (message.command === "sendMessage") {
-      await this._handleChatMessage(message.text ?? "");
+      await this._handleChatMessage((message.text as string) ?? "");
     } else if (message.command === "openSettings") {
       await this.openSettings();
     } else if (message.command === "newConversation") {
+      this._rejectPendingPermissions();
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
       this._view?.webview.postMessage({ type: "conversationReset" });
+    } else if (message.command === "toolResponse") {
+      const id = message.id as string;
+      const approved = message.approved as boolean;
+      const resolver = this._pendingPermissions.get(id);
+      if (resolver) {
+        this._pendingPermissions.delete(id);
+        resolver(approved);
+      }
     }
   }
 
@@ -113,7 +128,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     let session: ICopilotSession;
     try {
-      session = await getOrCreateSession(this._conversationId, config);
+      session = await getOrCreateSession(
+        this._conversationId,
+        config,
+        this._createPermissionHandler(),
+      );
     } catch (err: unknown) {
       if (err instanceof CopilotCliNotFoundError) {
         this._postError(err.message);
@@ -155,6 +174,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubDelta();
         unsubIdle();
         unsubError();
+        unsubToolStart();
+        unsubToolComplete();
       };
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
@@ -162,6 +183,28 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           this._view?.webview.postMessage({
             type: "streamDelta",
             content: event.data.deltaContent,
+          });
+        }
+      });
+
+      const unsubToolStart = session.on("tool.execution_start", (event: ToolExecutionStartEvent) => {
+        if (event?.data?.toolCallId && event?.data?.toolName) {
+          this._toolNames.set(event.data.toolCallId, event.data.toolName);
+        }
+      });
+
+      const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
+        if (event?.data?.toolCallId) {
+          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
+          this._toolNames.delete(event.data.toolCallId);
+          this._view?.webview.postMessage({
+            type: "toolResult",
+            id: event.data.toolCallId,
+            tool: toolName,
+            status: event.data.success ? "success" : "error",
+            output: event.data.success
+              ? (event.data.result?.content ?? "")
+              : (event.data.error?.message ?? "Tool execution failed"),
           });
         }
       });
@@ -190,6 +233,44 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       });
     });
+  }
+
+  private _createPermissionHandler() {
+    return async (
+      request: PermissionRequest,
+      _invocation: { sessionId: string },
+    ): Promise<PermissionRequestResult> => {
+      const config = vscode.workspace.getConfiguration("forge.copilot");
+      const autoApprove = config.get<boolean>("autoApproveTools", false);
+
+      if (autoApprove) {
+        return { kind: "approved" };
+      }
+
+      const toolCallId = request.toolCallId ?? crypto.randomUUID();
+      this._view?.webview.postMessage({
+        type: "toolConfirmation",
+        id: toolCallId,
+        tool: request.kind,
+        params: request,
+      });
+
+      return new Promise<PermissionRequestResult>((resolve) => {
+        this._pendingPermissions.set(toolCallId, (approved: boolean) => {
+          resolve({
+            kind: approved ? "approved" : "denied-interactively-by-user",
+          });
+        });
+      });
+    };
+  }
+
+  private _rejectPendingPermissions(): void {
+    for (const [, resolver] of this._pendingPermissions) {
+      resolver(false);
+    }
+    this._pendingPermissions.clear();
+    this._toolNames.clear();
   }
 
   private _postError(message: string): void {

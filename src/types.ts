@@ -13,6 +13,9 @@ export type {
   SessionConfig,
   SessionEventType,
   SessionEventPayload,
+  PermissionHandler,
+  PermissionRequest,
+  PermissionRequestResult,
 } from "@github/copilot-sdk";
 
 // Re-export the SDK's CopilotClient class type — it already covers start/stop/createSession.
@@ -48,6 +51,32 @@ export interface MessageDeltaEvent {
 export interface SessionErrorEvent {
   type: "session.error";
   data: { message: string; stack?: string };
+}
+
+/** Payload for `tool.execution_start` events. */
+export interface ToolExecutionStartEvent {
+  type: "tool.execution_start";
+  data: {
+    toolCallId: string;
+    toolName: string;
+    arguments?: unknown;
+    mcpServerName?: string;
+    mcpToolName?: string;
+    parentToolCallId?: string;
+  };
+}
+
+/** Payload for `tool.execution_complete` events. */
+export interface ToolExecutionCompleteEvent {
+  type: "tool.execution_complete";
+  data: {
+    toolCallId: string;
+    success: boolean;
+    isUserRequested?: boolean;
+    result?: { content: string; detailedContent?: string };
+    error?: { message: string; code?: string };
+    parentToolCallId?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------

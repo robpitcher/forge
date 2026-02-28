@@ -6,6 +6,7 @@ export interface ExtensionConfig {
   model: string;
   wireApi: string;
   cliPath: string;
+  autoApproveTools: boolean;
 }
 
 export interface ConfigValidationError {
@@ -21,6 +22,7 @@ export function getConfiguration(): ExtensionConfig {
     model: config.get<string>("model", "gpt-4.1"),
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
+    autoApproveTools: config.get<boolean>("autoApproveTools", false),
   };
 }
 
