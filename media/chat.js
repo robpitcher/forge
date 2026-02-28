@@ -35,7 +35,9 @@
   let autoAttachedCtx = null;
 
   userInput.addEventListener("focus", () => {
-    vscode.postMessage({ command: "chatFocused" });
+    if (pendingContext.length === 0 && !contextChipsContainer.hasChildNodes()) {
+      vscode.postMessage({ command: "chatFocused" });
+    }
   });
 
   function autoResizeTextarea() {
@@ -71,6 +73,11 @@
   function newConversation() {
     chatMessages.innerHTML = "";
     currentAssistantMessage = null;
+    pendingContext = [];
+    contextChipsContainer.innerHTML = "";
+    lastAutoAttachedContent = null;
+    autoAttachedChipElement = null;
+    autoAttachedCtx = null;
     vscode.postMessage({ command: "newConversation" });
   }
 
@@ -163,6 +170,11 @@
         currentAssistantMessage = null;
         isStreaming = false;
         setInputEnabled(true);
+        pendingContext = [];
+        contextChipsContainer.innerHTML = "";
+        lastAutoAttachedContent = null;
+        autoAttachedChipElement = null;
+        autoAttachedCtx = null;
         break;
     }
   });
@@ -179,8 +191,11 @@
     }
     const text = document.createTextNode(label + " ");
     chip.appendChild(text);
-    const removeBtn = document.createElement("span");
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className = "remove-btn";
+    removeBtn.setAttribute("aria-label", "Remove attached context");
+    removeBtn.title = "Remove attached context";
     removeBtn.textContent = "✕";
     removeBtn.addEventListener("click", () => {
       const idx = pendingContext.indexOf(ctx);
