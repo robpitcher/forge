@@ -150,6 +150,22 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
       this._view?.webview.postMessage({ type: "conversationReset" });
+    } else if (message.command === "chatFocused") {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { return; }
+      const selection = editor.selection;
+      const content = editor.document.getText(selection);
+      if (!content) { return; }
+      const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+      const ctx: ContextItem = {
+        type: "selection",
+        filePath,
+        languageId: editor.document.languageId,
+        content,
+        startLine: selection.start.line + 1,
+        endLine: selection.end.line + 1,
+      };
+      this.postContextAttached(ctx);
     } else if (message.command === "toolResponse") {
       const { id, approved } = message;
       if (typeof id !== "string" || id.length === 0) {

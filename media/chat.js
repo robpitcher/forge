@@ -11,6 +11,7 @@
   let currentAssistantMessage = null;
   let isStreaming = false;
   let pendingContext = [];
+  let lastAutoAttachedContent = null;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -29,6 +30,12 @@
   });
 
   userInput.addEventListener("input", autoResizeTextarea);
+
+  userInput.addEventListener("focus", () => {
+    if (pendingContext.length === 0) {
+      vscode.postMessage({ command: "chatFocused" });
+    }
+  });
 
   function autoResizeTextarea() {
     userInput.style.height = "auto";
@@ -54,6 +61,7 @@
       pendingContext = [];
       contextChipsContainer.innerHTML = "";
     }
+    lastAutoAttachedContent = null;
     vscode.postMessage(msg);
   }
 
@@ -119,9 +127,14 @@
         setInputEnabled(true);
         break;
 
-      case "contextAttached":
-        addContextChip(message.context);
+      case "contextAttached": {
+        const ctx = message.context;
+        const key = ctx.content + ":" + ctx.filePath + ":" + (ctx.startLine || "") + ":" + (ctx.endLine || "");
+        if (key === lastAutoAttachedContent) { break; }
+        lastAutoAttachedContent = key;
+        addContextChip(ctx);
         break;
+      }
 
       case "toolConfirmation":
         renderToolConfirmation(message);
