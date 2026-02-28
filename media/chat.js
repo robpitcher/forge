@@ -31,10 +31,11 @@
 
   userInput.addEventListener("input", autoResizeTextarea);
 
+  let autoAttachedChipElement = null;
+  let autoAttachedCtx = null;
+
   userInput.addEventListener("focus", () => {
-    if (pendingContext.length === 0) {
-      vscode.postMessage({ command: "chatFocused" });
-    }
+    vscode.postMessage({ command: "chatFocused" });
   });
 
   function autoResizeTextarea() {
@@ -62,6 +63,8 @@
       contextChipsContainer.innerHTML = "";
     }
     lastAutoAttachedContent = null;
+    autoAttachedChipElement = null;
+    autoAttachedCtx = null;
     vscode.postMessage(msg);
   }
 
@@ -131,8 +134,19 @@
         const ctx = message.context;
         const key = ctx.content + ":" + ctx.filePath + ":" + (ctx.startLine || "") + ":" + (ctx.endLine || "");
         if (key === lastAutoAttachedContent) { break; }
+        if (message.autoAttached && autoAttachedChipElement) {
+          const idx = pendingContext.indexOf(autoAttachedCtx);
+          if (idx !== -1) { pendingContext.splice(idx, 1); }
+          autoAttachedChipElement.remove();
+          autoAttachedChipElement = null;
+          autoAttachedCtx = null;
+        }
         lastAutoAttachedContent = key;
-        addContextChip(ctx);
+        const chip = addContextChip(ctx);
+        if (message.autoAttached) {
+          autoAttachedChipElement = chip;
+          autoAttachedCtx = ctx;
+        }
         break;
       }
 
@@ -175,6 +189,7 @@
     });
     chip.appendChild(removeBtn);
     contextChipsContainer.appendChild(chip);
+    return chip;
   }
 
   function renderToolConfirmation(message) {

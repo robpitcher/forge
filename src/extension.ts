@@ -165,7 +165,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         startLine: selection.start.line + 1,
         endLine: selection.end.line + 1,
       };
-      this.postContextAttached(ctx);
+      this._view?.webview.postMessage({ type: "contextAttached", context: ctx, autoAttached: true });
     } else if (message.command === "toolResponse") {
       const { id, approved } = message;
       if (typeof id !== "string" || id.length === 0) {
