@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 export interface ExtensionConfig {
   endpoint: string;
   apiKey: string;
+  authMethod: "entraId" | "apiKey";
   model: string;
   wireApi: string;
   cliPath: string;
@@ -19,6 +20,7 @@ export function getConfiguration(): ExtensionConfig {
   return {
     endpoint: config.get<string>("endpoint", ""),
     apiKey: "",
+    authMethod: config.get<string>("authMethod", "entraId") as "entraId" | "apiKey",
     model: config.get<string>("model", "gpt-4.1"),
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
@@ -49,7 +51,7 @@ export function validateConfiguration(
     });
   }
 
-  if (!config.apiKey) {
+  if (config.authMethod === "apiKey" && !config.apiKey) {
     errors.push({
       field: "forge.copilot.apiKey",
       message:

@@ -91,6 +91,16 @@
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"
         },
+        "forge.copilot.authMethod": {
+          "type": "string",
+          "enum": ["entraId", "apiKey"],
+          "default": "entraId",
+          "description": "Authentication method. 'entraId' uses DefaultAzureCredential (recommended). 'apiKey' uses a static API key.",
+          "enumDescriptions": [
+            "Use Azure Entra ID (DefaultAzureCredential) for authentication. Recommended for environments with Azure AD.",
+            "Use a static API key stored in VS Code SecretStorage. Use for air-gapped environments without Entra ID."
+          ]
+        },
         "forge.copilot.autoApproveTools": {
           "type": "boolean",
           "default": false,
@@ -100,6 +110,7 @@
     }
   },
   "dependencies": {
+    "@azure/identity": "^4.13.0",
     "@github/copilot-sdk": "0.1.26"
   },
   "devDependencies": {

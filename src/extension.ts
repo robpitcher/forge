@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
 import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
+import { createCredentialProvider } from "./auth/credentialProvider.js";
 import {
   getOrCreateSession,
   destroySession,
@@ -228,11 +229,31 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const credentialProvider = await createCredentialProvider(config, this._secrets);
+    let authToken: string;
+    try {
+      authToken = await credentialProvider.getToken();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (config.authMethod === "entraId") {
+        this._postError(
+          "Entra ID authentication failed. Ensure you're signed in via Azure CLI, " +
+          "VS Code Azure Account extension, or running on a VM with Managed Identity. " +
+          "Alternatively, switch to API key auth in Settings (forge.copilot.authMethod). " +
+          `Details: ${message}`
+        );
+      } else {
+        this._postError(`Authentication failed: ${message}`);
+      }
+      return;
+    }
+
     let session: ICopilotSession;
     try {
       session = await getOrCreateSession(
         this._conversationId,
         config,
+        authToken,
         this._createPermissionHandler(),
       );
     } catch (err: unknown) {
