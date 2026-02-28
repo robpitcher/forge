@@ -32,6 +32,15 @@ export interface ProviderConfig {
   wireApi?: "completions" | "responses";
   baseUrl: string;
   apiKey?: string;
+  /**
+   * Static bearer token for Entra ID / DefaultAzureCredential auth (#27).
+   * The Copilot SDK does not support Entra ID natively — its `bearerToken`
+   * field accepts a static string with no refresh callback. We obtain a
+   * token via `DefaultAzureCredential.getToken()` before session creation.
+   *
+   * // TODO(#27): Revisit if the SDK adds native Entra / managed-identity support.
+   */
+  bearerToken?: string;
   azure?: {
     apiVersion?: string;
   };

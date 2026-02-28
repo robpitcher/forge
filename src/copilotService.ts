@@ -65,6 +65,13 @@ export async function getOrCreateSession(
       ? config.wireApi
       : undefined;
 
+  // Auth strategy:
+  // - Default: API key auth via config.apiKey.
+  // - Entra ID (#27): A bearer token from @azure/identity DefaultAzureCredential
+  //   will be passed as `bearerToken` in ProviderConfig. Session-per-conversation
+  //   means token refresh at session creation is sufficient (~1 hr token lifetime).
+  // TODO(#27): If Copilot SDK adds native Entra / managed-identity support, refactor
+  //   to use SDK-native auth instead of manual token acquisition.
   const isAzure = /\.azure\.com/i.test(config.endpoint);
   const provider: ProviderConfig = {
     type: isAzure ? "azure" : "openai",
