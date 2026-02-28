@@ -8,8 +8,6 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
         "bierner.markdown-mermaid",
         "GitHub.vscode-pull-request-github",
         "dbaeumer.vscode-eslint"

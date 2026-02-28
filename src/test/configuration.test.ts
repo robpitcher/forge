@@ -29,6 +29,7 @@ describe("getConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      autoApproveTools: false,
     });
   });
 
@@ -63,6 +64,7 @@ describe("getConfiguration", () => {
       model: "gpt-4o",
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
+      autoApproveTools: false,
     });
   });
 });
