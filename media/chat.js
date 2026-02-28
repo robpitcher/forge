@@ -4,12 +4,22 @@
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
   const newConvBtn = document.getElementById("newConvBtn");
+  const attachSelectionBtn = document.getElementById("attachSelection");
+  const attachFileBtn = document.getElementById("attachFile");
+  const contextChipsContainer = document.getElementById("contextChips");
 
   let currentAssistantMessage = null;
   let isStreaming = false;
+  let pendingContext = [];
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
+  attachSelectionBtn.addEventListener("click", () => {
+    vscode.postMessage({ command: "attachSelection" });
+  });
+  attachFileBtn.addEventListener("click", () => {
+    vscode.postMessage({ command: "attachFile" });
+  });
 
   userInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
@@ -38,7 +48,13 @@
     userInput.value = "";
     autoResizeTextarea();
 
-    vscode.postMessage({ command: "sendMessage", text });
+    const msg = { command: "sendMessage", text };
+    if (pendingContext.length > 0) {
+      msg.context = pendingContext;
+      pendingContext = [];
+      contextChipsContainer.innerHTML = "";
+    }
+    vscode.postMessage(msg);
   }
 
   function newConversation() {
@@ -103,6 +119,10 @@
         setInputEnabled(true);
         break;
 
+      case "contextAttached":
+        addContextChip(message.context);
+        break;
+
       case "toolConfirmation":
         renderToolConfirmation(message);
         break;
@@ -119,6 +139,30 @@
         break;
     }
   });
+
+  function addContextChip(ctx) {
+    pendingContext.push(ctx);
+    const chip = document.createElement("span");
+    chip.className = "context-chip";
+    let label;
+    if (ctx.type === "selection") {
+      label = `📎 ${ctx.filePath}:${ctx.startLine}-${ctx.endLine} (${ctx.languageId})`;
+    } else {
+      label = `📄 ${ctx.filePath} (${ctx.languageId})`;
+    }
+    const text = document.createTextNode(label + " ");
+    chip.appendChild(text);
+    const removeBtn = document.createElement("span");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "✕";
+    removeBtn.addEventListener("click", () => {
+      const idx = pendingContext.indexOf(ctx);
+      if (idx !== -1) { pendingContext.splice(idx, 1); }
+      chip.remove();
+    });
+    chip.appendChild(removeBtn);
+    contextChipsContainer.appendChild(chip);
+  }
 
   function renderToolConfirmation(message) {
     const card = document.createElement("div");

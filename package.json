@@ -45,12 +45,25 @@
         "command": "forge.openSettings",
         "title": "Forge Settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "forge.attachSelection",
+        "title": "Forge: Attach Selection"
+      },
+      {
+        "command": "forge.attachFile",
+        "title": "Forge: Attach File"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "forge.openSettings",
+          "when": "view == forge.chatView",
+          "group": "navigation"
+        },
+        {
+          "command": "forge.attachSelection",
           "when": "view == forge.chatView",
           "group": "navigation"
         }
