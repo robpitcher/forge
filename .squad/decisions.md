@@ -236,10 +236,6 @@ Known risks are explicitly listed as issues or documented in decisions:
 
 ---
 
-## Decision
-
-**Triage complete on all 23 MVP milestone issues.** 8 issues rerouted to @copilot (Coding Agent) via label swap; 15 issues confirmed with current squad assignments.
-
 ### Rerouted to @copilot (8 issues)
 
 | Issue | Title | Old Label | New Label | Evaluation | Reason |
@@ -275,8 +271,6 @@ Known risks are explicitly listed as issues or documented in decisions:
 
 ---
 
-## Rationale
-
 ### @copilot Routing Criteria
 
 Issues routed to @copilot meet these criteria:
@@ -298,15 +292,6 @@ Issues kept with squad members require:
 
 ---
 
-## What This Enables
-
-1. **Parallel execution** — @copilot can start on 8 issues immediately via heartbeat workflow
-2. **Reduced cognitive load** — squad members focus on high-value architecture and testing work
-3. **Clear ownership** — each issue has a single owner (via `squad:*` label)
-4. **Flexible reassignment** — swapping labels is the standard mechanism for handoff
-
----
-
 ## Known Risks
 
 1. **Issue #6 (Settings Schema)** — flagged as 🟡; code already exists in `package.json` lines 36-64. @copilot should validate compliance with PRD Table FR6, not rewrite. PR review recommended.
@@ -314,34 +299,6 @@ Issues kept with squad members require:
 3. **@copilot context limits** — large issues (e.g., #18 README) may require multiple turns. Monitor for incomplete work.
 
 ---
-
-## Next Steps
-
-1. **@copilot**: Auto-assign workflow will pick up 8 rerouted issues based on priority and dependencies
-2. **Squad members**: Begin work on confirmed assignments in dependency order
-3. **MacReady**: Monitor @copilot PR quality; escalate to squad if issues arise
-4. **Scribe**: Merge this decision into `.squad/decisions.md` (append-only)
-
----
-
-## References
-
-- Coordinator routing analysis: `.squad/decisions/inbox/coordinator-mvp-routing.md` (assumed context)
-- PRD: `specs/PRD-airgapped-copilot-vscode-extension.md`
-- Team roster: `.squad/team.md`
-- Project history: `.squad/agents/macready/history.md`
-
----
-
-# Dependency Mapping & Sprint Assignment Decision
-
-**Date:** 2026-02-27  
-**Author:** Childs (SDK Dev)  
-**Context:** Rob Pitcher requested dependency links on all 28 issues and Sprint field values on Project #8
-
----
-
-## Decision
 
 ### Job 1: Dependency Links
 
@@ -386,14 +343,6 @@ All 28 issues have Sprint field values set on Project #8.
 
 ---
 
-## Rationale
-
-- **Dependency format** uses `**Dependencies:** #X, #Y` prepended with a horizontal rule separator, keeping existing body content intact.
-- **Sprint 1 contains all MVP work** — this mirrors the PRD critical path where all core functionality, testing, packaging, and documentation must land in the first iteration.
-- **Post-MVP phases get their own sprints** — keeps roadmap items visible but clearly deferred.
-
----
-
 ## API Details
 
 - **Project ID:** `PVT_kwHOANBAvc4BQSxx`
@@ -404,12 +353,6 @@ All 28 issues have Sprint field values set on Project #8.
 - **Iteration creation:** Not available via GraphQL API; must use GitHub Projects UI
 
 ---
-
-## Next Steps
-
-1. **MacReady:** Create Sprint 4 and Sprint 5 in GitHub Projects UI, reassign #28 and #29
-2. **Squad:** Use dependency links to determine work order — start with issues that have no pending dependencies
-3. **Scribe:** Merge this decision into `.squad/decisions.md`
 
 ### 2026-02-27T05:20:00Z: User directive — Branching strategy and main branch protection
 **By:** Rob Pitcher (via Copilot)
@@ -451,45 +394,6 @@ Established the release branch process for Enclave. Release branches follow the 
 - **PR:** #30 — "Release v0.2.0 — MVP infrastructure, workflows, and project setup" (base: main, head: rel/0.2.0)
 - **Status:** PR open, awaiting Rob's review
 
-#### Rationale
-
-- `.squad/` contains dev-only team state (agent charters, orchestration logs, decisions, casting, skills). This should not ship to `main` or be visible to end users.
-- Using `git rm --cached` removes files from git tracking on the release branch without deleting them from the local worktree, so squad tooling continues to work on dev.
-- `.gitignore` update prevents accidental re-addition of `.squad/` on the release branch.
-- `.github/agents/` is kept because it configures GitHub's Copilot agent recognition — this is user-facing, not dev tooling.
-
-#### What This Enables
-
-1. Clean `main` branch without dev tooling artifacts
-2. `squad-heartbeat.yml` cron workflow for @copilot auto-assignment
-3. CI and release workflows on main
-4. Repeatable process for future releases (rel/0.3.0, etc.)
-
-**Why:** Implements Rob Pitcher's branching directive for the first release.
-
----
-
-# Air-Gap Validation Testing Strategy
-
-**Date:** 2026-02-27  
-**Author:** Windows (Tester)  
-**Context:** Issue #11 — Test air-gap validation (SC2, SC3)
-
----
-
-## Decision
-
-Air-gap validation cannot be tested through manual network disconnection in unit tests. Instead, implemented **static code analysis and configuration inspection tests** that verify:
-
-1. **Source code analysis**: All source modules (configuration.ts, copilotService.ts, extension.ts) are free of GitHub API endpoint references
-2. **No GitHub authentication**: No GITHUB_TOKEN environment variable access or GitHub-specific configuration
-3. **Azure-only endpoint**: CopilotClient sessions are configured exclusively with user-provided Azure AI Foundry endpoint
-4. **No external HTTP calls**: Source code contains no direct fetch/axios/http.request calls (only SDK usage)
-5. **Settings schema**: Extension contributes only enclave.copilot.* settings with no GitHub-related properties
-6. **Provider type**: Sessions use OpenAI-compatible provider with Azure baseUrl
-
----
-
 ## Implementation
 
 Created `src/test/air-gap-validation.test.ts` with 18 tests organized in 7 test suites:
@@ -500,37 +404,6 @@ Created `src/test/air-gap-validation.test.ts` with 18 tests organized in 7 test 
 - Extension settings schema compliance (2 tests)
 - Provider configuration validation (2 tests)
 - No external network calls (2 tests)
-
----
-
-## Rationale
-
-**Why static analysis over dynamic network testing:**
-- Unit tests run in Node.js process without real VS Code environment
-- Simulating network disconnection is unreliable and non-portable
-- Static analysis catches violations at test time, not runtime
-- Prevents accidental introduction of GitHub API dependencies in future changes
-- Validates architecture intent: extension is designed for air-gap, not just works in air-gap
-
-**What we validate:**
-- ✅ Code doesn't reference GitHub endpoints (string matching on function source)
-- ✅ Configuration reads only from enclave.copilot.* namespace
-- ✅ Session config passes only Azure endpoint to SDK
-- ✅ No HTTP libraries imported for direct calls
-
-**What we don't validate:**
-- ❌ Actual network traffic (requires integration test with real environment)
-- ❌ SDK internal behavior (SDK is external dependency; we trust it honors provider config)
-- ❌ VS Code platform network isolation (manual test responsibility)
-
----
-
-## What This Enables
-
-1. **Regression protection**: If someone adds `fetch("https://api.github.com/...")`, tests fail
-2. **Architectural compliance**: Enforces design constraint that extension is Azure-only
-3. **Continuous validation**: Runs in CI on every commit
-4. **Documentation as code**: Tests serve as executable specification of air-gap requirements
 
 ---
 
@@ -552,17 +425,6 @@ This is complementary to automated tests: automation prevents mistakes, manual t
 **Author:** MacReady (Lead)  
 **Issues:** #19 (Copilot CLI installation guide), #20 (Azure AI Foundry configuration reference)  
 **Branch:** `squad/19-20-docs` → PR #45 (open to `dev`)
-
----
-
-## Decision
-
-Created and merged two comprehensive documentation files addressing air-gapped environment setup and Azure configuration:
-
-1. **`docs/installation-guide.md`** — Copilot CLI v0.0.418+ installation for disconnected environments
-2. **`docs/configuration-reference.md`** — Complete Azure AI Foundry endpoint and extension settings reference
-
-Both documents are complete, in-scope for MVP acceptance criteria, and ready for team review.
 
 ---
 
@@ -699,33 +561,6 @@ This catches problems at three levels: CLI availability, SDK communication, and 
 
 ---
 
-## Decision
-
-Implemented three-tier session cleanup strategy for CopilotClient:
-
-1. **destroySession(conversationId)** — Graceful single-session cleanup
-   - Calls `session.abort()` with error handling (session may already be ended)
-   - Removes from Map after abort
-   - Logs warnings but doesn't throw
-
-2. **destroyAllSessions()** — Concurrent cleanup for deactivation
-   - Iterates all sessions, aborts in parallel via `Promise.all()`
-   - Each abort is wrapped in `.catch()` to prevent one failure from blocking others
-   - Added safety guard: skips undefined sessions (edge case from concurrent removal)
-   - Clears Map after all aborts complete
-
-3. **getSessionCount()** — Debugging/testing utility
-   - Returns `sessions.size` for session tracking verification
-
-**Integration points:**
-- `stopClient()` now calls `destroyAllSessions()` before `client.stop()`
-- Extension error handler calls `destroySession()` instead of `removeSession()` for proper cleanup
-- `deactivate()` relies on `stopClient()` — no additional changes needed
-
----
-
-## Rationale
-
 ### Why graceful error handling?
 The SDK's `session.abort()` throws if the session has already ended or is in an invalid state. Since cleanup may be triggered from error paths, cancellation, or deactivation, we can't assume session state. Catching and logging prevents cleanup failures from cascading.
 
@@ -740,29 +575,10 @@ Test discovered edge case: if a session is removed from the Map (via `removeSess
 
 ---
 
-## What This Enables
-
-1. **No session memory leaks** — sessions are properly aborted and removed on error or deactivation
-2. **Graceful deactivation** — extension can be deactivated mid-stream without errors
-3. **Testable session lifecycle** — `getSessionCount()` allows verification in tests
-4. **Future session lifecycle features** — foundation for periodic stale session cleanup (deferred to post-MVP)
-
----
-
 ## What This Doesn't Solve
 
 - **No automatic conversation-end detection** — VS Code Chat API doesn't expose conversation close events. Sessions remain in memory until error or deactivation. Issue #24 (ChatContext ID reliability) may inform future cleanup triggers.
 - **No session timeout** — sessions persist indefinitely if no errors occur. Periodic cleanup (e.g., TTL-based) is deferred to post-MVP hardening.
-
----
-
-## Testing
-
-All 59 existing tests pass. Session cleanup is exercised in:
-- `multi-turn.test.ts` — `afterEach()` calls `stopClient()` → `destroyAllSessions()`
-- `copilotService.test.ts` — validates session removal and client stop behavior
-
-Mock update: `abort: vi.fn().mockResolvedValue(undefined)` — required for async abort compatibility.
 
 ---
 
@@ -874,55 +690,13 @@ context.subscriptions.push(
 
 **Description:** Open a full webview panel as an editor tab using `vscode.window.createWebviewPanel`.
 
-#### Pros
-- **Air-gapped compatible:** Zero external dependencies
-- **More screen real estate:** Full editor area instead of sidebar
-- **Simpler than sidebar:** No activity bar icon contribution needed
-
-#### Cons
-- **Poor UX for chat:** Chat should be persistent sidebar, not a tab
-- **Competes with editor:** Takes focus away from code
-- **Less "native" feel:** Webview panels are for tools/visualizations, not persistent chat
-- **User must manually open:** No "always available" sidebar presence
-
-#### Implementation Details
-Similar to Option 1, but simpler `package.json` (no viewsContainers) and use `createWebviewPanel` instead of `registerWebviewViewProvider`.
-
-**Complexity:** Moderate — 2 days
-
-**Recommendation:** ❌ Not recommended — UX is worse than sidebar for a chat assistant
-
 ### Option 3: Native VS Code TreeView + QuickInput
 
 **Description:** Use TreeView for message history, QuickInput for prompt input.
 
-#### Pros
-- **Air-gapped compatible:** Zero external dependencies
-- **Native performance:** No webview overhead
-- **Theme-aware:** Automatic VS Code theming
-
-#### Cons
-- **❌ Poor chat UX:** TreeView is for hierarchical data, not conversational UI
-- **❌ No markdown rendering:** Cannot display formatted code, syntax highlighting, etc.
-- **❌ Limited styling:** Cannot create a proper chat bubble interface
-- **❌ Streaming very difficult:** Would need to update tree nodes on every token delta
-
-**Recommendation:** ❌ Not viable — TreeView is fundamentally wrong UI pattern for chat
-
 ### Option 4: Terminal-based UI
 
 **Description:** Render chat in an integrated terminal.
-
-#### Pros
-- **Air-gapped compatible:** Zero external dependencies
-- **Simple implementation:** Just write to terminal output
-
-#### Cons
-- **❌ Terrible UX:** No scrollback control, no message editing, no proper formatting
-- **❌ Not a chat interface:** Terminal is for command output, not conversation
-- **❌ Cannot display markdown properly:** Limited ANSI color support
-
-**Recommendation:** ❌ Not viable — completely wrong UX for chat assistant
 
 ## What We Keep from Current Implementation
 
@@ -990,52 +764,6 @@ The architecture change only affects the **UI layer**. All backend logic remains
 - **Impact:** Team may not be familiar with webview API
 - **Mitigation:** Excellent official samples exist; well-documented API
 - **Severity:** Low — 1-2 hours to learn basics
-
-## Decision
-
-**Adopt Option 1: WebviewView (Sidebar)**
-
-**Rationale:**
-1. **Meets air-gapped requirement:** No GitHub auth dependency
-2. **Best UX:** Persistent sidebar is correct pattern for chat assistant
-3. **Proven approach:** Many VS Code extensions use WebviewView for custom UIs
-4. **Preserves backend:** No changes to SDK integration, BYOK, or streaming logic
-5. **Moderate complexity:** Well within team capability for 2-3 day implementation
-
-**Trade-offs accepted:**
-- Custom UI implementation effort (vs. free native Chat Participant UI)
-- Webview resource overhead (vs. native UI performance)
-- Manual theme integration (vs. automatic native theming)
-
-**Why not Chat Participant API:**
-- ❌ Requires GitHub Copilot authentication (violates G3)
-- ❌ Cannot work in air-gapped environment
-- ❌ Blocking issue for MVP
-
-## Next Steps
-
-1. **Blair or Windows**: Implement Phase 1 (Minimal Viable Sidebar)
-   - Priority: P0 (blocks all testing and validation)
-   - Dependencies: None (can start immediately)
-   - Acceptance criteria: User can open sidebar, send prompt, see streamed markdown response
-
-2. **Childs**: Update documentation
-   - Update README to reflect sidebar UI instead of Chat Participant
-   - No mention of GitHub Copilot authentication required
-
-3. **MacReady**: Create GitHub issue for WebviewView migration
-   - Link this decision document
-   - Assign to Blair or Windows based on availability
-
-4. **Squad**: Plan testing strategy
-   - SC1-SC7 still apply, but using sidebar instead of Chat Participant panel
-
-## References
-
-- [VS Code Webview API Docs](https://code.visualstudio.com/api/extension-guides/webview)
-- [VS Code WebviewView Sample](https://github.com/microsoft/vscode-extension-samples/tree/main/webview-view-sample)
-- [Webview UI Toolkit (deprecated but functional)](https://github.com/microsoft/vscode-webview-ui-toolkit)
-- [Research: Chat Participant API requires GitHub Copilot authentication](https://code.visualstudio.com/api/extension-guides/ai/chat)
 
 ## Appendix: Example WebviewViewProvider Skeleton
 
@@ -1204,8 +932,6 @@ User prompt → session.send({ prompt }) → LLM requests tool call →
   Confirm/reject back to SDK → SDK executes tool → LLM continues
 ```
 
-## Implementation Plan
-
 ### 1. Enable tools in `copilotService.ts`
 
 - **Remove `availableTools: []`** from the `createSession()` call (line 79). When omitted, the SDK exposes its default built-in tools.
@@ -1291,23 +1017,6 @@ Add to `contributes.configuration.properties`:
 
 ## Issue #26 — Add Workspace Context and Editor Selection (Rescoped)
 
-### Proposed New Issue Body
-
----
-
-## Summary
-
-Add the ability to attach **editor selection** and **file references** as context to chat prompts. Since we use a WebviewView (not Chat Participant API), there is no built-in `@workspace` variable — we must build context capture and attachment from scratch using the VS Code Extension API.
-
-## Background
-
-The original issue assumed Chat Participant API, which provides built-in `@workspace` and `#selection` variables. Our architecture uses a custom WebviewView sidebar (`forge.chatView`), so:
-- There is no `@workspace` variable — we need to capture and inject context ourselves.
-- Editor selection must be read via `vscode.window.activeTextEditor.selection` and forwarded to the webview.
-- File content must be resolved and prepended to prompts sent to `CopilotSession`.
-
-## Architecture
-
 ### Context flow
 ```
 1. User selects code in editor (or clicks "Attach Selection" button)
@@ -1317,8 +1026,6 @@ The original issue assumed Chat Participant API, which provides built-in `@works
 5. On send, context is included in the message to extension
 6. Extension prepends context to the prompt string sent to session.send()
 ```
-
-## Implementation Plan
 
 ### 1. Capture editor selection — `src/extension.ts`
 
@@ -1380,43 +1087,12 @@ This puts an "Attach Selection" icon in the sidebar title bar alongside the exis
 - Controlled by a setting `forge.copilot.autoAttachSelection` (default: `false`).
 - If enabled, the extension listens to `onDidChangeActiveTextEditor` and `onDidChangeTextEditorSelection` and auto-posts context to the webview.
 
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/extension.ts` | Register `forge.attachSelection` and `forge.attachFile` commands; wire `attachSelection`/`attachFile` message handlers; prepend context to prompts in `_handleChatMessage` |
-| `media/chat.js` | Add attach buttons, context chip rendering, include context in `sendMessage` payload |
-| `media/chat.css` | Styles for attach buttons and context chips |
-| `package.json` | Register `forge.attachSelection` and `forge.attachFile` commands; add view/title menu entry; optionally add `autoAttachSelection` setting |
-| `src/configuration.ts` | Read `autoAttachSelection` setting (if implemented) |
-
-## Acceptance Criteria
-
-- [ ] User can click "Attach Selection" to capture the current editor selection and see it as a chip in the chat input area.
-- [ ] User can click "Attach File" to pick a workspace file and attach it as context.
-- [ ] Attached context is visible in the webview as removable chips showing file name and line range.
-- [ ] Context is prepended to the prompt sent to `CopilotSession.send()`.
-- [ ] Multiple context items can be attached to a single message.
-- [ ] Context chips are cleared after sending the message.
-- [ ] Context is truncated with a note if it exceeds the size threshold.
-- [ ] No regression in existing chat flow (messages without context still work).
-- [ ] "Attach Selection" button in the sidebar title bar works when an editor is active.
-- [ ] Unit tests cover context capture, prompt construction, and truncation.
-
 ## Out of Scope (Phase 3+)
 
 - Full workspace indexing / semantic search (RAG)
 - Automatic context from open tabs
 - `@workspace` search across all project files
 - Drag-and-drop file attachment
-
-## Routing Recommendation
-
-- **Primary: Blair** (`squad:blair`) — VS Code Extension API: editor selection capture, command registration, webview UI, message handling.
-- **Secondary: Childs** (`squad:childs`) — Prompt construction: context prepending, size management, ensuring context flows correctly to `CopilotSession`.
-- **Review: MacReady** — Architecture review of the context flow and UX design.
-
----
 
 ## Decision Summary
 
@@ -1487,11 +1163,29 @@ The `toolResult` message uses `toolName` from `tool.execution_start`, tracked vi
 ### Enabling Tools
 Removing `availableTools: []` from `createSession()` exposes the CLI's default built-in tools. No explicit tool list needed.
 
-## Decision
-Implemented using `onPermissionRequest` for approval flow and session events for execution notifications. This matches the SDK's actual architecture rather than the assumed event-based confirmation pattern.
-
 ### 2026-02-28: User Directive — Auto-Approve Persistence
 
 **By:** Rob Pitcher (via Copilot)
 **What:** The `autoApproveTools` setting for issue #25 should use standard VS Code settings persistence (contributes.configuration in package.json, read via getConfiguration). Permanent until toggled off, scoped per VS Code's user/workspace model.
 **Why:** User confirmed this is the easiest approach and the right UX — users already understand VS Code settings.
+# Auto-attach editor selection on chat focus
+
+**Date:** 2025-07-18
+**Author:** Blair (Extension Dev)
+**Status:** Implemented
+
+## Approach
+
+- **Webview → Extension message**: The textarea `focus` event sends `{ command: "chatFocused" }` to the extension, but only when no context chips are already showing (avoids spamming on repeated focus/blur).
+- **Extension reads selection**: The `chatFocused` handler in `_handleMessage` reads `vscode.window.activeTextEditor` and posts `contextAttached` if there's a non-empty selection.
+- **Dedup on webview side**: `lastAutoAttachedContent` tracks the last auto-attached selection key (`content:filePath:startLine:endLine`). If the same selection arrives again (user clicks in/out), it's silently dropped. The key resets when the user sends a message, so the same selection can be re-attached for a new question.
+
+### Rules
+
+1. **Selections** include line range in the header: `{filePath}:{startLine}-{endLine} ({languageId})`
+2. **Files** omit line range: `{filePath} ({languageId})`
+3. **Truncation budget:** 8000 characters total for all context blocks (user prompt excluded from budget)
+4. If budget is exceeded, the **last** context item's content is truncated and a `...[truncated — context exceeds 8000 char limit]` note is appended
+5. Items beyond the truncated one are dropped entirely
+6. User prompt is always appended after a blank line, unmodified
+
