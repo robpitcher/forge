@@ -195,6 +195,155 @@
 - Squad members continue work on confirmed assignments in dependency order
 - Monitor @copilot PR quality for issues #2, #6, #15, #16, #18, #19, #20, #22
 
+### 2026-02-28: UI Enhancement Feasibility Analysis
+
+**Requested by:** Rob Pitcher
+
+**Proposals:**
+1. Model selector dropdown in chat UI (query AI Foundry for available models on auth, show in dropdown)
+2. Improve Entra ID authentication UX (make flow more obvious/easier)
+
+**Analysis — Enhancement 1: Model Selector Dropdown**
+
+**Feasibility:** Medium-High complexity. Feasible but requires significant work.
+
+**Architecture Impact:**
+- WebviewView has full control over UI — adding a dropdown is straightforward (HTML/CSS/JS in `media/chat.js`)
+- Challenge: **Azure AI Foundry has no standard "list models" API** in the OpenAI-compatible endpoint format
+  - OpenAI `/v1/models` endpoint exists, but Azure's implementation is inconsistent across regions/SKUs
+  - Would need to query `{endpoint}/models` and parse response, with error handling for unsupported endpoints
+- Alternative: **Azure Management API** (`management.azure.com`) for listing deployments — requires separate auth (ARM token, not API key or Cognitive Services token)
+  - Massive scope increase: new auth provider, new API client, different permissions model
+  - Air-gapped environments may not have ARM API access even if they have data plane access
+
+**Key Trade-offs:**
+1. **Data plane query (OpenAI `/v1/models`):**
+   - ✅ Simple, uses existing auth (API key or Cognitive Services token)
+   - ✅ No new permissions required
+   - ❌ Unreliable — endpoint may not support listing, may return stale data
+   - ❌ Extra network call on auth (latency hit in air-gap)
+   
+2. **Management plane query (ARM API):**
+   - ✅ Authoritative — returns actual deployment names from Azure resource
+   - ❌ Requires ARM token (different auth flow, separate permissions)
+   - ❌ Likely blocked in air-gapped environments (ARM is often unavailable even when data plane is accessible)
+   - ❌ High complexity for marginal UX benefit
+
+3. **Local config file (JSON in user workspace):**
+   - ✅ Works in all environments
+   - ✅ Zero auth complexity
+   - ❌ Manual maintenance by user
+   - ❌ Defeats the point of "querying" AI Foundry
+
+**Components to Change:**
+- `media/chat.js`: Add `<select>` dropdown above input area, populate on load, send selected model with prompt
+- `media/chat.css`: Style model selector dropdown
+- `src/extension.ts`: Add `queryModels` command handler to call AI Foundry `/v1/models` endpoint
+- `src/configuration.ts`: Make `model` setting optional (default: first model from query)
+- Extension → webview messaging: Add `modelsLoaded` message type with model list
+
+**Gotchas:**
+1. **First auth chicken-egg problem** — can't query models until user authenticates, but user sees empty dropdown until first successful auth. Need loading state + fallback to settings.
+2. **Caching stale model list** — if user queries models, then deployment is deleted/renamed, dropdown shows wrong options. Need refresh button or TTL.
+3. **Error handling for unsupported endpoints** — some Azure regions/SKUs don't expose `/v1/models`. Need graceful fallback to settings-based flow.
+4. **Webview lifecycle** — model list needs to persist across webview reload (store in extension state, re-send on `resolveWebviewView`).
+
+**Recommendation:** **Defer to Phase 6 (Multi-Model)** or implement as **local config file** pattern instead of querying.
+- Querying AI Foundry for models is unreliable and adds complexity with marginal benefit.
+- Most air-gapped deployments have 1-3 known models; dropdown from a user-editable JSON file (`~/.forge/models.json` or workspace `.vscode/forge-models.json`) is simpler and more reliable.
+- If Rob wants the "feels like GitHub Copilot" UX, recommend **hardcoded model list** in UI based on common Azure AI Foundry models (gpt-4.1, gpt-5, etc.) with a "Custom..." option that opens settings.
+
+---
+
+**Analysis — Enhancement 2: Entra ID Auth Flow UX**
+
+**Feasibility:** Low-Medium complexity. Several viable options with different trade-offs.
+
+**Current State:**
+- Silent auth using `@azure/identity` `DefaultAzureCredential` (Azure CLI, VS Code Azure extension, Managed Identity, environment variables)
+- No UI during auth — token acquisition happens in background
+- Errors surface as generic messages in chat: "Entra ID authentication failed. Ensure you're signed in via Azure CLI..."
+
+**Problem:**
+- Users don't know *when* auth is happening or *which* credential source was used
+- First-time setup is confusing — no prompt to sign in, just an error message
+- No way to force re-auth or switch credential source
+
+**Options to Improve UX:**
+
+**Option 2A: Status Bar Item (Low Complexity)**
+- Add status bar item (bottom-left) showing auth status: "🔒 Forge: Not Authenticated" / "✅ Forge: Authenticated (Azure CLI)" / "⚠️ Forge: Auth Error"
+- Click opens quick pick: "Sign in with Azure CLI", "Use Managed Identity", "Switch to API Key", "Open Settings"
+- Shows which credential source succeeded (Azure CLI, VS Code, Managed Identity)
+- **Components:** New `src/auth/authStatusProvider.ts`, status bar item in `extension.ts`, click handler
+- **Pros:** Non-intrusive, always visible, actionable
+- **Cons:** Can't auto-trigger Azure CLI sign-in from VS Code (user must run `az login` in terminal manually)
+
+**Option 2B: Welcome View in Sidebar (Medium Complexity)**
+- Show welcome view in Forge sidebar when not authenticated (replaces chat UI)
+- Buttons: "Authenticate with Entra ID", "Use API Key", "Configure Settings"
+- After auth succeeds, replace with chat UI
+- **Components:** New webview state (`authenticated` boolean), conditional HTML in `_getHtmlForWebview`, auth flow wiring
+- **Pros:** Obvious first-run experience, guides user through auth
+- **Cons:** Blocks chat UI until auth — annoying if auth is already configured but token expired
+
+**Option 2C: Inline Auth Prompt in Chat (Low Complexity)**
+- On first chat attempt with Entra ID configured, show inline message in chat stream:
+  - "🔒 Authenticating with Entra ID..."
+  - "✅ Authenticated via Azure CLI" (on success)
+  - "❌ Authentication failed. [Try Again] [Switch to API Key] [Open Settings]" (on error)
+- **Components:** New message type in `media/chat.js`, enhanced error rendering in `extension.ts`
+- **Pros:** Minimal disruption, contextual (only shows when user tries to chat)
+- **Cons:** Still doesn't solve the "how do I sign in?" problem for first-time users
+
+**Option 2D: VS Code Authentication Provider (High Complexity)**
+- Register a VS Code Authentication Provider (`vscode.authentication.registerAuthenticationProvider`)
+- VS Code native auth UI: "The extension 'Forge' wants to sign in using Azure"
+- Redirect to Azure OAuth flow (or Azure CLI)
+- **Components:** New `src/auth/forgeAuthProvider.ts` implementing `vscode.AuthenticationProvider`, session storage
+- **Pros:** Native VS Code UX, familiar to users
+- **Cons:** Massive complexity, requires OAuth client ID registration (may not work in air-gap), overkill for DefaultAzureCredential
+
+**Recommended Approach: Option 2A (Status Bar) + Option 2C (Inline Prompt)**
+- **Status bar item** for persistent visibility and manual control
+- **Inline auth prompt** on first chat attempt for contextual feedback
+- **Enhanced error messages** with actionable buttons: "Run 'az login'", "Switch to API Key", "Open Settings"
+
+**Components to Change:**
+- `src/auth/authStatusProvider.ts` (new): Status bar item, click handler
+- `src/extension.ts`: Register status bar item, update on auth success/failure
+- `media/chat.js`: Render auth status messages with action buttons
+- `src/auth/credentialProvider.ts`: Detect which credential source succeeded (Azure CLI vs VS Code vs MI) and return metadata
+- `package.json`: No new settings (use existing `forge.copilot.authMethod`)
+
+**Complexity:** Low-Medium
+- Status bar: ~50 lines (new file + registration)
+- Inline prompt: ~30 lines (webview message type + rendering)
+- Credential source detection: ~20 lines (inspect `DefaultAzureCredential` internals or add logging)
+
+**Gotchas:**
+1. **Detecting credential source** — `DefaultAzureCredential` doesn't expose which provider succeeded. Need to either:
+   - Try each provider individually (AzureCliCredential, EnvironmentCredential, ManagedIdentityCredential) and detect which one works (adds auth latency)
+   - Parse error messages (fragile)
+   - Just show "Authenticated via Entra ID" without specifics (acceptable)
+2. **Azure CLI sign-in from VS Code** — can't auto-trigger `az login` from extension. Best we can do: show terminal with command pre-filled (`vscode.window.createTerminal` + `sendText("az login")`)
+3. **Token expiry during session** — current implementation fetches token once at session creation (~1hr lifetime). If token expires mid-session, user sees API error. Status bar can show "⚠️ Token Expired" and prompt re-auth.
+
+**Recommendation:** **Implement Option 2A + 2C (Status Bar + Inline Prompt).** Low-medium effort, high UX impact, no architecture changes.
+
+---
+
+**Summary for Rob:**
+
+| Enhancement | Feasibility | Complexity | Recommendation |
+|-------------|-------------|------------|----------------|
+| **Model Selector Dropdown** | Medium-High | Medium-High | **Defer or use local config file.** Querying AI Foundry is unreliable; most air-gapped envs have 1-3 known models. Dropdown from JSON config is simpler. |
+| **Entra ID Auth UX** | High | Low-Medium | **Implement (Status Bar + Inline Prompt).** Clear wins: persistent auth status, actionable errors, detect credential source. ~100 lines, no SDK/API changes. |
+
+**Next Steps:**
+- If Rob approves Enhancement 2, can spec it as a new issue for Phase 3b (post-Entra ID auth implementation)
+- Enhancement 1 needs more discussion — is the goal to avoid editing settings, or to support dynamic model discovery? If the former, a local config file achieves the same UX with 1/10th the complexity.
+
 ### 2026-02-27 (Evening): Architecture Documentation Update — WebviewView Sidebar
 
 **Issue:** #52 — Update documentation for standalone WebviewView architecture (priority P1, should-have for MVP)
