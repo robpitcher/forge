@@ -101,7 +101,6 @@ const session = await client.createSession({
         wireApi: "completions",   // "completions" (default) or "responses" (GPT-5 series)
     },
     streaming: true,
-    availableTools: [],           // Disabled for MVP
 });
 ```
 
