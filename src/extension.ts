@@ -9,14 +9,13 @@ import {
   CopilotCliNotFoundError,
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
+import { ForgeCodeActionProvider } from "./codeActionProvider.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
   SessionErrorEvent,
   PermissionRequest,
   PermissionRequestResult,
-  ToolExecutionStartEvent,
-  ToolExecutionCompleteEvent,
   ToolExecutionProgressEvent,
   ToolExecutionPartialResultEvent,
   ContextItem,
@@ -146,7 +145,54 @@ export function activate(context: vscode.ExtensionContext): void {
       const ctx: ContextItem = { type: "file", filePath, languageId, content };
       provider.postContextAttached(ctx);
     }),
+    vscode.languages.registerCodeActionsProvider(
+      [{ scheme: "file" }, { scheme: "untitled" }],
+      new ForgeCodeActionProvider(),
+      { providedCodeActionKinds: ForgeCodeActionProvider.providedCodeActionKinds },
+    ),
+    vscode.commands.registerCommand("forge.explain", () =>
+      sendFromEditor("Explain the following code in detail.", provider)
+    ),
+    vscode.commands.registerCommand("forge.fix", () =>
+      sendFromEditor("Find and fix any bugs or issues in the following code.", provider)
+    ),
+    vscode.commands.registerCommand("forge.tests", () =>
+      sendFromEditor("Write unit tests for the following code.", provider)
+    ),
   );
+}
+
+/**
+ * Grabs the active editor selection, reveals the Forge panel, and sends
+ * a prompt with the selected code as context.
+ */
+async function sendFromEditor(instruction: string, provider: ChatViewProvider): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) { return; }
+  const selection = editor.selection;
+  const content = editor.document.getText(selection);
+  if (!content) { return; }
+
+  const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+  const startLine = selection.start.line + 1;
+  let endLine = selection.end.line + 1;
+  if (selection.end.character === 0 && selection.end.line > selection.start.line) {
+    endLine = selection.end.line;
+  }
+
+  const ctx: ContextItem = {
+    type: "selection",
+    filePath,
+    languageId: editor.document.languageId,
+    content,
+    startLine,
+    endLine,
+  };
+
+  // Reveal the Forge panel so the user sees the response
+  await vscode.commands.executeCommand("forge.chatView.focus");
+
+  provider.sendMessageWithContext(instruction, [ctx]);
 }
 
 async function updateAuthStatus(
@@ -160,7 +206,11 @@ async function updateAuthStatus(
   switch (status.state) {
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
-      statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      if (status.method === "entraId" && status.account) {
+        statusBarItem.tooltip = `Signed in as ${status.account} (Entra ID)`;
+      } else {
+        statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      }
       statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
@@ -195,9 +245,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
-  private _toolNames = new Map<string, string>();
 
   private _refreshAuthStatus?: () => void;
+  private _lastAuthStatus?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -213,7 +263,21 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "contextAttached", context });
   }
 
+  /** Programmatically send a message with context (used by code action commands). */
+  public sendMessageWithContext(prompt: string, context: ContextItem[]): void {
+    this._handleChatMessage(prompt, context).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    });
+  }
+
   public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    // Deduplicate authStatus messages to prevent banner flashing every 30s
+    const statusKey = JSON.stringify({ status, hasEndpoint: !!hasEndpoint });
+    if (this._lastAuthStatus === statusKey) {
+      return; // Status unchanged, skip posting to webview
+    }
+    this._lastAuthStatus = statusKey;
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
@@ -237,6 +301,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
+    
+    // Reset dedup state so initial status always goes through
+    this._lastAuthStatus = undefined;
     
     // Send initial auth status
     getConfigurationAsync(this._secrets)
@@ -495,8 +562,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubDelta();
         unsubIdle();
         unsubError();
-        unsubToolStart();
-        unsubToolComplete();
         unsubToolProgress();
         unsubToolPartialResult();
       };
@@ -510,35 +575,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       });
 
-      const unsubToolStart = session.on("tool.execution_start", (event: ToolExecutionStartEvent) => {
-        if (event?.data?.toolCallId && event?.data?.toolName) {
-          this._toolNames.set(event.data.toolCallId, event.data.toolName);
-        }
-      });
-
-      const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
-        if (event?.data?.toolCallId) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
-          this._toolNames.delete(event.data.toolCallId);
-          this._view?.webview.postMessage({
-            type: "toolResult",
-            id: event.data.toolCallId,
-            tool: toolName,
-            status: event.data.success ? "success" : "error",
-            output: event.data.success
-              ? (event.data.result?.content ?? "")
-              : (event.data.error?.message ?? "Tool execution failed"),
-          });
-        }
-      });
-
       const unsubToolProgress = session.on("tool.execution_progress", (event: ToolExecutionProgressEvent) => {
         if (event?.data?.toolCallId && event?.data?.progressMessage) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
           this._view?.webview.postMessage({
             type: "toolProgress",
             id: event.data.toolCallId,
-            tool: toolName,
             message: event.data.progressMessage,
           });
         }
@@ -546,15 +587,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
       const unsubToolPartialResult = session.on("tool.execution_partial_result", (event: ToolExecutionPartialResultEvent) => {
         if (event?.data?.toolCallId && event?.data?.partialOutput) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
           this._view?.webview.postMessage({
             type: "toolPartialResult",
             id: event.data.toolCallId,
-            tool: toolName,
             output: event.data.partialOutput,
           });
         }
       });
+
 
       const unsubIdle = session.on("session.idle", () => {
         if (settled) { return; }
@@ -638,7 +678,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       resolver(false);
     }
     this._pendingPermissions.clear();
-    this._toolNames.clear();
   }
 
   private _postError(message: string): void {

@@ -1444,3 +1444,138 @@ Four auth UX enhancements:
 
 ---
 
+# Auth UX Improvements
+
+**Date:** 2026-03-01  
+**Decided by:** Blair  
+**Context:** User feedback — auth banner flashing every 30s was distracting; status bar tooltip didn't show signed-in account
+
+## Decisions
+
+### 1. Deduplicate authStatus messages to webview
+
+**Problem:** `updateAuthStatus()` is called every 30s by the auth polling interval. Each call triggers `postAuthStatus()` which posts to the webview, causing the green "✅ Authenticated via Entra ID" banner to flash every 30 seconds even when nothing has changed.
+
+**Solution:** Track the last auth status sent to the webview (`_lastAuthStatus` field on `ChatViewProvider`) and compare before posting. Use `JSON.stringify()` on the full status object + hasEndpoint flag for comparison. Reset `_lastAuthStatus` to `undefined` in `resolveWebviewView()` so the initial status message always goes through when the webview loads.
+
+**Rationale:** Status bar updates should continue happening every 30s (they don't cause disruption), but the webview banner should only appear when the auth state actually changes. This preserves reactive UI behavior while eliminating the distracting flash.
+
+### 2. Show signed-in account in status bar tooltip
+
+**Problem:** Status bar tooltip showed "Authenticated via Entra ID" without identifying which Azure account was signed in. Users wanted to confirm they're using the correct account.
+
+**Solution:** 
+- Added optional `account?: string` field to `AuthStatus` authenticated state
+- In `checkAuthStatus()` for Entra ID mode, decode the JWT token payload and extract the user identity from `upn`, `preferred_username`, or `name` claims (in that order)
+- Updated status bar tooltip logic to show "Signed in as {account} (Entra ID)" when account is available
+- For API Key mode, tooltip remains "Authenticated via API Key" (no user identity available)
+
+**JWT decode implementation:** Simple base64url decode using `Buffer.from(parts[1], "base64url")` — no signature verification needed since we're only using this for display, not authentication.
+
+**Rationale:** Helps users confirm they're authenticated with the correct Azure identity, especially in environments where multiple Azure accounts might be configured.
+
+## Impact
+
+- **Extension UX:** Less distracting auth polling, more informative status bar
+- **No breaking changes:** Auth logic unchanged, only display improvements
+- **Tests:** All 134 tests pass with no modifications needed
+
+### 2026-03-01: Remove Tool Execution Result Cards from Chat UI
+
+**By:** Blair (Extension Dev)  
+**Date:** 2026-03-01  
+**Context:** User testing revealed redundant tool execution result cards
+
+## Problem
+
+During tool execution, Forge was posting both success AND error result cards to the chat window:
+
+1. **Redundant success cards** — Model's streaming text already described what happened (e.g., "I created a hello world file"). Separate ✅ card was unnecessary noise.
+2. **Confusing error cards** — When model retried a tool internally, users saw both ❌ and ✅ cards. Error card was scary even though everything ultimately worked.
+3. **Visual clutter** — Multiple tool calls per response = multiple cards cluttering chat window.
+
+## Decision
+
+**Remove tool execution result cards entirely.** Model's streaming text response is sufficient to communicate tool outcomes.
+
+## Implementation
+
+Removed from `src/extension.ts`:
+- `tool.execution_start` event handler
+- `tool.execution_complete` event handler
+- `_toolNames` map (only used for result card tracking)
+
+Removed from `media/chat.js`:
+- `renderToolResult()` function
+- `"toolResult"` message handler case
+
+Removed from `media/chat.css`:
+- `.tool-result`, `.tool-result-summary`, `.tool-output`, `.tool-output-toggle` styles
+
+Removed from `src/test/tool-approval.test.ts`:
+- 2 `.todo()` tests (never implemented)
+
+**Kept intact:**
+- `toolConfirmation` message type and rendering (user approval cards)
+- `toolResponse` message handler (webview → extension for user approval)
+- `onPermissionRequest` handler in extension
+- `ToolExecutionStartEvent` and `ToolExecutionCompleteEvent` types in `types.ts` (SDK event surface, may be useful for future features)
+
+## Rationale
+
+1. **Model text is sufficient** — Model already describes tool actions in streaming response. A "file_write completed" card doesn't add information beyond "I created hello.py with the following content."
+2. **Internal retries are implementation details** — Users don't need to see failed attempts that model recovered from. Showing them creates unnecessary alarm.
+3. **Cleaner chat UX** — Fewer UI elements = less cognitive load. Approval cards (which ARE user-facing) remain for important interaction point.
+
+## Impact
+
+- **User-facing:** Chat window is cleaner, no redundant cards
+- **Code:** ~40 lines removed from extension.ts, ~35 lines removed from chat.js/css
+- **Tests:** All 122 tests pass (2 `.todo()` tests removed, never implemented)
+- **Tool approval flow:** Unaffected — confirmation cards and approval handlers unchanged
+
+## Team Notes
+
+This is an extension-level decision (webview message protocol change). Childs (Copilot SDK integration) doesn't need to change anything — SDK still emits events, we just don't subscribe to them anymore.
+
+---
+
+# Context Chips in Sent Messages
+
+**Decision:** Render read-only context chips below user messages in chat history.
+
+**Context:** When users attached file or selection context and sent a message, the context chips in the input area disappeared and the message rendered as plain text. There was no visual indication in the chat history that context was sent with the prompt. Users had no way to look back and see which files/selections were attached to past questions.
+
+**Solution:** Modified `media/chat.js` to:
+1. Capture pending context before clearing: `const sentContext = [...pendingContext]`
+2. Pass context to `appendMessage()`: `appendMessage("user", text, sentContext)`
+3. Render compact read-only chips below user messages when context is present:
+   - Selection chips: `📎 {truncatedPath} (L{start}-{end})`
+   - File chips: `📄 {truncatedPath}`
+   - Truncate paths >30 chars to last 2 segments (e.g., `…/components/Button.tsx`)
+   - Full path in tooltip via `title` attribute
+
+**CSS:** `.sent-context-chips` and `.sent-context-chip` using badge theme tokens, 11px font, 200px max-width with ellipsis.
+
+**Rationale:**
+- Users need to see what context was sent when reviewing conversation history
+- Read-only chips (no remove buttons) are appropriate for historical messages
+- Compact styling keeps the chat clean while preserving important information
+- Consistent visual language with the input area context chips (same icons, similar styling)
+
+**Impact:** Improved UX — users can now trace which code they asked about when reviewing past questions. No breaking changes, all 122 tests pass.
+
+**Files:**
+- `media/chat.js` — `sendMessage()`, `appendMessage()`, `truncateFilePath()`
+- `media/chat.css` — `.sent-context-chips`, `.sent-context-chip`
+
+**Date:** 2026-03-01  
+**Owner:** Blair (Extension Dev)
+
+### Tool control precedence rule (#91)
+
+**By:** Childs  
+**Date:** 2026-03-01  
+**Status:** Decided
+
+When both `availableTools` and `excludedTools` are configured, `availableTools` takes precedence — only it is passed to the SDK `SessionConfig`. A `console.warn` is emitted and `validateConfiguration()` returns a warning error. This is intentional: whitelisting is stricter than blacklisting, so it should win. Empty arrays are valid and passed through (empty `excludedTools` = "exclude nothing", empty `availableTools` = "no tools available").

@@ -57,6 +57,18 @@
       {
         "command": "forge.attachFile",
         "title": "Forge: Attach File"
+      },
+      {
+        "command": "forge.explain",
+        "title": "Forge: Explain with Forge"
+      },
+      {
+        "command": "forge.fix",
+        "title": "Forge: Fix with Forge"
+      },
+      {
+        "command": "forge.tests",
+        "title": "Forge: Write Tests with Forge"
       }
     ],
     "menus": {
@@ -110,11 +122,22 @@
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
         },
-        "forge.copilot.systemMessage": {
-          "type": "string",
-          "default": "",
-          "editPresentation": "multilineText",
-          "markdownDescription": "Custom system message **appended** to the SDK's default system prompt. Use this to tailor the AI's behavior (e.g., coding style, response format). Leave empty to use the SDK default. Takes effect on the next new conversation."
+        "forge.copilot.excludedTools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["shell", "read", "write", "url", "mcp"],
+            "enumDescriptions": [
+              "Execute shell commands",
+              "Read files from the workspace",
+              "Write files to the workspace",
+              "Fetch URLs from the internet",
+              "Connect to MCP servers"
+            ]
+          },
+          "uniqueItems": true,
+          "default": ["url"],
+          "description": "SDK tools to disable. Default excludes 'url' for air-gap compliance. All unlisted tools are enabled."
         }
       }
     }

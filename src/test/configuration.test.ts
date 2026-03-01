@@ -31,6 +31,7 @@ describe("getConfiguration", () => {
       wireApi: "completions",
       cliPath: "",
       autoApproveTools: false,
+      excludedTools: ["url"],
     });
   });
 
@@ -67,6 +68,7 @@ describe("getConfiguration", () => {
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
       autoApproveTools: false,
+      excludedTools: ["url"],
     });
   });
 });
@@ -253,3 +255,4 @@ describe("getConfiguration — authMethod", () => {
     expect(config.authMethod).toBe("apiKey");
   });
 });
+

@@ -162,6 +162,26 @@ describe("copilotService", () => {
         }),
       );
     });
+    // --- #91 tool control tests ---
+
+    it("passes excludedTools to createSession when configured", async () => {
+      const configWithExcluded = { ...validConfig, excludedTools: ["url"] };
+      await getOrCreateSession("conv-excluded", configWithExcluded, "test-key-123");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          excludedTools: ["url"],
+        }),
+      );
+    });
+
+    it("does not pass excludedTools when not set", async () => {
+      const configWithNone = { ...validConfig, excludedTools: undefined };
+      await getOrCreateSession("conv-none", configWithNone, "test-key-123");
+
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.excludedTools).toBeUndefined();
+    });
   });
 
   describe("removeSession", () => {

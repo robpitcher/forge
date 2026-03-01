@@ -54,7 +54,8 @@
     const text = userInput.value.trim();
     if (!text || isStreaming) return;
 
-    appendMessage("user", text);
+    const sentContext = [...pendingContext];
+    appendMessage("user", text, sentContext);
     userInput.value = "";
     autoResizeTextarea();
 
@@ -81,7 +82,7 @@
     vscode.postMessage({ command: "newConversation" });
   }
 
-  function appendMessage(role, content) {
+  function appendMessage(role, content, contextItems = []) {
     const messageDiv = document.createElement("div");
     messageDiv.className = `message ${role}`;
 
@@ -95,10 +96,42 @@
 
     messageDiv.appendChild(roleLabel);
     messageDiv.appendChild(contentDiv);
+
+    // Render sent context chips for user messages
+    if (role === "user" && contextItems.length > 0) {
+      const chipsContainer = document.createElement("div");
+      chipsContainer.className = "sent-context-chips";
+
+      contextItems.forEach((ctx) => {
+        const chip = document.createElement("span");
+        chip.className = "sent-context-chip";
+
+        let label;
+        if (ctx.type === "selection") {
+          label = `📎 ${truncateFilePath(ctx.filePath)} (L${ctx.startLine}-${ctx.endLine})`;
+        } else {
+          label = `📄 ${truncateFilePath(ctx.filePath)}`;
+        }
+        chip.textContent = label;
+        chip.title = ctx.filePath; // Full path in tooltip
+        chipsContainer.appendChild(chip);
+      });
+
+      messageDiv.appendChild(chipsContainer);
+    }
+
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     return { messageDiv, contentDiv };
+  }
+
+  function truncateFilePath(filePath) {
+    const normalized = filePath.replace(/\\/g, "/");
+    if (normalized.length <= 30) return normalized;
+    const parts = normalized.split("/");
+    if (parts.length <= 2) return normalized;
+    return "…/" + parts.slice(-2).join("/");
   }
 
   function appendDelta(content) {
@@ -165,10 +198,6 @@
         renderToolConfirmation(message);
         break;
 
-      case "toolResult":
-        renderToolResult(message);
-        break;
-
       case "toolProgress":
         renderToolProgress(message);
         break;
@@ -176,6 +205,7 @@
       case "toolPartialResult":
         renderToolPartialResult(message);
         break;
+
 
       case "conversationReset":
         chatMessages.innerHTML = "";
@@ -303,7 +333,6 @@
   }
 
   function renderToolProgress(message) {
-    // Find or create a progress indicator for this tool call
     let indicator = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
     if (!indicator) {
       indicator = document.createElement("div");
@@ -323,13 +352,12 @@
     }
     const label = indicator.querySelector(".tool-progress-label");
     if (label) {
-      label.textContent = `${message.tool}: ${message.message}`;
+      label.textContent = message.message;
     }
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
   function renderToolPartialResult(message) {
-    // Find or create a partial result container for this tool call
     let container = document.querySelector(`.tool-partial-result[data-tool-id="${message.id}"]`);
     if (!container) {
       container = document.createElement("div");
@@ -364,46 +392,6 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  function removeToolProgressIndicator(toolId) {
-    const indicator = document.querySelector(`.tool-progress[data-tool-id="${toolId}"]`);
-    if (indicator) { indicator.remove(); }
-  }
-
-  function renderToolResult(message) {
-    // Remove any active progress indicator for this tool
-    removeToolProgressIndicator(message.id);
-    const result = document.createElement("div");
-    result.className = `tool-result ${message.status === "success" ? "success" : "error"}`;
-
-    const icon = message.status === "success" ? "✅" : "❌";
-    const verb = message.status === "success" ? "completed" : "failed";
-
-    const summary = document.createElement("div");
-    summary.className = "tool-result-summary";
-    summary.textContent = `${icon} ${message.tool} ${verb}`;
-
-    result.appendChild(summary);
-
-    if (message.output) {
-      const toggle = document.createElement("button");
-      toggle.className = "tool-output-toggle";
-      toggle.textContent = " ▶ Details";
-      summary.appendChild(toggle);
-
-      const output = document.createElement("div");
-      output.className = "tool-output";
-      output.textContent = message.output;
-      result.appendChild(output);
-
-      toggle.addEventListener("click", () => {
-        const expanded = output.classList.toggle("expanded");
-        toggle.textContent = expanded ? " ▼ Details" : " ▶ Details";
-      });
-    }
-
-    chatMessages.appendChild(result);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
 
   function updateAuthBanner(status, hasEndpoint) {
     let banner = document.getElementById("authBanner");
