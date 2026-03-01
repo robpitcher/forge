@@ -10,7 +10,7 @@ export class ForgeCodeActionProvider implements vscode.CodeActionProvider {
   ];
 
   public provideCodeActions(
-    document: vscode.TextDocument,
+    _document: vscode.TextDocument,
     range: vscode.Range | vscode.Selection,
   ): vscode.CodeAction[] | undefined {
     if (range.isEmpty) {

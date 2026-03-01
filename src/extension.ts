@@ -146,7 +146,7 @@ export function activate(context: vscode.ExtensionContext): void {
       provider.postContextAttached(ctx);
     }),
     vscode.languages.registerCodeActionsProvider(
-      { scheme: "*" },
+      [{ scheme: "file" }, { scheme: "untitled" }],
       new ForgeCodeActionProvider(),
       { providedCodeActionKinds: ForgeCodeActionProvider.providedCodeActionKinds },
     ),

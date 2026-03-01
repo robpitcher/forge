@@ -121,17 +121,6 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
-        },
-        "forge.copilot.availableTools": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Whitelist of SDK tools to enable. When set, only these tools are available. Mutually exclusive with excludedTools."
-        },
-        "forge.copilot.excludedTools": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": ["url"],
-          "description": "Blacklist of SDK tools to disable. Default excludes 'url' for air-gap compliance. Mutually exclusive with availableTools."
         }
       }
     }
