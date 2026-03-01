@@ -25,7 +25,6 @@ export function activate(context: vscode.ExtensionContext): void {
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-  statusBarItem.command = "forge.signIn";
   statusBarItem.show();
   
   // Initial auth status update
@@ -141,17 +140,20 @@ async function updateAuthStatus(
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
       statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
+      statusBarItem.command = "forge.signIn";
       if (config.authMethod === "entraId") {
         statusBarItem.text = "$(sign-in) Forge: Sign In";
-        statusBarItem.tooltip = "Click to sign in with Azure CLI, or open Settings to configure an API key";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
       } else {
         statusBarItem.text = "$(key) Forge: Set API Key";
-        statusBarItem.tooltip = "Click to set your API key, or sign in with Entra ID via Azure CLI";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
       }
       break;
     case "error": {
+      statusBarItem.command = "forge.signIn";
       statusBarItem.text = "$(warning) Forge: Auth Issue";
       const msg = status.message ?? "Unknown error";
       statusBarItem.tooltip = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
