@@ -4,17 +4,21 @@
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
   const newConvBtn = document.getElementById("newConvBtn");
+  const historyBtn = document.getElementById("historyBtn");
   const attachSelectionBtn = document.getElementById("attachSelection");
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
+  const conversationList = document.getElementById("conversationList");
 
   let currentAssistantMessage = null;
   let isStreaming = false;
   let pendingContext = [];
   let lastAutoAttachedContent = null;
+  let messages = [];
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
+  historyBtn.addEventListener("click", toggleConversationList);
   attachSelectionBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachSelection" });
   });
@@ -56,6 +60,7 @@
 
     const sentContext = [...pendingContext];
     appendMessage("user", text, sentContext);
+    messages.push({ role: "user", content: text });
     userInput.value = "";
     autoResizeTextarea();
 
@@ -79,7 +84,85 @@
     lastAutoAttachedContent = null;
     autoAttachedChipElement = null;
     autoAttachedCtx = null;
+    messages = [];
     vscode.postMessage({ command: "newConversation" });
+  }
+
+  function toggleConversationList() {
+    if (conversationList.classList.contains("hidden")) {
+      vscode.postMessage({ command: "listConversations" });
+    } else {
+      conversationList.classList.add("hidden");
+    }
+  }
+
+  function relativeTime(date) {
+    const now = Date.now();
+    const diff = now - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "yesterday";
+    return `${days}d ago`;
+  }
+
+  function renderConversationList(conversations) {
+    conversationList.innerHTML = "";
+    conversationList.classList.remove("hidden");
+
+    if (!conversations || conversations.length === 0) {
+      conversationList.innerHTML = '<div class="conversation-empty">No saved conversations</div>';
+      return;
+    }
+
+    const header = document.createElement("div");
+    header.className = "conversation-list-header";
+    header.innerHTML = '<span>Conversation History</span><button class="conversation-close-btn">✕</button>';
+    header.querySelector(".conversation-close-btn").addEventListener("click", () => {
+      conversationList.classList.add("hidden");
+    });
+    conversationList.appendChild(header);
+
+    conversations.forEach((conv) => {
+      const item = document.createElement("div");
+      item.className = "conversation-item";
+
+      const info = document.createElement("div");
+      info.className = "conversation-info";
+
+      const summary = document.createElement("div");
+      summary.className = "conversation-summary";
+      summary.textContent = conv.summary || "Untitled conversation";
+
+      const time = document.createElement("div");
+      time.className = "conversation-time";
+      time.textContent = relativeTime(conv.modifiedTime);
+
+      info.appendChild(summary);
+      info.appendChild(time);
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "conversation-delete-btn";
+      deleteBtn.textContent = "🗑️";
+      deleteBtn.title = "Delete conversation";
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ command: "deleteConversation", sessionId: conv.sessionId });
+      });
+
+      item.appendChild(info);
+      item.appendChild(deleteBtn);
+
+      item.addEventListener("click", () => {
+        vscode.postMessage({ command: "resumeConversation", sessionId: conv.sessionId });
+        conversationList.classList.add("hidden");
+      });
+
+      conversationList.appendChild(item);
+    });
   }
 
   function appendMessage(role, content, contextItems = []) {
@@ -162,6 +245,9 @@
         break;
 
       case "streamEnd":
+        if (currentAssistantMessage && currentAssistantMessage.textContent) {
+          messages.push({ role: "assistant", content: currentAssistantMessage.textContent });
+        }
         currentAssistantMessage = null;
         isStreaming = false;
         setInputEnabled(true);
@@ -225,6 +311,21 @@
         lastAutoAttachedContent = null;
         autoAttachedChipElement = null;
         autoAttachedCtx = null;
+        messages = [];
+        break;
+
+      case "conversationList":
+        renderConversationList(message.conversations);
+        break;
+
+      case "conversationResumed":
+        chatMessages.innerHTML = "";
+        currentAssistantMessage = null;
+        messages = message.messages || [];
+        // Render restored messages
+        messages.forEach((msg) => {
+          appendMessage(msg.role, msg.content);
+        });
         break;
     }
   });

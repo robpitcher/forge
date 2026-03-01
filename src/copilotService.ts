@@ -1,5 +1,13 @@
 import { ExtensionConfig } from "./configuration.js";
-import type { CopilotClient, ICopilotSession, PermissionHandler, ProviderConfig } from "./types.js";
+import type {
+  CopilotClient,
+  ICopilotSession,
+  PermissionHandler,
+  ProviderConfig,
+  SessionMetadata,
+  ConversationMetadata,
+  ResumeSessionConfig,
+} from "./types.js";
 
 let client: CopilotClient | undefined;
 const sessions = new Map<string, ICopilotSession>();
@@ -48,19 +56,10 @@ export async function getOrCreateClient(
   return client;
 }
 
-export async function getOrCreateSession(
-  conversationId: string,
-  config: ExtensionConfig,
-  authToken: string,
-  onPermissionRequest?: PermissionHandler,
-): Promise<ICopilotSession> {
-  const existing = sessions.get(conversationId);
-  if (existing) {
-    return existing;
-  }
-
-  const copilotClient = await getOrCreateClient(config);
-
+/**
+ * Builds a provider configuration for BYOK mode.
+ */
+function buildProviderConfig(config: ExtensionConfig, authToken: string): ProviderConfig {
   const wireApi =
     config.wireApi === "completions" || config.wireApi === "responses"
       ? config.wireApi
@@ -74,7 +73,7 @@ export async function getOrCreateSession(
   // TODO(#27): If Copilot SDK adds native Entra / managed-identity support, refactor
   //   to use SDK-native auth instead of manual token acquisition.
   const isAzure = /\.azure\.com/i.test(config.endpoint);
-  const provider: ProviderConfig = {
+  return {
     type: isAzure ? "azure" : "openai",
     baseUrl: config.endpoint,
     wireApi,
@@ -83,17 +82,39 @@ export async function getOrCreateSession(
       : { apiKey: authToken }),
     ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
   };
-  // Tool control: compute excludedTools from individual boolean settings
+}
+
+/**
+ * Builds tool configuration from individual boolean settings.
+ */
+function buildToolConfig(config: ExtensionConfig): Record<string, unknown> {
   const excludedTools: string[] = [];
   if (!config.toolShell) excludedTools.push("shell");
   if (!config.toolRead) excludedTools.push("read");
   if (!config.toolWrite) excludedTools.push("write");
   if (!config.toolUrl) excludedTools.push("url");
   if (!config.toolMcp) excludedTools.push("mcp");
-  const toolConfig: Record<string, unknown> = {};
+  
   if (excludedTools.length > 0) {
-    toolConfig.excludedTools = excludedTools;
+    return { excludedTools };
   }
+  return {};
+}
+
+export async function getOrCreateSession(
+  conversationId: string,
+  config: ExtensionConfig,
+  authToken: string,
+  onPermissionRequest?: PermissionHandler,
+): Promise<ICopilotSession> {
+  const existing = sessions.get(conversationId);
+  if (existing) {
+    return existing;
+  }
+
+  const copilotClient = await getOrCreateClient(config);
+  const provider = buildProviderConfig(config, authToken);
+  const toolConfig = buildToolConfig(config);
 
   const session = (await copilotClient.createSession({
     model: config.model,
@@ -159,6 +180,106 @@ export async function destroyAllSessions(): Promise<void> {
 
 function getSessionCount(): number {
   return sessions.size;
+}
+
+/**
+ * Lists all available conversations.
+ * 
+ * Wraps the SDK's `client.listSessions()` and maps SessionMetadata to ConversationMetadata.
+ */
+export async function listConversations(): Promise<ConversationMetadata[]> {
+  try {
+    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    const sessionList: SessionMetadata[] = await copilotClient.listSessions();
+    
+    return sessionList.map((s) => ({
+      sessionId: s.sessionId,
+      summary: s.summary,
+      startTime: s.startTime,
+      modifiedTime: s.modifiedTime,
+    }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to list conversations: ${message}`);
+  }
+}
+
+/**
+ * Resumes an existing conversation by session ID.
+ * 
+ * Wraps the SDK's `client.resumeSession()`, applies the same provider and tool config
+ * as `getOrCreateSession`, and stores the session in the local sessions map.
+ */
+export async function resumeConversation(
+  sessionId: string,
+  config: ExtensionConfig,
+  authToken: string,
+  onPermissionRequest?: PermissionHandler,
+): Promise<ICopilotSession> {
+  try {
+    const copilotClient = await getOrCreateClient(config);
+    const provider = buildProviderConfig(config, authToken);
+    const toolConfig = buildToolConfig(config);
+
+    const resumeConfig: ResumeSessionConfig = {
+      model: config.model,
+      provider,
+      streaming: true,
+      ...toolConfig,
+      ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
+      ...(onPermissionRequest && { onPermissionRequest }),
+    };
+
+    const session = (await copilotClient.resumeSession(
+      sessionId,
+      resumeConfig
+    )) as unknown as ICopilotSession;
+
+    // Store in local sessions map so it can be managed alongside new sessions
+    sessions.set(sessionId, session);
+    return session;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to resume conversation ${sessionId}: ${message}. The session may not exist or may have been deleted.`
+    );
+  }
+}
+
+/**
+ * Gets the ID of the most recently updated conversation.
+ * 
+ * Wraps the SDK's `client.getLastSessionId()`.
+ */
+export async function getLastConversationId(): Promise<string | undefined> {
+  try {
+    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    return await copilotClient.getLastSessionId();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to get last conversation ID: ${message}`);
+  }
+}
+
+/**
+ * Deletes a conversation and its data from disk.
+ * 
+ * Wraps the SDK's `client.deleteSession()` and also removes the session
+ * from the local sessions map if present.
+ */
+export async function deleteConversation(sessionId: string): Promise<void> {
+  try {
+    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    await copilotClient.deleteSession(sessionId);
+    
+    // Remove from local map if present
+    sessions.delete(sessionId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to delete conversation ${sessionId}: ${message}. The session may not exist or deletion may have failed.`
+    );
+  }
 }
 
 export async function stopClient(): Promise<void> {

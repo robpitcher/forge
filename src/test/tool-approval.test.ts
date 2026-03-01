@@ -96,6 +96,7 @@ describe("Tool approval flow (#25)", () => {
     setMockClient(mockClient);
     setupConfig();
 
+    const stateStore = new Map<string, unknown>();
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
@@ -106,6 +107,11 @@ describe("Tool approval flow (#25)", () => {
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
         onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+      workspaceState: {
+        get: vi.fn((key: string, defaultValue?: unknown) => stateStore.get(key) ?? defaultValue),
+        update: vi.fn((key: string, value: unknown) => { stateStore.set(key, value); return Promise.resolve(); }),
+        keys: vi.fn(() => [...stateStore.keys()]),
       },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
@@ -213,6 +219,7 @@ describe("Tool approval flow (#25)", () => {
       setupConfig({ autoApproveTools: true });
 
       // Re-activate with new config
+      const stateStore2 = new Map<string, unknown>();
       const mockExtContext = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
@@ -223,6 +230,11 @@ describe("Tool approval flow (#25)", () => {
           store: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
           onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
+        workspaceState: {
+          get: vi.fn((key: string, defaultValue?: unknown) => stateStore2.get(key) ?? defaultValue),
+          update: vi.fn((key: string, value: unknown) => { stateStore2.set(key, value); return Promise.resolve(); }),
+          keys: vi.fn(() => [...stateStore2.keys()]),
         },
       };
       activate(mockExtContext as unknown as import("vscode").ExtensionContext);

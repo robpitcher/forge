@@ -7,6 +7,9 @@ import {
   destroySession,
   stopClient,
   CopilotCliNotFoundError,
+  listConversations,
+  resumeConversation,
+  deleteConversation,
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import { ForgeCodeActionProvider } from "./codeActionProvider.js";
@@ -22,7 +25,7 @@ import type {
 } from "./types.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri, context.secrets);
+  const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState);
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
@@ -245,13 +248,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
+  private _conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _secrets: vscode.SecretStorage
+    private readonly _secrets: vscode.SecretStorage,
+    private readonly _workspaceState: vscode.Memento
   ) {}
 
   /** Set by activate() to trigger auth status refresh from within the provider. */
@@ -371,6 +376,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
       this._view?.webview.postMessage({ type: "conversationReset" });
     } else if (message.command === "chatFocused") {
       const editor = vscode.window.activeTextEditor;
@@ -415,6 +421,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       resolver(approved === true);
+    } else if (message.command === "listConversations") {
+      await this._handleListConversations();
+    } else if (message.command === "resumeConversation") {
+      await this._handleResumeConversation(message.sessionId as string);
+    } else if (message.command === "deleteConversation") {
+      await this._handleDeleteConversation(message.sessionId as string);
     }
   }
 
@@ -478,7 +490,17 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     this._isProcessing = true;
     try {
+      // Add user message to cache
+      this._conversationMessages.push({ role: "user", content: prompt });
+
       await this._streamResponse(enrichedPrompt, session);
+
+      // Cache messages after successful response
+      const cacheKey = `forge.messages.${this._conversationId}`;
+      await this._workspaceState.update(cacheKey, this._conversationMessages);
+      
+      // Store as last session
+      await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
       const message = this._rewriteAuthError(raw);
@@ -558,6 +580,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._view?.webview.postMessage({ type: "streamStart" });
 
       let settled = false;
+      let accumulatedContent = "";
       const cleanup = () => {
         unsubDelta();
         unsubIdle();
@@ -569,6 +592,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
         if (event?.data?.deltaContent) {
+          accumulatedContent += event.data.deltaContent;
           this._view?.webview.postMessage({
             type: "streamDelta",
             content: event.data.deltaContent,
@@ -610,6 +634,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         if (settled) { return; }
         settled = true;
         cleanup();
+        
+        // Add assistant message to cache
+        if (accumulatedContent) {
+          this._conversationMessages.push({ role: "assistant", content: accumulatedContent });
+        }
+        
         this._view?.webview.postMessage({ type: "streamEnd" });
         resolve();
       });
@@ -684,14 +714,106 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _rejectPendingPermissions(): void {
-    for (const [, resolver] of this._pendingPermissions) {
+    this._pendingPermissions.forEach((resolver) => {
       resolver(false);
-    }
+    });
     this._pendingPermissions.clear();
   }
 
   private _postError(message: string): void {
     this._view?.webview.postMessage({ type: "error", message });
+  }
+
+  private async _handleListConversations(): Promise<void> {
+    try {
+      const conversations = await listConversations();
+      this._view?.webview.postMessage({ type: "conversationList", conversations });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(`Failed to load conversations: ${message}`);
+    }
+  }
+
+  private async _handleResumeConversation(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      this._postError("Invalid session ID");
+      return;
+    }
+
+    try {
+      const config = await getConfigurationAsync(this._secrets);
+      const validationErrors = validateConfiguration(config);
+      if (validationErrors.length > 0) {
+        for (const error of validationErrors) {
+          this._postError(error.message);
+        }
+        return;
+      }
+
+      const credentialProvider = await createCredentialProvider(config, this._secrets);
+      let authToken: string;
+      try {
+        authToken = await credentialProvider.getToken();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (config.authMethod === "entraId") {
+          this._postError(
+            "Entra ID authentication failed. Ensure you're signed in via Azure CLI. " +
+            `Details: ${message}`
+          );
+        } else {
+          this._postError(`Authentication failed: ${message}`);
+        }
+        return;
+      }
+
+      // Destroy current session
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+
+      // Resume the selected conversation
+      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler());
+      this._conversationId = sessionId;
+
+      // Restore cached messages from workspaceState
+      const cacheKey = `forge.messages.${sessionId}`;
+      const cachedMessages = this._workspaceState.get<Array<{ role: "user" | "assistant"; content: string }>>(cacheKey, []);
+      this._conversationMessages = cachedMessages;
+
+      // Store as last session
+      await this._workspaceState.update("forge.lastSessionId", sessionId);
+
+      // Send to webview
+      this._view?.webview.postMessage({
+        type: "conversationResumed",
+        sessionId,
+        messages: cachedMessages,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(`Failed to resume conversation: ${message}`);
+    }
+  }
+
+  private async _handleDeleteConversation(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      this._postError("Invalid session ID");
+      return;
+    }
+
+    try {
+      await deleteConversation(sessionId);
+
+      // Remove cached messages
+      const cacheKey = `forge.messages.${sessionId}`;
+      await this._workspaceState.update(cacheKey, undefined);
+
+      // Send updated conversation list
+      await this._handleListConversations();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(`Failed to delete conversation: ${message}`);
+    }
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -715,6 +837,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="container">
+        <div id="conversationList" class="conversation-list hidden"></div>
         <div id="chatMessages"></div>
         <div class="input-area">
             <div class="context-actions">
@@ -726,6 +849,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             <div class="button-row">
                 <button id="sendBtn">Send</button>
                 <button id="newConvBtn">New Conversation</button>
+                <button id="historyBtn">📋 History</button>
             </div>
         </div>
     </div>
