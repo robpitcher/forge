@@ -379,14 +379,18 @@ describe("Tool approval flow (#25)", () => {
       simulateUserMessage(mockView, "hello");
 
       await vi.waitFor(() => {
-        const messages = getPostedMessages(mockView);
+        const messages = getPostedMessages(mockView)
+          .filter((m: unknown) => {
+            const t = (m as { type: string }).type;
+            return t !== "authStatus" && t !== "modeUpdated" && t !== "modelsUpdated" && t !== "modelSelected";
+          });
         expect(messages.length).toBeGreaterThanOrEqual(3);
       });
 
       const types = getPostedMessages(mockView)
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modeUpdated";
+          return t !== "authStatus" && t !== "modeUpdated" && t !== "modelsUpdated" && t !== "modelSelected";
         })
         .map((m: unknown) => (m as { type: string }).type);
       expect(types[0]).toBe("streamStart");

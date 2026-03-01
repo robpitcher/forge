@@ -306,7 +306,7 @@ describe("Context attachment (#26)", () => {
     const types = getPostedMessages(mockView)
       .filter((m: unknown) => {
         const t = (m as { type: string }).type;
-        return t !== "authStatus" && t !== "modeUpdated";
+        return t !== "authStatus" && t !== "modeUpdated" && t !== "modelsUpdated" && t !== "modelSelected";
       })
       .map((m: unknown) => (m as { type: string }).type);
     expect(types[0]).toBe("streamStart");

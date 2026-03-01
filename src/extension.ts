@@ -322,6 +322,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       .then(async (config) => {
         const status = await checkAuthStatus(config, this._secrets);
         this.postAuthStatus(status, !!config.endpoint);
+        this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
+        this._view?.webview.postMessage({ type: "modelSelected", model: config.model });
       })
       .catch(() => {
         // Silent failure — status bar will show the error
@@ -385,6 +387,27 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._conversationId = `conv-${crypto.randomUUID()}`;
       this._conversationMessages = [];
       this._view?.webview.postMessage({ type: "conversationReset" });
+    } else if (message.command === "modelChanged") {
+      const newModel = message.model as string;
+      if (!newModel) { return; }
+      const confirm = await vscode.window.showWarningMessage(
+        "Changing models will reset the current conversation. Continue?",
+        { modal: true },
+        "Continue"
+      );
+      if (confirm !== "Continue") {
+        const currentConfig = await getConfigurationAsync(this._secrets);
+        this._view?.webview.postMessage({ type: "modelSelected", model: currentConfig.model });
+        return;
+      }
+      const vsConfig = vscode.workspace.getConfiguration("forge.copilot");
+      await vsConfig.update("model", newModel, vscode.ConfigurationTarget.Global);
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+      this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
+      this._view?.webview.postMessage({ type: "conversationReset" });
+      this._view?.webview.postMessage({ type: "modelSelected", model: newModel });
     } else if (message.command === "chatFocused") {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -780,7 +803,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler(), this._currentMode);
+      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler());
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState
@@ -865,6 +888,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             <div class="button-row">
                 <button id="sendBtn">Send</button>
                 <button id="newConvBtn">New Conversation</button>
+                <select id="modelSelector" title="Select model deployment"></select>
             </div>
         </div>
     </div>

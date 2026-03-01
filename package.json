@@ -103,6 +103,18 @@
           "default": "gpt-4.1",
           "description": "Model deployment name"
         },
+        "forge.copilot.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "gpt-4.1",
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "description": "Available model deployments for the model selector"
+        },
         "forge.copilot.wireApi": {
           "type": "string",
           "default": "completions",
@@ -179,7 +191,9 @@
             "oneOf": [
               {
                 "type": "object",
-                "required": ["command"],
+                "required": [
+                  "command"
+                ],
                 "properties": {
                   "command": {
                     "type": "string",
@@ -187,19 +201,25 @@
                   },
                   "args": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                      "type": "string"
+                    },
                     "description": "Arguments to pass to the server command"
                   },
                   "env": {
                     "type": "object",
-                    "additionalProperties": { "type": "string" },
+                    "additionalProperties": {
+                      "type": "string"
+                    },
                     "description": "Environment variables for the server process"
                   }
                 }
               },
               {
                 "type": "object",
-                "required": ["url"],
+                "required": [
+                  "url"
+                ],
                 "properties": {
                   "url": {
                     "type": "string",
@@ -207,7 +227,9 @@
                   },
                   "headers": {
                     "type": "object",
-                    "additionalProperties": { "type": "string" },
+                    "additionalProperties": {
+                      "type": "string"
+                    },
                     "description": "HTTP headers to include in requests to the remote server"
                   }
                 }

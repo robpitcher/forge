@@ -157,7 +157,7 @@ describe("WebviewView chat panel", () => {
       const types = messages
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modeUpdated";
+          return t !== "authStatus" && t !== "modeUpdated" && t !== "modelsUpdated" && t !== "modelSelected";
         })
         .map((m: unknown) => (m as { type: string }).type);
 

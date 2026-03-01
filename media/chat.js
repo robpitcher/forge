@@ -8,6 +8,7 @@
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
+  const modelSelector = document.getElementById("modelSelector");
   const modeSelector = document.getElementById("modeSelector");
 
   let currentAssistantMessage = null;
@@ -23,6 +24,10 @@
   });
   attachFileBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachFile" });
+  });
+
+  modelSelector.addEventListener("change", () => {
+    vscode.postMessage({ command: "modelChanged", model: modelSelector.value });
   });
 
   // Mode selector
@@ -347,6 +352,24 @@
           modeSelector.querySelectorAll(".mode-btn").forEach((btn) => {
             btn.classList.toggle("active", btn.dataset.mode === message.mode);
           });
+        }
+        break;
+
+      case "modelsUpdated": {
+        modelSelector.innerHTML = "";
+        const models = message.models || [];
+        models.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          modelSelector.appendChild(opt);
+        });
+        break;
+      }
+
+      case "modelSelected":
+        if (message.model) {
+          modelSelector.value = message.model;
         }
         break;
     }
