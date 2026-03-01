@@ -225,9 +225,6 @@ button:active {
   opacity: 1;
 }
 
-/* Auth Banner */
-.auth-banner {
-
 /* Tool Progress Indicator */
 .tool-progress {
   display: flex;

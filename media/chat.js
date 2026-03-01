@@ -206,6 +206,14 @@
         renderToolPartialResult(message);
         break;
 
+      case "toolComplete": {
+        const progressEl = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
+        if (progressEl) {
+          progressEl.remove();
+        }
+        break;
+      }
+
 
       case "conversationReset":
         chatMessages.innerHTML = "";
@@ -387,7 +395,7 @@
     }
     const output = container.querySelector(".tool-partial-output");
     if (output) {
-      output.textContent += message.output;
+      output.appendChild(document.createTextNode(message.output));
     }
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }

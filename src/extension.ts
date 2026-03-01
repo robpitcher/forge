@@ -564,6 +564,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubError();
         unsubToolProgress();
         unsubToolPartialResult();
+        unsubToolComplete();
       };
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
@@ -595,6 +596,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       });
 
+      const unsubToolComplete = session.on("tool.execution_complete", (event: any) => {
+        const toolCallId = event?.data?.toolCallId;
+        if (toolCallId && this._view) {
+          this._view.webview.postMessage({
+            type: "toolComplete",
+            id: toolCallId,
+          });
+        }
+      });
 
       const unsubIdle = session.on("session.idle", () => {
         if (settled) { return; }
