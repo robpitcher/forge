@@ -166,7 +166,7 @@
           "default": true,
           "description": "Enable MCP tool support (Model Context Protocol servers)"
         },
-        "forge.copilot.allowRemoteMcp": {
+        "forge.copilot.mcpAllowRemote": {
           "type": "boolean",
           "default": false,
           "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for air-gap safety."

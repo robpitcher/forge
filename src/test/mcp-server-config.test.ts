@@ -136,8 +136,8 @@ describe("MCP server configuration (#90)", () => {
       expect(config.mcpServers!["server-b"].env).toEqual({ DEBUG: "true" });
     });
 
-    it("getConfiguration reads allowRemoteMcp setting", () => {
-      setupVscodeConfig({ allowRemoteMcp: true });
+    it("getConfiguration reads mcpAllowRemote setting", () => {
+      setupVscodeConfig({ mcpAllowRemote: true });
       const config = getConfiguration();
       expect(config.allowRemoteMcp).toBe(true);
     });

@@ -40,7 +40,7 @@ export function getConfiguration(): ExtensionConfig {
     toolWrite: config.get<boolean>("tools.write", true),
     toolUrl: config.get<boolean>("tools.url", false),
     toolMcp: config.get<boolean>("tools.mcp", true),
-    allowRemoteMcp: config.get<boolean>("allowRemoteMcp", false) || undefined,
+    allowRemoteMcp: config.get<boolean>("mcpAllowRemote", false) || undefined,
     mcpServers: config.get<Record<string, McpServerConfig | RemoteMcpServerConfig>>("mcpServers") || undefined,
   };
 }
@@ -99,7 +99,7 @@ export function validateConfiguration(
         if (!config.allowRemoteMcp) {
           errors.push({
             field,
-            message: `Remote MCP servers are disabled. Enable forge.copilot.allowRemoteMcp to allow remote (HTTP/SSE) servers.`,
+            message: `Remote MCP servers are disabled. Enable forge.copilot.mcpAllowRemote to allow remote (HTTP/SSE) servers.`,
           });
         }
         if (!remote.url || typeof remote.url !== "string") {
