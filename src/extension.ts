@@ -11,6 +11,7 @@ import {
   resumeConversation,
   deleteConversation,
 } from "./copilotService.js";
+import type { ChatMode } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import { ForgeCodeActionProvider } from "./codeActionProvider.js";
 import type {
@@ -248,6 +249,7 @@ export async function deactivate(): Promise<void> {
 class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _conversationId: string = `conv-${crypto.randomUUID()}`;
+  private _currentMode: ChatMode = "agent";
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
@@ -408,6 +410,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._conversationMessages = [];
       this._view?.webview.postMessage({ type: "conversationReset" });
       this._view?.webview.postMessage({ type: "modelSelected", model: newModel });
+    } else if (message.command === "modeChanged") {
+      const newMode = message.mode as ChatMode;
+      if (!newMode || !["chat", "agent", "plan"].includes(newMode)) { return; }
+      this._currentMode = newMode;
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+      this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
+      this._view?.webview.postMessage({ type: "conversationReset" });
     } else if (message.command === "chatFocused") {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -505,6 +516,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         config,
         authToken,
         this._createPermissionHandler(),
+        this._currentMode,
       );
     } catch (err: unknown) {
       if (err instanceof CopilotCliNotFoundError) {
