@@ -127,9 +127,10 @@
   }
 
   function truncateFilePath(filePath) {
-    if (filePath.length <= 30) return filePath;
-    const parts = filePath.split("/");
-    if (parts.length <= 2) return filePath;
+    const normalized = filePath.replace(/\\/g, "/");
+    if (normalized.length <= 30) return normalized;
+    const parts = normalized.split("/");
+    if (parts.length <= 2) return normalized;
     return "…/" + parts.slice(-2).join("/");
   }
 

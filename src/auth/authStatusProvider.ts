@@ -39,7 +39,10 @@ export async function checkAuthStatus(
       const provider = await createCredentialProvider(config, secrets);
       const token = await provider.getToken();
       const account = decodeJwtPayload(token);
-      return { state: "authenticated", method: "entraId", account };
+      if (account && account.trim().length > 0) {
+        return { state: "authenticated", method: "entraId", account };
+      }
+      return { state: "authenticated", method: "entraId" };
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : String(error);
