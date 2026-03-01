@@ -3,8 +3,10 @@ import type {
   CopilotClient,
   ICopilotSession,
   MCPLocalServerConfig,
+  MCPRemoteServerConfig,
   PermissionHandler,
   ProviderConfig,
+  RemoteMcpServerConfig,
   SessionMetadata,
   ConversationMetadata,
   ResumeSessionConfig,
@@ -88,23 +90,34 @@ function buildProviderConfig(config: ExtensionConfig, authToken: string): Provid
 /**
  * Builds MCP server configuration for the SDK's createSession/resumeSession.
  *
- * Maps our simplified McpServerConfig to the SDK's MCPLocalServerConfig shape.
- * Only "local" (stdio) transport is supported — air-gap safe, no remote servers.
+ * Maps our simplified McpServerConfig / RemoteMcpServerConfig to the SDK's
+ * MCPLocalServerConfig or MCPRemoteServerConfig shape. Supports both local
+ * (stdio) and remote (HTTP/SSE) transports.
  */
-function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocalServerConfig> | undefined {
+function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocalServerConfig | MCPRemoteServerConfig> | undefined {
   if (!config.mcpServers || Object.keys(config.mcpServers).length === 0) {
     return undefined;
   }
 
-  const mcpServers: Record<string, MCPLocalServerConfig> = {};
+  const mcpServers: Record<string, MCPLocalServerConfig | MCPRemoteServerConfig> = {};
   for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-    mcpServers[name] = {
-      type: "local" as const,
-      command: serverConfig.command,
-      args: serverConfig.args ?? [],
-      tools: ["*"],
-      ...(serverConfig.env && { env: serverConfig.env }),
-    };
+    if ('url' in serverConfig) {
+      const remote = serverConfig as RemoteMcpServerConfig;
+      mcpServers[name] = {
+        type: "http" as const,
+        url: remote.url,
+        tools: ["*"],
+        ...(remote.headers && { headers: remote.headers }),
+      };
+    } else {
+      mcpServers[name] = {
+        type: "local" as const,
+        command: serverConfig.command,
+        args: serverConfig.args ?? [],
+        tools: ["*"],
+        ...(serverConfig.env && { env: serverConfig.env }),
+      };
+    }
   }
   return mcpServers;
 }
