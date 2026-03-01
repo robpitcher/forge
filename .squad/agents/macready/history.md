@@ -483,3 +483,17 @@
 - `.squad/skills/copilot-sdk-byok/SKILL.md`, `.squad/skills/copilot-sdk-cookbook/SKILL.md`, `.squad/skills/copilot-sdk-nodejs-api/SKILL.md` — SDK reference skills consulted
 
 **Decision document:** `.squad/decisions/inbox/macready-copilot-instructions-standards.md`
+
+### 2025-07-25: PR #83 Review Fix — copilot-instructions.md
+
+**Work Completed:**
+- Fixed 4 unresolved Copilot review comments on `squad/copilot-instructions-standards` branch
+- Rebased on `origin/dev` (clean, no conflicts) and force-pushed
+
+**Fixes Applied:**
+1. Removed ghost file `src/auth/authStatusProvider.ts` from architecture map — only `credentialProvider.ts` exists
+2. BYOK provider type: changed example from `type: "openai"` to `type: "azure"` for `.azure.com` endpoints (matches `copilotService.ts` line 76-78)
+3. Event payload: `event.data.deltaContent` not `event.data.delta.content` (matches `extension.ts` line 362)
+4. Message protocol tables synced with actual code: added `contextAttached`, `conversationReset` to ext→webview; added `newConversation`, `attachSelection`, `attachFile`, `chatFocused`, `openSettings` to webview→ext
+
+**Key Insight:** The `authStatusProvider.ts` file was referenced in the original instructions but never existed on this branch — likely a planned-but-not-yet-implemented module. The `authStatus` message type IS in the table (added on another branch) and was kept.
