@@ -53,3 +53,5 @@
 
 ---
 📌 Team update (2026-03-01T03:14:32Z): Auth system improvements — Childs added 4 new error classification tests. Pre-existing `error-scenarios.test.ts` failure unrelated (authMethod from #27). All authStatusProvider tests (17 total) pass. — decided by Childs & Blair
+
+📌 Team update (2026-03-01T12:20:19Z): Context chips in sent messages — chat history now displays visual badges (📎/📄) showing which files/selections were attached to each user message. Blair's UI enhancement improves conversation review experience. 122 tests pass. — decided by Blair

@@ -1537,3 +1537,37 @@ Removed from `src/test/tool-approval.test.ts`:
 ## Team Notes
 
 This is an extension-level decision (webview message protocol change). Childs (Copilot SDK integration) doesn't need to change anything — SDK still emits events, we just don't subscribe to them anymore.
+
+---
+
+# Context Chips in Sent Messages
+
+**Decision:** Render read-only context chips below user messages in chat history.
+
+**Context:** When users attached file or selection context and sent a message, the context chips in the input area disappeared and the message rendered as plain text. There was no visual indication in the chat history that context was sent with the prompt. Users had no way to look back and see which files/selections were attached to past questions.
+
+**Solution:** Modified `media/chat.js` to:
+1. Capture pending context before clearing: `const sentContext = [...pendingContext]`
+2. Pass context to `appendMessage()`: `appendMessage("user", text, sentContext)`
+3. Render compact read-only chips below user messages when context is present:
+   - Selection chips: `📎 {truncatedPath} (L{start}-{end})`
+   - File chips: `📄 {truncatedPath}`
+   - Truncate paths >30 chars to last 2 segments (e.g., `…/components/Button.tsx`)
+   - Full path in tooltip via `title` attribute
+
+**CSS:** `.sent-context-chips` and `.sent-context-chip` using badge theme tokens, 11px font, 200px max-width with ellipsis.
+
+**Rationale:**
+- Users need to see what context was sent when reviewing conversation history
+- Read-only chips (no remove buttons) are appropriate for historical messages
+- Compact styling keeps the chat clean while preserving important information
+- Consistent visual language with the input area context chips (same icons, similar styling)
+
+**Impact:** Improved UX — users can now trace which code they asked about when reviewing past questions. No breaking changes, all 122 tests pass.
+
+**Files:**
+- `media/chat.js` — `sendMessage()`, `appendMessage()`, `truncateFilePath()`
+- `media/chat.css` — `.sent-context-chips`, `.sent-context-chip`
+
+**Date:** 2026-03-01  
+**Owner:** Blair (Extension Dev)
