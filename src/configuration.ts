@@ -8,6 +8,7 @@ export interface ExtensionConfig {
   wireApi: string;
   cliPath: string;
   autoApproveTools?: boolean;
+  excludedTools?: string[];
 }
 
 export interface ConfigValidationError {
@@ -25,6 +26,7 @@ export function getConfiguration(): ExtensionConfig {
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
     autoApproveTools: config.get<boolean>("autoApproveTools", false),
+    excludedTools: config.get<string[]>("excludedTools", ["url"]),
   };
 }
 

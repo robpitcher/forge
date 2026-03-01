@@ -83,10 +83,17 @@ export async function getOrCreateSession(
       : { apiKey: authToken }),
     ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
   };
+  // Tool control: excludedTools blacklist. Default: ["url"] for air-gap compliance.
+  const toolConfig: Record<string, unknown> = {};
+  if (config.excludedTools !== undefined) {
+    toolConfig.excludedTools = config.excludedTools;
+  }
+
   const session = (await copilotClient.createSession({
     model: config.model,
     provider,
     streaming: true,
+    ...toolConfig,
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 
