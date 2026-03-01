@@ -47,6 +47,11 @@
         "icon": "$(gear)"
       },
       {
+        "command": "forge.showHistory",
+        "title": "Conversation History",
+        "icon": "$(history)"
+      },
+      {
         "command": "forge.signIn",
         "title": "Forge: Sign In"
       },
@@ -75,6 +80,11 @@
       "view/title": [
         {
           "command": "forge.openSettings",
+          "when": "view == forge.chatView",
+          "group": "navigation"
+        },
+        {
+          "command": "forge.showHistory",
           "when": "view == forge.chatView",
           "group": "navigation"
         }

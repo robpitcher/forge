@@ -82,6 +82,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
     ),
+    vscode.commands.registerCommand("forge.showHistory", () =>
+      provider.toggleHistory()
+    ),
     vscode.commands.registerCommand("forge.signIn", async () => {
       const config = await getConfigurationAsync(context.secrets);
       if (config.authMethod === "entraId") {
@@ -266,6 +269,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
+  }
+
+  public toggleHistory(): void {
+    this._view?.webview.postMessage({ type: "toggleHistory" });
   }
 
   /** Programmatically send a message with context (used by code action commands). */
@@ -851,7 +858,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             <div class="button-row">
                 <button id="sendBtn">Send</button>
                 <button id="newConvBtn">New Conversation</button>
-                <button id="historyBtn">📋 History</button>
             </div>
         </div>
     </div>
