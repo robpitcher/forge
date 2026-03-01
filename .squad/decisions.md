@@ -1837,3 +1837,43 @@ Childs' implementation broke 5 tests in other files:
 - Pre-existing failures documented but not fixed (implementation responsibility)
 - Future work: Blair's webview UI tests will cover user-facing conversation list, delete buttons, resume clicks
 
+---
+
+### 2026-03-01: Model Selector UI Pattern
+
+**By:** Blair (Extension Dev)  
+**Issue:** #81  
+**PR:** #111  
+
+## Decision
+
+Model switching requires a confirmation dialog and full session reset. The `forge.copilot.models` setting provides the dropdown options, while `forge.copilot.model` remains the active model. The dropdown is placed in the button row with `margin-left: auto` for right-alignment.
+
+## Rationale
+
+- Model changes affect the entire conversation context, so resetting is safer than silently switching mid-conversation
+- Confirmation prevents accidental model switches that would lose conversation state
+- Separating `models` (available list) from `model` (active selection) allows the list to be configured once while the active model changes per-conversation
+
+---
+
+### 2026-03-01: Rename RemoteMcpServerConfig → RemoteMcpSettings
+
+**By:** Blair (Extension Dev)  
+**Context:** PR #106 review  
+
+## Decision
+
+Our local type `RemoteMcpServerConfig` is renamed to `RemoteMcpSettings` to avoid confusion with the SDK's re-exported `MCPRemoteServerConfig`.
+
+**Naming convention:** Our config types use `*Settings` suffix (`RemoteMcpSettings`), while SDK re-exports keep their original names (`MCPRemoteServerConfig`, `MCPLocalServerConfig`).
+
+## Rationale
+
+- `RemoteMcpServerConfig` (ours) vs `MCPRemoteServerConfig` (SDK) is too close — easy to import the wrong one.
+- `RemoteMcpSettings` clearly signals "this is our VS Code settings shape" vs the SDK's wire format.
+
+## Validation Architecture
+
+Ambiguous MCP server configs (`{command, url}`) are now rejected at the **validation layer** (`validateConfiguration()`), not silently handled at the mapper layer (`buildMcpServersConfig()`). Validation gives actionable error messages; mapper-layer skipping is silent and confusing.
+
