@@ -83,18 +83,9 @@ export async function getOrCreateSession(
       : { apiKey: authToken }),
     ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
   };
-  // Tool control: availableTools (whitelist) takes precedence over excludedTools (blacklist).
-  // Default excludedTools: ["url"] for air-gap compliance.
+  // Tool control: excludedTools blacklist. Default: ["url"] for air-gap compliance.
   const toolConfig: Record<string, unknown> = {};
-  if (config.availableTools !== undefined && config.excludedTools !== undefined
-      && config.availableTools.length > 0 && config.excludedTools.length > 0) {
-    console.warn(
-      "Both availableTools and excludedTools are configured. availableTools takes precedence; excludedTools will be ignored.",
-    );
-  }
-  if (config.availableTools !== undefined) {
-    toolConfig.availableTools = config.availableTools;
-  } else if (config.excludedTools !== undefined) {
+  if (config.excludedTools !== undefined) {
     toolConfig.excludedTools = config.excludedTools;
   }
 

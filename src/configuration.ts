@@ -8,7 +8,6 @@ export interface ExtensionConfig {
   wireApi: string;
   cliPath: string;
   autoApproveTools?: boolean;
-  availableTools?: string[];
   excludedTools?: string[];
 }
 
@@ -27,7 +26,6 @@ export function getConfiguration(): ExtensionConfig {
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
     autoApproveTools: config.get<boolean>("autoApproveTools", false),
-    availableTools: config.get<string[] | undefined>("availableTools", undefined),
     excludedTools: config.get<string[]>("excludedTools", ["url"]),
   };
 }
@@ -60,14 +58,6 @@ export function validateConfiguration(
       field: "forge.copilot.apiKey",
       message:
         "Please set your API key via the ⚙️ gear menu → 'Set API Key (secure)'",
-    });
-  }
-
-  if (config.availableTools?.length && config.excludedTools?.length) {
-    errors.push({
-      field: "forge.copilot.availableTools",
-      message:
-        "Both availableTools and excludedTools are set. Only one should be configured — availableTools takes precedence.",
     });
   }
 

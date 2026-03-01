@@ -110,16 +110,22 @@
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
         },
-        "forge.copilot.availableTools": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Whitelist of SDK tools to enable. When set, only these tools are available. Mutually exclusive with excludedTools."
-        },
         "forge.copilot.excludedTools": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string",
+            "enum": ["shell", "read", "write", "url", "mcp"],
+            "enumDescriptions": [
+              "Execute shell commands",
+              "Read files from the workspace",
+              "Write files to the workspace",
+              "Fetch URLs from the internet",
+              "Connect to MCP servers"
+            ]
+          },
+          "uniqueItems": true,
           "default": ["url"],
-          "description": "Blacklist of SDK tools to disable. Default excludes 'url' for air-gap compliance. Mutually exclusive with availableTools."
+          "description": "SDK tools to disable. Default excludes 'url' for air-gap compliance. All unlisted tools are enabled."
         }
       }
     }
