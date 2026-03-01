@@ -162,6 +162,51 @@ describe("copilotService", () => {
         }),
       );
     });
+    // --- #91 tool control tests ---
+
+    it("passes excludedTools to createSession when configured", async () => {
+      const configWithExcluded = { ...validConfig, excludedTools: ["url"] };
+      await getOrCreateSession("conv-excluded", configWithExcluded, "test-key-123");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          excludedTools: ["url"],
+        }),
+      );
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.availableTools).toBeUndefined();
+    });
+
+    it("passes availableTools to createSession when configured", async () => {
+      const configWithAvailable = { ...validConfig, availableTools: ["code_interpreter"], excludedTools: undefined };
+      await getOrCreateSession("conv-available", configWithAvailable, "test-key-123");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          availableTools: ["code_interpreter"],
+        }),
+      );
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.excludedTools).toBeUndefined();
+    });
+
+    it("availableTools takes precedence over excludedTools", async () => {
+      const configWithBoth = { ...validConfig, availableTools: ["code_interpreter"], excludedTools: ["url"] };
+      await getOrCreateSession("conv-both", configWithBoth, "test-key-123");
+
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.availableTools).toEqual(["code_interpreter"]);
+      expect(callArgs.excludedTools).toBeUndefined();
+    });
+
+    it("does not pass tool config when neither is set", async () => {
+      const configWithNone = { ...validConfig, availableTools: undefined, excludedTools: undefined };
+      await getOrCreateSession("conv-none", configWithNone, "test-key-123");
+
+      const callArgs = mockClient.createSession.mock.calls[0][0];
+      expect(callArgs.availableTools).toBeUndefined();
+      expect(callArgs.excludedTools).toBeUndefined();
+    });
   });
 
   describe("removeSession", () => {

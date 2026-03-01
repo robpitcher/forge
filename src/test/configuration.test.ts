@@ -31,6 +31,8 @@ describe("getConfiguration", () => {
       wireApi: "completions",
       cliPath: "",
       autoApproveTools: false,
+      availableTools: undefined,
+      excludedTools: ["url"],
     });
   });
 
@@ -67,6 +69,8 @@ describe("getConfiguration", () => {
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
       autoApproveTools: false,
+      availableTools: undefined,
+      excludedTools: ["url"],
     });
   });
 });
@@ -251,5 +255,56 @@ describe("getConfiguration — authMethod", () => {
     const config = getConfiguration();
 
     expect(config.authMethod).toBe("apiKey");
+  });
+});
+
+describe("validateConfiguration — tool control", () => {
+  it("warns when both availableTools and excludedTools are set", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://example.com",
+      apiKey: "key",
+      authMethod: "apiKey",
+      model: "gpt-4.1",
+      wireApi: "completions",
+      cliPath: "",
+      availableTools: ["code_interpreter"],
+      excludedTools: ["url"],
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors.some((e) => e.field === "forge.copilot.availableTools")).toBe(true);
+  });
+
+  it("does not warn when only excludedTools is set", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://example.com",
+      apiKey: "key",
+      authMethod: "apiKey",
+      model: "gpt-4.1",
+      wireApi: "completions",
+      cliPath: "",
+      excludedTools: ["url"],
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors.some((e) => e.field === "forge.copilot.availableTools")).toBe(false);
+  });
+
+  it("does not warn when only availableTools is set", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://example.com",
+      apiKey: "key",
+      authMethod: "apiKey",
+      model: "gpt-4.1",
+      wireApi: "completions",
+      cliPath: "",
+      availableTools: ["code_interpreter"],
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors.some((e) => e.field === "forge.copilot.availableTools")).toBe(false);
   });
 });
