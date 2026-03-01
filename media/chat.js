@@ -353,24 +353,26 @@
       }, 3000);
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
-      banner.textContent = "🔒 Not authenticated — ";
+      banner.textContent = "🔐 Sign in to start chatting — ";
       
-      const settingsBtn = document.createElement("button");
-      settingsBtn.textContent = "Open Settings";
-      settingsBtn.addEventListener("click", () => {
-        vscode.postMessage({ command: "openSettings" });
+      const signInBtn = document.createElement("button");
+      signInBtn.textContent = "Sign In";
+      signInBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "signIn" });
       });
-      banner.appendChild(settingsBtn);
+      banner.appendChild(signInBtn);
     } else if (status.state === "error") {
       banner.className = "auth-banner error";
-      banner.textContent = `⚠️ Auth error: ${status.message} — `;
+      const rawMsg = status.message || "Unknown error";
+      const shortMsg = rawMsg.length > 80 ? rawMsg.slice(0, 80) + "…" : rawMsg;
+      banner.textContent = `⚠️ Authentication issue — ${shortMsg} `;
       
-      const settingsBtn = document.createElement("button");
-      settingsBtn.textContent = "Open Settings";
-      settingsBtn.addEventListener("click", () => {
+      const troubleshootBtn = document.createElement("button");
+      troubleshootBtn.textContent = "Troubleshoot";
+      troubleshootBtn.addEventListener("click", () => {
         vscode.postMessage({ command: "openSettings" });
       });
-      banner.appendChild(settingsBtn);
+      banner.appendChild(troubleshootBtn);
     }
   }
 })();

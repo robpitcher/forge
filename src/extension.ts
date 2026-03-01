@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-  statusBarItem.command = "forge.openSettings";
+  statusBarItem.command = "forge.signIn";
   statusBarItem.show();
   
   // Initial auth status update
@@ -42,13 +42,42 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
   
+  // Poll auth status every 30s (catches `az login` completions that don't trigger config changes)
+  const authPollInterval = setInterval(() => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+  }, 30_000);
+  const authPollDisposable = new vscode.Disposable(() => clearInterval(authPollInterval));
+  
+  // Re-check auth when the window regains focus
+  const focusListener = vscode.window.onDidChangeWindowState((e) => {
+    if (e.focused) {
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+    }
+  });
+  
   context.subscriptions.push(
     statusBarItem,
     configListener,
+    authPollDisposable,
+    focusListener,
     vscode.window.registerWebviewViewProvider("forge.chatView", provider),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
     ),
+    vscode.commands.registerCommand("forge.signIn", async () => {
+      const config = await getConfigurationAsync(context.secrets);
+      if (config.authMethod === "entraId") {
+        const terminal = vscode.window.createTerminal("Azure Sign In");
+        terminal.sendText("az login");
+        terminal.show();
+        // Re-check auth after a few seconds to pick up the new token
+        setTimeout(() => {
+          updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+        }, 5000);
+      } else {
+        await provider.openSettings();
+      }
+    }),
     vscode.commands.registerCommand("forge.attachSelection", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -114,13 +143,20 @@ async function updateAuthStatus(
       statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
       break;
     case "notAuthenticated":
-      statusBarItem.text = "$(lock) Forge: Not Authenticated";
-      statusBarItem.tooltip = status.reason ?? "Not authenticated";
+      if (config.authMethod === "entraId") {
+        statusBarItem.text = "$(sign-in) Forge: Sign In";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+      } else {
+        statusBarItem.text = "$(key) Forge: Set API Key";
+        statusBarItem.tooltip = "Click to set your API key";
+      }
       break;
-    case "error":
-      statusBarItem.text = "$(warning) Forge: Auth Error";
-      statusBarItem.tooltip = status.message;
+    case "error": {
+      statusBarItem.text = "$(warning) Forge: Auth Issue";
+      const msg = status.message ?? "Unknown error";
+      statusBarItem.tooltip = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
       break;
+    }
   }
   
   provider.postAuthStatus(status);
@@ -220,6 +256,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachFile");
     } else if (message.command === "openSettings") {
       await this.openSettings();
+    } else if (message.command === "signIn") {
+      await vscode.commands.executeCommand("forge.signIn");
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);

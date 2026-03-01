@@ -47,6 +47,10 @@
         "icon": "$(gear)"
       },
       {
+        "command": "forge.signIn",
+        "title": "Forge: Sign In"
+      },
+      {
         "command": "forge.attachSelection",
         "title": "Forge: Attach Selection"
       },
