@@ -52,3 +52,5 @@
 
 ---
 📌 Team update (2026-03-01T03:14:32Z): Auth UX Fixes completed — Childs' error classification integrated with Blair's sign-in flow. First-run users now see sign-in prompt (not error) when using Entra ID without being logged in. — decided by Childs & Blair
+
+📌 Tool control settings (#91) (2026-03-01): Added `forge.copilot.availableTools` (whitelist, optional string[]) and `forge.copilot.excludedTools` (blacklist, default: `["url"]`) to `package.json` contributes, `ExtensionConfig` interface, and `getConfiguration()`. In `getOrCreateSession()`, `availableTools` takes precedence when both are set — a `console.warn` fires and only `availableTools` is passed to `SessionConfig`. Empty arrays are passed through (empty `excludedTools` = "exclude nothing"). Validation in `validateConfiguration()` also flags the conflict. Pre-existing test file `src/test/tool-control-settings.test.ts` (19 tests written by Windows) all pass alongside 7 new tests in configuration/copilotService test files. PR #93.
