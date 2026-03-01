@@ -179,7 +179,9 @@
             "oneOf": [
               {
                 "type": "object",
-                "required": ["command"],
+                "required": [
+                  "command"
+                ],
                 "properties": {
                   "command": {
                     "type": "string",
@@ -187,19 +189,25 @@
                   },
                   "args": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                      "type": "string"
+                    },
                     "description": "Arguments to pass to the server command"
                   },
                   "env": {
                     "type": "object",
-                    "additionalProperties": { "type": "string" },
+                    "additionalProperties": {
+                      "type": "string"
+                    },
                     "description": "Environment variables for the server process"
                   }
                 }
               },
               {
                 "type": "object",
-                "required": ["url"],
+                "required": [
+                  "url"
+                ],
                 "properties": {
                   "url": {
                     "type": "string",
@@ -207,7 +215,9 @@
                   },
                   "headers": {
                     "type": "object",
-                    "additionalProperties": { "type": "string" },
+                    "additionalProperties": {
+                      "type": "string"
+                    },
                     "description": "HTTP headers to include in requests to the remote server"
                   }
                 }
@@ -220,7 +230,8 @@
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",
-    "@github/copilot-sdk": "0.1.26"
+    "@github/copilot-sdk": "0.1.26",
+    "marked": "^17.0.3"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",

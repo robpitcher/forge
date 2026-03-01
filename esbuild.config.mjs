@@ -45,11 +45,28 @@ const buildOptions = {
   define: { "import.meta.resolve": "__importMetaResolve" },
 };
 
+// Webview bundle — bundles media/chat.js with marked for markdown rendering
+const webviewBuildOptions = {
+  entryPoints: ["media/chat.js"],
+  bundle: true,
+  outfile: "dist/chat.js",
+  platform: "browser",
+  format: "iife",
+  minify: production,
+  sourcemap: !production,
+};
+
 if (watch) {
-  const ctx = await esbuild.context(buildOptions);
-  await ctx.watch();
+  const [ctx, webCtx] = await Promise.all([
+    esbuild.context(buildOptions),
+    esbuild.context(webviewBuildOptions),
+  ]);
+  await Promise.all([ctx.watch(), webCtx.watch()]);
   console.log("Watching for changes...");
 } else {
-  await esbuild.build(buildOptions);
+  await Promise.all([
+    esbuild.build(buildOptions),
+    esbuild.build(webviewBuildOptions),
+  ]);
   console.log("Build complete.");
 }

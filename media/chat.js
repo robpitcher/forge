@@ -1,4 +1,12 @@
 (function () {
+  const { marked } = require("marked");
+
+  // Configure marked for chat rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+  });
+
   const vscode = acquireVsCodeApi();
   const chatMessages = document.getElementById("chatMessages");
   const userInput = document.getElementById("userInput");
@@ -10,6 +18,7 @@
   const conversationList = document.getElementById("conversationList");
 
   let currentAssistantMessage = null;
+  let currentAssistantRawText = "";
   let isStreaming = false;
   let pendingContext = [];
   let lastAutoAttachedContent = null;
@@ -173,7 +182,13 @@
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "message-content";
-    contentDiv.textContent = content;
+
+    if (role === "assistant") {
+      contentDiv.classList.add("markdown-body");
+      contentDiv.innerHTML = renderMarkdown(content);
+    } else {
+      contentDiv.textContent = content;
+    }
 
     messageDiv.appendChild(roleLabel);
     messageDiv.appendChild(contentDiv);
@@ -215,12 +230,19 @@
     return "…/" + parts.slice(-2).join("/");
   }
 
+  function renderMarkdown(text) {
+    if (!text) return "";
+    return marked.parse(text);
+  }
+
   function appendDelta(content) {
     if (!currentAssistantMessage) {
       const { contentDiv } = appendMessage("assistant", "");
       currentAssistantMessage = contentDiv;
+      currentAssistantRawText = "";
     }
-    currentAssistantMessage.textContent += content;
+    currentAssistantRawText += content;
+    currentAssistantMessage.innerHTML = renderMarkdown(currentAssistantRawText);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
@@ -234,6 +256,7 @@
 
       case "streamStart":
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = true;
         setInputEnabled(false);
         break;
@@ -243,10 +266,11 @@
         break;
 
       case "streamEnd":
-        if (currentAssistantMessage && currentAssistantMessage.textContent) {
-          messages.push({ role: "assistant", content: currentAssistantMessage.textContent });
+        if (currentAssistantRawText) {
+          messages.push({ role: "assistant", content: currentAssistantRawText });
         }
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = false;
         setInputEnabled(true);
         break;
@@ -302,6 +326,7 @@
       case "conversationReset":
         chatMessages.innerHTML = "";
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = false;
         setInputEnabled(true);
         pendingContext = [];
@@ -328,6 +353,24 @@
         messages.forEach((msg) => {
           appendMessage(msg.role, msg.content);
         });
+        break;
+
+      case "modelsUpdated": {
+        modelSelector.innerHTML = "";
+        const models = message.models || [];
+        models.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          modelSelector.appendChild(opt);
+        });
+        break;
+      }
+
+      case "modelSelected":
+        if (message.model) {
+          modelSelector.value = message.model;
+        }
         break;
     }
   });
