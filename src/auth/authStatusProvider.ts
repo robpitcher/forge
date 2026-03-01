@@ -40,9 +40,19 @@ export async function checkAuthStatus(
       await provider.getToken();
       return { state: "authenticated", method: "entraId" };
     } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : String(error);
+
+      if (isNotLoggedInError(msg)) {
+        return {
+          state: "notAuthenticated",
+          reason: "Sign in with Azure CLI to use Entra ID authentication",
+        };
+      }
+
       return {
         state: "error",
-        message: error instanceof Error ? error.message : "Entra ID auth failed",
+        message: "Entra ID configuration error — check Azure CLI setup",
       };
     }
   }
@@ -64,4 +74,20 @@ export async function checkAuthStatus(
           : "Failed to read API key from secret storage",
     };
   }
+}
+
+const NOT_LOGGED_IN_PATTERNS: RegExp[] = [
+  /credentialunavailableerror/i,
+  /credential[\s_-]*unavailable/i,
+  /no\s+(default\s+)?credential/i,
+  /az\s*login/i,
+  /please run .?az login/i,
+  /AADSTS\d+/,
+  /interactive[\s\S]*authentication/i,
+  /failed to retrieve[\s\S]*token/i,
+];
+
+/** Distinguishes "not logged in" from genuine config/network errors. */
+function isNotLoggedInError(message: string): boolean {
+  return NOT_LOGGED_IN_PATTERNS.some((pattern) => pattern.test(message));
 }

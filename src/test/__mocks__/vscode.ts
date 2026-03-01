@@ -32,6 +32,12 @@ export const window = {
     hide: vi.fn(),
     dispose: vi.fn(),
   }),
+  onDidChangeWindowState: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  createTerminal: vi.fn().mockReturnValue({
+    sendText: vi.fn(),
+    show: vi.fn(),
+    dispose: vi.fn(),
+  }),
 };
 
 export const commands = {
@@ -58,5 +64,12 @@ export class Uri {
   }
   toString(): string {
     return "mock-uri";
+  }
+}
+
+export class Disposable {
+  constructor(private readonly callOnDispose: () => void) {}
+  dispose(): void {
+    this.callOnDispose();
   }
 }

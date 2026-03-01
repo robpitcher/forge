@@ -95,7 +95,7 @@ describe("checkAuthStatus", () => {
       });
     });
 
-    it("returns error when Entra ID token fails with AggregateAuthenticationError", async () => {
+    it("returns notAuthenticated when Entra ID fails with AggregateAuthenticationError (no credential)", async () => {
       mockGetToken.mockRejectedValue(
         new Error(
           "AggregateAuthenticationError: No credential in the chain provided a token",
@@ -113,14 +113,13 @@ describe("checkAuthStatus", () => {
 
       const status = await checkAuthStatus(config, createMockSecrets());
 
-      expect(status.state).toBe("error");
-      expect(status).toHaveProperty("message");
-      if (status.state === "error") {
-        expect(status.message).toContain("AggregateAuthenticationError");
-      }
+      expect(status).toEqual({
+        state: "notAuthenticated",
+        reason: "Sign in with Azure CLI to use Entra ID authentication",
+      });
     });
 
-    it("returns error when Entra ID token fails with CredentialUnavailableError", async () => {
+    it("returns notAuthenticated when Entra ID fails with CredentialUnavailableError", async () => {
       const credError = new Error(
         "CredentialUnavailableError: Azure CLI not found",
       );
@@ -138,13 +137,57 @@ describe("checkAuthStatus", () => {
 
       const status = await checkAuthStatus(config, createMockSecrets());
 
-      expect(status.state).toBe("error");
-      if (status.state === "error") {
-        expect(status.message).toContain("Azure CLI not found");
-      }
+      expect(status).toEqual({
+        state: "notAuthenticated",
+        reason: "Sign in with Azure CLI to use Entra ID authentication",
+      });
     });
 
-    it("returns error with generic message when Entra ID fails with non-Error", async () => {
+    it("returns notAuthenticated when error suggests az login is needed", async () => {
+      mockGetToken.mockRejectedValue(
+        new Error("Please run 'az login' to authenticate"),
+      );
+
+      const config: ExtensionConfig = {
+        endpoint: "https://myresource.openai.azure.com/openai/v1/",
+        apiKey: "",
+        authMethod: "entraId",
+        model: "gpt-4.1",
+        wireApi: "completions",
+        cliPath: "",
+      };
+
+      const status = await checkAuthStatus(config, createMockSecrets());
+
+      expect(status).toEqual({
+        state: "notAuthenticated",
+        reason: "Sign in with Azure CLI to use Entra ID authentication",
+      });
+    });
+
+    it("returns notAuthenticated when error contains AADSTS code", async () => {
+      mockGetToken.mockRejectedValue(
+        new Error("AADSTS70011: The provided request must include an input_token"),
+      );
+
+      const config: ExtensionConfig = {
+        endpoint: "https://myresource.openai.azure.com/openai/v1/",
+        apiKey: "",
+        authMethod: "entraId",
+        model: "gpt-4.1",
+        wireApi: "completions",
+        cliPath: "",
+      };
+
+      const status = await checkAuthStatus(config, createMockSecrets());
+
+      expect(status).toEqual({
+        state: "notAuthenticated",
+        reason: "Sign in with Azure CLI to use Entra ID authentication",
+      });
+    });
+
+    it("returns error with friendly message when Entra ID fails with non-Error", async () => {
       mockGetToken.mockRejectedValue("something went wrong");
 
       const config: ExtensionConfig = {
@@ -160,7 +203,7 @@ describe("checkAuthStatus", () => {
 
       expect(status).toEqual({
         state: "error",
-        message: "Entra ID auth failed",
+        message: "Entra ID configuration error — check Azure CLI setup",
       });
     });
   });
@@ -297,7 +340,7 @@ describe("checkAuthStatus", () => {
       const status = await statusPromise;
       expect(status.state).toBe("error");
       if (status.state === "error") {
-        expect(status.message).toContain("Network timeout");
+        expect(status.message).toBe("Entra ID configuration error — check Azure CLI setup");
       }
     });
   });
@@ -349,7 +392,7 @@ describe("checkAuthStatus", () => {
     });
 
     it("error status has message, not method or reason", async () => {
-      mockGetToken.mockRejectedValue(new Error("Auth error"));
+      mockGetToken.mockRejectedValue(new Error("Some network failure"));
 
       const config: ExtensionConfig = {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",

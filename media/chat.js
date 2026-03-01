@@ -115,7 +115,7 @@
 
     switch (message.type) {
       case "authStatus":
-        updateAuthBanner(message.status);
+        updateAuthBanner(message.status, message.hasEndpoint);
         break;
 
       case "streamStart":
@@ -328,7 +328,7 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  function updateAuthBanner(status) {
+  function updateAuthBanner(status, hasEndpoint) {
     let banner = document.getElementById("authBanner");
     if (!banner) {
       banner = document.createElement("div");
@@ -353,24 +353,55 @@
       }, 3000);
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
-      banner.textContent = "🔒 Not authenticated — ";
-      
-      const settingsBtn = document.createElement("button");
-      settingsBtn.textContent = "Open Settings";
-      settingsBtn.addEventListener("click", () => {
-        vscode.postMessage({ command: "openSettings" });
+
+      // Only show endpoint message if endpoint is not configured
+      if (!hasEndpoint) {
+        banner.appendChild(document.createTextNode("🔐 Set your endpoint in "));
+
+        const settingsLink = document.createElement("button");
+        settingsLink.textContent = "Settings";
+        settingsLink.addEventListener("click", () => {
+          vscode.postMessage({ command: "openEndpointSettings" });
+        });
+        banner.appendChild(settingsLink);
+
+        banner.appendChild(document.createTextNode(". "));
+      } else {
+        banner.appendChild(document.createTextNode("🔐 "));
+      }
+
+      // Auth options
+      banner.appendChild(document.createTextNode("Sign in with "));
+
+      const entraLink = document.createElement("button");
+      entraLink.textContent = "Entra ID";
+      entraLink.addEventListener("click", () => {
+        vscode.postMessage({ command: "signIn" });
       });
-      banner.appendChild(settingsBtn);
+      banner.appendChild(entraLink);
+
+      banner.appendChild(document.createTextNode(" or "));
+
+      const apiKeyLink = document.createElement("button");
+      apiKeyLink.textContent = "configure an API key";
+      apiKeyLink.addEventListener("click", () => {
+        vscode.postMessage({ command: "setApiKey" });
+      });
+      banner.appendChild(apiKeyLink);
+
+      banner.appendChild(document.createTextNode(" to start chatting."));
     } else if (status.state === "error") {
       banner.className = "auth-banner error";
-      banner.textContent = `⚠️ Auth error: ${status.message} — `;
+      const rawMsg = status.message || "Unknown error";
+      const shortMsg = rawMsg.length > 80 ? rawMsg.slice(0, 80) + "…" : rawMsg;
+      banner.textContent = `⚠️ Authentication issue — ${shortMsg} `;
       
-      const settingsBtn = document.createElement("button");
-      settingsBtn.textContent = "Open Settings";
-      settingsBtn.addEventListener("click", () => {
+      const troubleshootBtn = document.createElement("button");
+      troubleshootBtn.textContent = "Troubleshoot";
+      troubleshootBtn.addEventListener("click", () => {
         vscode.postMessage({ command: "openSettings" });
       });
-      banner.appendChild(settingsBtn);
+      banner.appendChild(troubleshootBtn);
     }
   }
 })();

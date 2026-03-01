@@ -1410,3 +1410,36 @@ Expanded `.github/copilot-instructions.md` with 8 sections covering project over
 - All `@copilot` PRs should now align with project conventions without squad members having to correct patterns
 - SDK integration patterns are documented in one place instead of scattered across skill files
 - Reduces review burden on MacReady and Childs for SDK-related changes
+# Decision Log
+
+### Entra ID Error Classification in authStatusProvider
+**Date:** 2026-02-28  
+**Author:** Childs (SDK Dev)  
+**Scope:** `src/auth/authStatusProvider.ts`
+
+Classify Entra ID credential errors into two buckets:
+1. **Not logged in** → `{ state: "notAuthenticated", reason: "Sign in with Azure CLI to use Entra ID authentication" }`. Detected by pattern-matching against 8 known DefaultAzureCredential signals.
+2. **Actual errors** → `{ state: "error", message: "Entra ID configuration error — check Azure CLI setup" }`. No raw SDK stack traces in UI.
+
+**Rationale:** Not being logged in is a normal initial state. The UI should show a sign-in prompt, not an error banner. AuthStatus type already supports `notAuthenticated` — no type changes needed. Friendly messages prevent exposing internal SDK details.
+
+**Impact:** UI shows correct sign-in prompt for first-run users. Prevents exposing SDK internals. Type-compatible with existing interface.
+
+---
+
+### Auth UX Fixes — Sign-In Flow and Status Feedback
+**Date:** 2026-03-01  
+**Author:** Blair (UI/UX)  
+**Related:** Childs' error classification decision
+
+Four auth UX enhancements:
+1. **`forge.signIn` command** — Status bar click runs `az login` terminal (Entra ID) or opens API key settings.
+2. **Auth polling** — 30-second interval + focus listener auto-detect sign-in completions.
+3. **Webview banner** — `notAuthenticated` → "Sign in to start chatting"; `error` → truncated message + "Troubleshoot".
+4. **Auth-method-aware status bar** — Icons: `$(sign-in)` Entra ID, `$(key)` API key, `$(warning)` error.
+
+**Decisions:** Polling catches `az login` without settings change. Banner distinguishes `notAuthenticated` (prompt) from `error` (troubleshooting). Status bar shows method-specific icons.
+
+**Impact:** First-run users see sign-in prompt; sign-in flow is seamless; auth status always visible and method-aware.
+
+---

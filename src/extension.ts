@@ -25,8 +25,13 @@ export function activate(context: vscode.ExtensionContext): void {
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-  statusBarItem.command = "forge.openSettings";
   statusBarItem.show();
+  
+  // Wire auth refresh callback so provider methods can trigger status updates
+  const refreshAuth = () => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+  };
+  provider.setAuthRefreshCallback(refreshAuth);
   
   // Initial auth status update
   updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
@@ -42,13 +47,55 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
   
+  // Poll auth status every 30s (catches `az login` completions that don't trigger config changes)
+  const authPollInterval = setInterval(() => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+  }, 30_000);
+  const authPollDisposable = new vscode.Disposable(() => clearInterval(authPollInterval));
+  
+  // Re-check auth when the window regains focus
+  const focusListener = vscode.window.onDidChangeWindowState((e) => {
+    if (e.focused) {
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+    }
+  });
+  
+  // Track sign-in timeout so it can be disposed on deactivation
+  let signInTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  
   context.subscriptions.push(
     statusBarItem,
     configListener,
+    authPollDisposable,
+    focusListener,
+    new vscode.Disposable(() => {
+      if (signInTimeoutHandle !== undefined) {
+        clearTimeout(signInTimeoutHandle);
+        signInTimeoutHandle = undefined;
+      }
+    }),
     vscode.window.registerWebviewViewProvider("forge.chatView", provider),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
     ),
+    vscode.commands.registerCommand("forge.signIn", async () => {
+      const config = await getConfigurationAsync(context.secrets);
+      if (config.authMethod === "entraId") {
+        const terminal = vscode.window.createTerminal("Azure Sign In");
+        terminal.sendText("az login");
+        terminal.show();
+        // Re-check auth after a few seconds to pick up the new token
+        if (signInTimeoutHandle !== undefined) {
+          clearTimeout(signInTimeoutHandle);
+        }
+        signInTimeoutHandle = setTimeout(() => {
+          signInTimeoutHandle = undefined;
+          updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+        }, 5000);
+      } else {
+        await provider.openSettings();
+      }
+    }),
     vscode.commands.registerCommand("forge.attachSelection", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -112,18 +159,28 @@ async function updateAuthStatus(
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
       statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
-      statusBarItem.text = "$(lock) Forge: Not Authenticated";
-      statusBarItem.tooltip = status.reason ?? "Not authenticated";
+      statusBarItem.command = "forge.signIn";
+      if (config.authMethod === "entraId") {
+        statusBarItem.text = "$(sign-in) Forge: Sign In";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+      } else {
+        statusBarItem.text = "$(key) Forge: Set API Key";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+      }
       break;
-    case "error":
-      statusBarItem.text = "$(warning) Forge: Auth Error";
-      statusBarItem.tooltip = status.message;
+    case "error": {
+      statusBarItem.command = "forge.signIn";
+      statusBarItem.text = "$(warning) Forge: Auth Issue";
+      const msg = status.message ?? "Unknown error";
+      statusBarItem.tooltip = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
       break;
+    }
   }
   
-  provider.postAuthStatus(status);
+  provider.postAuthStatus(status, !!config.endpoint);
 }
 
 export async function deactivate(): Promise<void> {
@@ -138,17 +195,24 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
   private _toolNames = new Map<string, string>();
 
+  private _refreshAuthStatus?: () => void;
+
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage
   ) {}
 
+  /** Set by activate() to trigger auth status refresh from within the provider. */
+  public setAuthRefreshCallback(callback: () => void): void {
+    this._refreshAuthStatus = callback;
+  }
+
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
   }
 
-  public postAuthStatus(status: AuthStatus): void {
-    this._view?.webview.postMessage({ type: "authStatus", status });
+  public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
   public resolveWebviewView(
@@ -174,8 +238,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     
     // Send initial auth status
     getConfigurationAsync(this._secrets)
-      .then((config) => checkAuthStatus(config, this._secrets))
-      .then((status) => this.postAuthStatus(status))
+      .then(async (config) => {
+        const status = await checkAuthStatus(config, this._secrets);
+        this.postAuthStatus(status, !!config.endpoint);
+      })
       .catch(() => {
         // Silent failure — status bar will show the error
       });
@@ -189,15 +255,21 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     if (choice === "Open Settings") {
       await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
     } else if (choice === "Set API Key (secure)") {
-      const value = await vscode.window.showInputBox({
-        prompt: "Enter your API key",
-        password: true,
-        placeHolder: "Paste your Azure AI Foundry API key",
-      });
-      if (value !== undefined) {
-        await this._secrets.store("forge.copilot.apiKey", value);
-        await vscode.window.showInformationMessage("API key stored securely.");
-      }
+      await this._promptAndStoreApiKey();
+    }
+  }
+
+  /** Shared helper: prompt for API key, store in SecretStorage, refresh auth status. */
+  private async _promptAndStoreApiKey(): Promise<void> {
+    const value = await vscode.window.showInputBox({
+      prompt: "Enter your API key",
+      password: true,
+      placeHolder: "Paste your Azure AI Foundry API key",
+    });
+    if (value !== undefined) {
+      await this._secrets.store("forge.copilot.apiKey", value);
+      await vscode.window.showInformationMessage("API key stored securely.");
+      this._refreshAuthStatus?.();
     }
   }
 
@@ -220,6 +292,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachFile");
     } else if (message.command === "openSettings") {
       await this.openSettings();
+    } else if (message.command === "openEndpointSettings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
+    } else if (message.command === "signIn") {
+      await vscode.commands.executeCommand("forge.signIn");
+    } else if (message.command === "setApiKey") {
+      await this._promptAndStoreApiKey();
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
