@@ -88,6 +88,24 @@ export interface ToolExecutionCompleteEvent {
   };
 }
 
+/** Payload for `tool.execution_progress` events. */
+export interface ToolExecutionProgressEvent {
+  type: "tool.execution_progress";
+  data: {
+    toolCallId: string;
+    progressMessage: string;
+  };
+}
+
+/** Payload for `tool.execution_partial_result` events. */
+export interface ToolExecutionPartialResultEvent {
+  type: "tool.execution_partial_result";
+  data: {
+    toolCallId: string;
+    partialOutput: string;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Context items attached to prompts (workspace context)
 // ---------------------------------------------------------------------------

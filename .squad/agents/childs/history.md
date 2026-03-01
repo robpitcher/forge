@@ -53,6 +53,7 @@
 ---
 📌 Team update (2026-03-01T03:14:32Z): Auth UX Fixes completed — Childs' error classification integrated with Blair's sign-in flow. First-run users now see sign-in prompt (not error) when using Entra ID without being logged in. — decided by Childs & Blair
 
+📌 System message customization (#88) (2026-03-01): Added `forge.copilot.systemMessage` setting to `package.json` (multiline string with `editPresentation: multilineText`), `ExtensionConfig` interface, and `getConfiguration()`. In `getOrCreateSession()`, non-empty values are passed to `SessionConfig` as `{ content: value }` which the SDK appends to the default system prompt (append mode). Empty/undefined preserves SDK default behavior — no `systemMessage` key is spread into the config. SDK's `SystemMessageConfig` type requires `{ content: string, mode?: "replace" }` — plain strings are not accepted. PR #95.
 📌 Team update (2026-03-01T12:13:49Z): Tool result cards removed from chat UI — redundant noise eliminated. Model's streaming text + tool approval cards sufficient for UX. 122 tests pass, build clean. — decided by Blair
 
 📌 Team update (2026-03-01T12:20:19Z): Context chips in sent messages — UI enhancement renders context attachment history below user messages. Blair's webview changes. No SDK changes needed. — decided by Blair

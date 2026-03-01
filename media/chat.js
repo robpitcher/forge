@@ -198,6 +198,23 @@
         renderToolConfirmation(message);
         break;
 
+      case "toolProgress":
+        renderToolProgress(message);
+        break;
+
+      case "toolPartialResult":
+        renderToolPartialResult(message);
+        break;
+
+      case "toolComplete": {
+        const progressEl = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
+        if (progressEl) {
+          progressEl.remove();
+        }
+        break;
+      }
+
+
       case "conversationReset":
         chatMessages.innerHTML = "";
         currentAssistantMessage = null;
@@ -322,6 +339,67 @@
     chatMessages.appendChild(card);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
+
+  function renderToolProgress(message) {
+    let indicator = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.className = "tool-progress";
+      indicator.dataset.toolId = message.id;
+
+      const spinner = document.createElement("span");
+      spinner.className = "tool-spinner";
+      spinner.textContent = "⟳";
+      indicator.appendChild(spinner);
+
+      const label = document.createElement("span");
+      label.className = "tool-progress-label";
+      indicator.appendChild(label);
+
+      chatMessages.appendChild(indicator);
+    }
+    const label = indicator.querySelector(".tool-progress-label");
+    if (label) {
+      label.textContent = message.message;
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function renderToolPartialResult(message) {
+    let container = document.querySelector(`.tool-partial-result[data-tool-id="${message.id}"]`);
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "tool-partial-result";
+      container.dataset.toolId = message.id;
+
+      const header = document.createElement("div");
+      header.className = "tool-partial-header";
+
+      const toggle = document.createElement("button");
+      toggle.className = "tool-output-toggle";
+      toggle.textContent = "▶ Partial output";
+      header.appendChild(toggle);
+
+      container.appendChild(header);
+
+      const output = document.createElement("div");
+      output.className = "tool-partial-output";
+      container.appendChild(output);
+
+      toggle.addEventListener("click", () => {
+        const expanded = output.classList.toggle("expanded");
+        toggle.textContent = expanded ? "▼ Partial output" : "▶ Partial output";
+      });
+
+      chatMessages.appendChild(container);
+    }
+    const output = container.querySelector(".tool-partial-output");
+    if (output) {
+      output.appendChild(document.createTextNode(message.output));
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
 
   function updateAuthBanner(status, hasEndpoint) {
     let banner = document.getElementById("authBanner");
