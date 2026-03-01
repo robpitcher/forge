@@ -20,6 +20,7 @@ export type {
   SessionListFilter,
   ResumeSessionConfig,
   MCPLocalServerConfig,
+  MCPRemoteServerConfig,
 } from "@github/copilot-sdk";
 
 // Re-export the SDK's CopilotClient class type — it already covers start/stop/createSession.
@@ -35,6 +36,18 @@ export interface McpServerConfig {
   args?: string[];
   env?: Record<string, string>;
 }
+
+/** Configuration for a remote (HTTP/SSE) MCP server. */
+export interface RemoteMcpServerConfig {
+  url: string;
+  headers?: Record<string, string>;
+  command?: never;
+  args?: never;
+  env?: never;
+}
+
+/** Union of local and remote MCP server configurations. */
+export type AnyMcpServerConfig = McpServerConfig | RemoteMcpServerConfig;
 
 // ---------------------------------------------------------------------------
 // ProviderConfig — not re-exported by the SDK's public API, so defined here

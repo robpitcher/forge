@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { McpServerConfig } from "./types.js";
+import type { McpServerConfig, RemoteMcpServerConfig } from "./types.js";
 
 export interface ExtensionConfig {
   endpoint: string;
@@ -15,7 +15,8 @@ export interface ExtensionConfig {
   toolWrite: boolean;
   toolUrl: boolean;
   toolMcp: boolean;
-  mcpServers?: Record<string, McpServerConfig>;
+  allowRemoteMcp?: boolean;
+  mcpServers?: Record<string, McpServerConfig | RemoteMcpServerConfig>;
 }
 
 export interface ConfigValidationError {
@@ -39,7 +40,8 @@ export function getConfiguration(): ExtensionConfig {
     toolWrite: config.get<boolean>("tools.write", true),
     toolUrl: config.get<boolean>("tools.url", false),
     toolMcp: config.get<boolean>("tools.mcp", true),
-    mcpServers: config.get<Record<string, McpServerConfig>>("mcpServers") || undefined,
+    allowRemoteMcp: config.get<boolean>("allowRemoteMcp", false) || undefined,
+    mcpServers: config.get<Record<string, McpServerConfig | RemoteMcpServerConfig>>("mcpServers") || undefined,
   };
 }
 
@@ -77,31 +79,77 @@ export function validateConfiguration(
   if (config.mcpServers) {
     for (const [name, server] of Object.entries(config.mcpServers)) {
       const field = `forge.copilot.mcpServers.${name}`;
-      if (!server.command || typeof server.command !== "string") {
+      const s = server as unknown as Record<string, unknown>;
+      const hasCommand = "command" in s && s.command;
+      const hasUrl = "url" in s && s.url;
+      const isRemote = hasUrl && !hasCommand;
+      const isLocal = hasCommand;
+
+      if (!isLocal && !isRemote) {
         errors.push({
           field,
-          message: `MCP server "${name}" requires a non-empty "command" string. Set the command to start the server process.`,
+          message: `MCP server "${name}" requires either a "command" (local) or a "url" (remote).`,
         });
+        continue;
       }
-      if (server.args !== undefined) {
-        if (!Array.isArray(server.args) || !server.args.every((a) => typeof a === "string")) {
+
+      if (isRemote) {
+        // Remote server validation
+        const remote = server as RemoteMcpServerConfig;
+        if (!config.allowRemoteMcp) {
           errors.push({
             field,
-            message: `MCP server "${name}" has invalid "args" — must be an array of strings.`,
+            message: `Remote MCP servers are disabled. Enable forge.copilot.allowRemoteMcp to allow remote (HTTP/SSE) servers.`,
           });
         }
-      }
-      if (server.env !== undefined) {
-        if (
-          typeof server.env !== "object" ||
-          server.env === null ||
-          Array.isArray(server.env) ||
-          !Object.values(server.env).every((v) => typeof v === "string")
-        ) {
+        if (!remote.url || typeof remote.url !== "string") {
           errors.push({
             field,
-            message: `MCP server "${name}" has invalid "env" — must be an object with string values.`,
+            message: `MCP server "${name}" requires a non-empty "url" for remote servers.`,
           });
+        }
+        if (remote.headers !== undefined) {
+          if (
+            typeof remote.headers !== "object" ||
+            remote.headers === null ||
+            Array.isArray(remote.headers) ||
+            !Object.values(remote.headers).every((v) => typeof v === "string")
+          ) {
+            errors.push({
+              field,
+              message: `MCP server "${name}" has invalid "headers" — must be an object with string values.`,
+            });
+          }
+        }
+      } else {
+        // Local server validation
+        const local = server as McpServerConfig;
+        if (!local.command || typeof local.command !== "string") {
+          errors.push({
+            field,
+            message: `MCP server "${name}" requires a non-empty "command" string. Set the command to start the server process.`,
+          });
+        }
+        if (local.args !== undefined) {
+          if (!Array.isArray(local.args) || !local.args.every((a) => typeof a === "string")) {
+            errors.push({
+              field,
+              message: `MCP server "${name}" has invalid "args" — must be an array of strings.`,
+            });
+          }
+        }
+        if (local.env !== undefined) {
+          if (
+            typeof local.env !== "object" ||
+            local.env === null ||
+            Array.isArray(local.env) ||
+            !Object.values(local.env).every((v) => typeof v === "string")
+          ) {
+            errors.push({
+              field,
+              message: `MCP server "${name}" has invalid "env" — must be an object with string values.`,
+            });
+          }
         }
       }
     }
