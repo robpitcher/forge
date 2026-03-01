@@ -52,3 +52,5 @@
 
 ---
 📌 Team update (2026-03-01T03:14:32Z): Auth UX Fixes completed — Childs' error classification integrated with Blair's sign-in flow. First-run users now see sign-in prompt (not error) when using Entra ID without being logged in. — decided by Childs & Blair
+
+📌 Team update (2026-03-01T12:13:49Z): Tool result cards removed from chat UI — redundant noise eliminated. Model's streaming text + tool approval cards sufficient for UX. 122 tests pass, build clean. — decided by Blair

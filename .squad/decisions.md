@@ -1479,3 +1479,61 @@ Four auth UX enhancements:
 - **Extension UX:** Less distracting auth polling, more informative status bar
 - **No breaking changes:** Auth logic unchanged, only display improvements
 - **Tests:** All 134 tests pass with no modifications needed
+
+### 2026-03-01: Remove Tool Execution Result Cards from Chat UI
+
+**By:** Blair (Extension Dev)  
+**Date:** 2026-03-01  
+**Context:** User testing revealed redundant tool execution result cards
+
+## Problem
+
+During tool execution, Forge was posting both success AND error result cards to the chat window:
+
+1. **Redundant success cards** — Model's streaming text already described what happened (e.g., "I created a hello world file"). Separate ✅ card was unnecessary noise.
+2. **Confusing error cards** — When model retried a tool internally, users saw both ❌ and ✅ cards. Error card was scary even though everything ultimately worked.
+3. **Visual clutter** — Multiple tool calls per response = multiple cards cluttering chat window.
+
+## Decision
+
+**Remove tool execution result cards entirely.** Model's streaming text response is sufficient to communicate tool outcomes.
+
+## Implementation
+
+Removed from `src/extension.ts`:
+- `tool.execution_start` event handler
+- `tool.execution_complete` event handler
+- `_toolNames` map (only used for result card tracking)
+
+Removed from `media/chat.js`:
+- `renderToolResult()` function
+- `"toolResult"` message handler case
+
+Removed from `media/chat.css`:
+- `.tool-result`, `.tool-result-summary`, `.tool-output`, `.tool-output-toggle` styles
+
+Removed from `src/test/tool-approval.test.ts`:
+- 2 `.todo()` tests (never implemented)
+
+**Kept intact:**
+- `toolConfirmation` message type and rendering (user approval cards)
+- `toolResponse` message handler (webview → extension for user approval)
+- `onPermissionRequest` handler in extension
+- `ToolExecutionStartEvent` and `ToolExecutionCompleteEvent` types in `types.ts` (SDK event surface, may be useful for future features)
+
+## Rationale
+
+1. **Model text is sufficient** — Model already describes tool actions in streaming response. A "file_write completed" card doesn't add information beyond "I created hello.py with the following content."
+2. **Internal retries are implementation details** — Users don't need to see failed attempts that model recovered from. Showing them creates unnecessary alarm.
+3. **Cleaner chat UX** — Fewer UI elements = less cognitive load. Approval cards (which ARE user-facing) remain for important interaction point.
+
+## Impact
+
+- **User-facing:** Chat window is cleaner, no redundant cards
+- **Code:** ~40 lines removed from extension.ts, ~35 lines removed from chat.js/css
+- **Tests:** All 122 tests pass (2 `.todo()` tests removed, never implemented)
+- **Tool approval flow:** Unaffected — confirmation cards and approval handlers unchanged
+
+## Team Notes
+
+This is an extension-level decision (webview message protocol change). Childs (Copilot SDK integration) doesn't need to change anything — SDK still emits events, we just don't subscribe to them anymore.
