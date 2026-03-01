@@ -77,7 +77,6 @@ VS Code Extension Host
   ├─ src/copilotService.ts      → CopilotClient lifecycle, BYOK session creation
   ├─ src/configuration.ts       → VS Code settings, validation
   ├─ src/auth/credentialProvider.ts → auth abstraction (Entra ID / API Key)
-  ├─ src/auth/authStatusProvider.ts → auth status probing (never throws)
   ├─ src/types.ts               → SDK type definitions, structural interfaces
   ├─ media/chat.js              → webview UI logic
   └─ media/chat.css             → webview styles
@@ -95,8 +94,8 @@ One `CopilotClient` per extension lifetime. Sessions keyed by conversation ID an
 const session = await client.createSession({
     model: deploymentName,        // Required with BYOK — SDK throws if missing
     provider: {
-        type: "openai",           // Use "openai" for Azure AI Foundry /openai/v1/ path
-        baseUrl: endpoint,        // e.g. "https://resource.openai.azure.com/openai/v1/"
+        type: "azure",            // Use "azure" for Azure AI Foundry (.azure.com) endpoints
+        baseUrl: endpoint,        // e.g. "https://resource.openai.azure.com/"
         apiKey: key,              // Static string — or use bearerToken for Entra ID
         wireApi: "completions",   // "completions" (default) or "responses" (GPT-5 series)
     },
@@ -105,7 +104,7 @@ const session = await client.createSession({
 ```
 
 - `bearerToken` accepts only a **static string** — no refresh callback. For Entra ID, fetch token before session creation. (See #27)
-- `type: "azure"` auto-appends `/openai/v1/` — don't use it if your `baseUrl` already includes that path.
+- The SDK derives `type: "azure"` for any `.azure.com` endpoint — this auto-appends `/openai/v1/`, so your `baseUrl` should NOT include that path. Use `type: "openai"` only for non-Azure OpenAI-compatible endpoints.
 
 ### Session Lifecycle
 
@@ -123,7 +122,7 @@ Use the **named event** pattern. `.on(eventName, handler)` returns an unsubscrib
 
 ```typescript
 const unsub = session.on("assistant.message_delta", (event) => {
-    // event.data.delta.content — incremental token
+    // event.data.deltaContent — incremental token
 });
 
 // Cleanup
@@ -136,7 +135,7 @@ unsub();
 
 | Event | Data | When |
 |-------|------|------|
-| `assistant.message_delta` | `delta.content` | Each token chunk |
+| `assistant.message_delta` | `deltaContent` | Each token chunk |
 | `assistant.message` | `content` | Complete response |
 | `session.idle` | — | Response finished |
 | `session.error` | `error.message` | Error occurred |
@@ -212,6 +211,8 @@ const mockSecretStorage = {
 | `streamEnd` | Response complete |
 | `error` | Error with actionable message |
 | `authStatus` | Auth state update |
+| `contextAttached` | File/selection context added |
+| `conversationReset` | Conversation cleared |
 | `toolConfirmation` | Tool approval prompt |
 | `toolResult` | Tool execution result |
 
@@ -220,7 +221,12 @@ const mockSecretStorage = {
 | Message Type | Purpose |
 |-------------|---------|
 | `sendMessage` | User prompt |
+| `newConversation` | Reset conversation |
+| `attachSelection` | Attach editor selection |
+| `attachFile` | Attach file from disk |
+| `chatFocused` | Chat input focused (triggers auto-attach) |
 | `toolResponse` | Tool approval/rejection |
+| `openSettings` | Open settings UI |
 
 ### Context Attachments
 
