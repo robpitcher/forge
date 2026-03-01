@@ -497,3 +497,5 @@
 4. Message protocol tables synced with actual code: added `contextAttached`, `conversationReset` to ext→webview; added `newConversation`, `attachSelection`, `attachFile`, `chatFocused`, `openSettings` to webview→ext
 
 **Key Insight:** The `authStatusProvider.ts` file was referenced in the original instructions but never existed on this branch — likely a planned-but-not-yet-implemented module. The `authStatus` message type IS in the table (added on another branch) and was kept.
+---
+📌 Team update (2026-03-01T03:14:32Z): Auth UX foundation work complete — Childs & Blair fixed Entra ID error classification and sign-in flow. Status bar + webview banner now distinguish `notAuthenticated` from `error`. Ready for broader integration. — decided by Childs & Blair
