@@ -16,8 +16,6 @@ import type {
   SessionErrorEvent,
   PermissionRequest,
   PermissionRequestResult,
-  ToolExecutionStartEvent,
-  ToolExecutionCompleteEvent,
   ContextItem,
 } from "./types.js";
 
@@ -206,7 +204,11 @@ async function updateAuthStatus(
   switch (status.state) {
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
-      statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      if (status.method === "entraId" && status.account) {
+        statusBarItem.tooltip = `Signed in as ${status.account} (Entra ID)`;
+      } else {
+        statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      }
       statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
@@ -241,9 +243,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
-  private _toolNames = new Map<string, string>();
 
   private _refreshAuthStatus?: () => void;
+  private _lastAuthStatus?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -268,6 +270,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    // Deduplicate authStatus messages to prevent banner flashing every 30s
+    const statusKey = JSON.stringify({ status, hasEndpoint: !!hasEndpoint });
+    if (this._lastAuthStatus === statusKey) {
+      return; // Status unchanged, skip posting to webview
+    }
+    this._lastAuthStatus = statusKey;
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
@@ -291,6 +299,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
+    
+    // Reset dedup state so initial status always goes through
+    this._lastAuthStatus = undefined;
     
     // Send initial auth status
     getConfigurationAsync(this._secrets)
@@ -549,8 +560,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubDelta();
         unsubIdle();
         unsubError();
-        unsubToolStart();
-        unsubToolComplete();
       };
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
@@ -558,28 +567,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           this._view?.webview.postMessage({
             type: "streamDelta",
             content: event.data.deltaContent,
-          });
-        }
-      });
-
-      const unsubToolStart = session.on("tool.execution_start", (event: ToolExecutionStartEvent) => {
-        if (event?.data?.toolCallId && event?.data?.toolName) {
-          this._toolNames.set(event.data.toolCallId, event.data.toolName);
-        }
-      });
-
-      const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
-        if (event?.data?.toolCallId) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
-          this._toolNames.delete(event.data.toolCallId);
-          this._view?.webview.postMessage({
-            type: "toolResult",
-            id: event.data.toolCallId,
-            tool: toolName,
-            status: event.data.success ? "success" : "error",
-            output: event.data.success
-              ? (event.data.result?.content ?? "")
-              : (event.data.error?.message ?? "Tool execution failed"),
           });
         }
       });
@@ -666,7 +653,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       resolver(false);
     }
     this._pendingPermissions.clear();
-    this._toolNames.clear();
   }
 
   private _postError(message: string): void {

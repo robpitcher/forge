@@ -11,7 +11,7 @@ export type AuthState = "authenticated" | "notAuthenticated" | "error";
  * Detailed authentication status with method and error information.
  */
 export type AuthStatus =
-  | { state: "authenticated"; method: "entraId" | "apiKey" }
+  | { state: "authenticated"; method: "entraId" | "apiKey"; account?: string }
   | { state: "notAuthenticated"; reason?: string }
   | { state: "error"; message: string };
 
@@ -37,7 +37,11 @@ export async function checkAuthStatus(
   if (config.authMethod === "entraId") {
     try {
       const provider = await createCredentialProvider(config, secrets);
-      await provider.getToken();
+      const token = await provider.getToken();
+      const account = decodeJwtPayload(token);
+      if (account && account.trim().length > 0) {
+        return { state: "authenticated", method: "entraId", account };
+      }
       return { state: "authenticated", method: "entraId" };
     } catch (error) {
       const msg =
@@ -90,4 +94,32 @@ const NOT_LOGGED_IN_PATTERNS: RegExp[] = [
 /** Distinguishes "not logged in" from genuine config/network errors. */
 function isNotLoggedInError(message: string): boolean {
   return NOT_LOGGED_IN_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+/**
+ * Decodes JWT payload to extract user identity.
+ * Returns the user's account name (upn, preferred_username, or name claim).
+ * Returns undefined if token cannot be decoded or no identity claims found.
+ */
+function decodeJwtPayload(token: string): string | undefined {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+    const payload = Buffer.from(parts[1], "base64url").toString("utf-8");
+    const claims = JSON.parse(payload) as Record<string, unknown>;
+    
+    // Try claims in order of preference
+    const upn = typeof claims["upn"] === "string" ? claims["upn"] : undefined;
+    if (upn) return upn;
+    
+    const preferred = typeof claims["preferred_username"] === "string" ? claims["preferred_username"] : undefined;
+    if (preferred) return preferred;
+    
+    const name = typeof claims["name"] === "string" ? claims["name"] : undefined;
+    if (name) return name;
+    
+    return undefined;
+  } catch {
+    return undefined;
+  }
 }

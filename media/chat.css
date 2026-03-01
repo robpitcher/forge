@@ -165,61 +165,6 @@ button:active {
   font-weight: bold;
 }
 
-/* Tool Result */
-.tool-result {
-  margin-bottom: 16px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  border-left: 3px solid;
-}
-
-.tool-result.success {
-  border-left-color: var(--vscode-testing-iconPassed, #73c991);
-  background-color: var(--vscode-editor-background);
-}
-
-.tool-result.error {
-  border-left-color: var(--vscode-testing-iconFailed, #f48771);
-  background-color: var(--vscode-inputValidation-errorBackground);
-}
-
-.tool-result-summary {
-  font-size: 13px;
-}
-
-.tool-output-toggle {
-  cursor: pointer;
-  opacity: 0.7;
-  font-size: 12px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-}
-
-.tool-output-toggle:hover {
-  opacity: 1;
-}
-
-.tool-output {
-  display: none;
-  margin-top: 8px;
-  padding: 8px;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  background-color: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.1));
-  border-radius: 2px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.tool-output.expanded {
-  display: block;
-}
-
 /* Context Attach Actions */
 .context-actions {
   display: flex;
@@ -319,4 +264,24 @@ button:active {
 
 .auth-banner button:hover {
   opacity: 0.8;
+}
+
+/* Sent Context Chips (in user messages) */
+.sent-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.sent-context-chip {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
