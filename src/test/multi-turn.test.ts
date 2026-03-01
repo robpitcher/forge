@@ -205,6 +205,7 @@ describe("multi-turn conversation context (SC4)", () => {
     beforeEach(() => {
       setupValidSettings();
 
+      const stateStore = new Map<string, unknown>();
       const mockExtCtx = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
@@ -215,6 +216,11 @@ describe("multi-turn conversation context (SC4)", () => {
           store: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
           onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
+        workspaceState: {
+          get: vi.fn((key: string, defaultValue?: unknown) => stateStore.get(key) ?? defaultValue),
+          update: vi.fn((key: string, value: unknown) => { stateStore.set(key, value); return Promise.resolve(); }),
+          keys: vi.fn(() => [...stateStore.keys()]),
         },
       };
       activate(mockExtCtx as unknown as import("vscode").ExtensionContext);

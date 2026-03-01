@@ -16,6 +16,9 @@ export type {
   PermissionHandler,
   PermissionRequest,
   PermissionRequestResult,
+  SessionMetadata,
+  SessionListFilter,
+  ResumeSessionConfig,
 } from "@github/copilot-sdk";
 
 // Re-export the SDK's CopilotClient class type — it already covers start/stop/createSession.
@@ -121,6 +124,18 @@ export interface ContextItem {
 }
 
 // ---------------------------------------------------------------------------
+// Conversation metadata for the UI
+// ---------------------------------------------------------------------------
+
+/** Conversation metadata for UI display (simplified from SessionMetadata). */
+export interface ConversationMetadata {
+  sessionId: string;
+  summary?: string;
+  startTime: Date;
+  modifiedTime: Date;
+}
+
+// ---------------------------------------------------------------------------
 // CopilotSession structural interface
 // ---------------------------------------------------------------------------
 
@@ -155,3 +170,5 @@ export interface ICopilotSession {
   ): Unsubscribe;
   on(event: string, handler: EventCallback): Unsubscribe;
 }
+
+

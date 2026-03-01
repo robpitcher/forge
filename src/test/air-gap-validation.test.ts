@@ -208,7 +208,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("creates session with only Azure config, no GitHub credentials", async () => {
       expect(process.env.GITHUB_TOKEN).toBeUndefined();
 
-      const session = await getOrCreateSession("agv-no-github", validAzureConfig, "test-azure-key-123");
+      const session = await getOrCreateSession("agv-azure-only", validAzureConfig, "test-azure-key-123");
 
       expect(session).toBeDefined();
       

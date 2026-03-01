@@ -92,6 +92,7 @@ describe("copilotService", () => {
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledWith({
+        sessionId: "conv-1",
         model: "gpt-4.1",
         provider: {
           type: "azure",
