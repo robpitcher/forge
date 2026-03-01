@@ -171,14 +171,4 @@ export interface ICopilotSession {
   on(event: string, handler: EventCallback): Unsubscribe;
 }
 
-// ---------------------------------------------------------------------------
-// Conversation persistence metadata
-// ---------------------------------------------------------------------------
 
-/** Metadata for a saved conversation. */
-export interface ConversationMetadata {
-  sessionId: string;
-  summary?: string;
-  startTime: Date;
-  modifiedTime: Date;
-}

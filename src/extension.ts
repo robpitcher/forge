@@ -726,11 +726,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleListConversations(): Promise<void> {
     try {
-      const conversations = await listConversations();
+      const config = await getConfigurationAsync(this._secrets);
+      const conversations = await listConversations(config);
       this._view?.webview.postMessage({ type: "conversationList", conversations });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._postError(`Failed to load conversations: ${message}`);
+      this._postError(message);
     }
   }
 
@@ -791,7 +792,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._postError(`Failed to resume conversation: ${message}`);
+      this._postError(message);
     }
   }
 
@@ -802,7 +803,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      await deleteConversation(sessionId);
+      const config = await getConfigurationAsync(this._secrets);
+      await deleteConversation(sessionId, config);
 
       // Remove cached messages
       const cacheKey = `forge.messages.${sessionId}`;
@@ -812,7 +814,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._handleListConversations();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._postError(`Failed to delete conversation: ${message}`);
+      this._postError(message);
     }
   }
 

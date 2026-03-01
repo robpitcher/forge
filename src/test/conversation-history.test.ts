@@ -8,25 +8,11 @@ import {
 import type { ExtensionConfig } from "../configuration.js";
 import {
   stopClient,
+  listConversations,
+  resumeConversation,
+  getLastConversationId,
+  deleteConversation,
 } from "../copilotService.js";
-
-// These imports will be available once Childs adds the functions
-type ListConversationsFunc = () => Promise<ConversationMetadata[]>;
-type ResumeConversationFunc = (
-  sessionId: string,
-  config: ExtensionConfig,
-  authToken: string,
-  onPermissionRequest?: unknown
-) => Promise<unknown>;
-type GetLastConversationIdFunc = () => Promise<string | undefined>;
-type DeleteConversationFunc = (sessionId: string) => Promise<void>;
-
-interface ConversationMetadata {
-  sessionId: string;
-  summary?: string;
-  startTime: Date;
-  modifiedTime: Date;
-}
 
 // SDK SessionMetadata structure (from SDK types)
 interface SDKSessionMetadata {
@@ -65,27 +51,11 @@ const entraIdConfig: ExtensionConfig = {
 describe("conversation history persistence", () => {
   let mockSession: ReturnType<typeof createMockSession>;
   let mockClient: MockClient;
-  let listConversations: ListConversationsFunc;
-  let resumeConversation: ResumeConversationFunc;
-  let getLastConversationId: GetLastConversationIdFunc;
-  let deleteConversation: DeleteConversationFunc;
 
   beforeEach(async () => {
     mockSession = createMockSession();
     mockClient = createMockClient(mockSession);
     setMockClient(mockClient);
-
-    // Dynamically import the service functions
-    // This will fail gracefully until Childs implements them
-    try {
-      const service = await import("../copilotService.js");
-      listConversations = service.listConversations as ListConversationsFunc;
-      resumeConversation = service.resumeConversation as ResumeConversationFunc;
-      getLastConversationId = service.getLastConversationId as GetLastConversationIdFunc;
-      deleteConversation = service.deleteConversation as DeleteConversationFunc;
-    } catch {
-      // Functions not yet implemented — tests will be skipped
-    }
   });
 
   afterEach(async () => {
@@ -94,9 +64,6 @@ describe("conversation history persistence", () => {
 
   describe("listConversations", () => {
     it("returns mapped ConversationMetadata from SDK's listSessions", async () => {
-      if (!listConversations) {
-        return; // Skip until implemented
-      }
 
       const sdkMetadata: SDKSessionMetadata[] = [
         {
@@ -117,7 +84,7 @@ describe("conversation history persistence", () => {
 
       mockClient.listSessions.mockResolvedValue(sdkMetadata);
 
-      const result = await listConversations();
+      const result = await listConversations(validConfig);
 
       expect(mockClient.listSessions).toHaveBeenCalledOnce();
       expect(result).toHaveLength(2);
@@ -136,53 +103,38 @@ describe("conversation history persistence", () => {
     });
 
     it("returns empty array when no sessions exist", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       mockClient.listSessions.mockResolvedValue([]);
 
-      const result = await listConversations();
+      const result = await listConversations(validConfig);
 
       expect(result).toEqual([]);
     });
 
     it("creates client if not already started", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       mockClient.listSessions.mockResolvedValue([]);
 
-      await listConversations();
+      await listConversations(validConfig);
 
       expect(mockClient.start).toHaveBeenCalledOnce();
     });
 
     it("handles SDK errors gracefully when client not started", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       mockClient.start.mockRejectedValue(new Error("Client start failed"));
 
-      await expect(listConversations()).rejects.toThrow("Client start failed");
+      await expect(listConversations(validConfig)).rejects.toThrow("Client start failed");
     });
 
     it("handles SDK errors gracefully on listSessions call", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       mockClient.listSessions.mockRejectedValue(new Error("Connection error"));
 
-      await expect(listConversations()).rejects.toThrow("Connection error");
+      await expect(listConversations(validConfig)).rejects.toThrow("Connection error");
     });
 
     it("handles missing summary field in SDK metadata", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       const sdkMetadata: SDKSessionMetadata[] = [
         {
@@ -195,7 +147,7 @@ describe("conversation history persistence", () => {
 
       mockClient.listSessions.mockResolvedValue(sdkMetadata);
 
-      const result = await listConversations();
+      const result = await listConversations(validConfig);
 
       expect(result[0]).toEqual({
         sessionId: "session-no-summary",
@@ -208,9 +160,6 @@ describe("conversation history persistence", () => {
 
   describe("resumeConversation", () => {
     it("resumes a session and stores it in the sessions map", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const session = await resumeConversation(
         "session-1",
@@ -234,9 +183,6 @@ describe("conversation history persistence", () => {
     });
 
     it("applies correct provider config for azure endpoints", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       await resumeConversation("session-azure", validConfig, "test-key-123");
 
@@ -252,9 +198,6 @@ describe("conversation history persistence", () => {
     });
 
     it("applies correct provider config for openai endpoints", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const openaiConfig: ExtensionConfig = {
         ...validConfig,
@@ -274,9 +217,6 @@ describe("conversation history persistence", () => {
     });
 
     it("applies apiKey auth when authMethod is apiKey", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       await resumeConversation("session-apikey", validConfig, "my-api-key");
 
@@ -286,9 +226,6 @@ describe("conversation history persistence", () => {
     });
 
     it("applies bearerToken auth when authMethod is entraId", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       await resumeConversation("session-entra", entraIdConfig, "entra-token-xyz");
 
@@ -298,9 +235,6 @@ describe("conversation history persistence", () => {
     });
 
     it("applies tool exclusion settings from config", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const configWithExcluded: ExtensionConfig = {
         ...validConfig,
@@ -323,9 +257,6 @@ describe("conversation history persistence", () => {
     });
 
     it("stores resumed session in sessions map for reuse", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const session1 = await resumeConversation(
         "session-reuse",
@@ -347,9 +278,6 @@ describe("conversation history persistence", () => {
     });
 
     it("throws actionable error when session ID doesn't exist", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       mockClient.resumeSession.mockRejectedValue(
         new Error("Session not found")
@@ -361,9 +289,6 @@ describe("conversation history persistence", () => {
     });
 
     it("creates client if not already started", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       await resumeConversation("session-1", validConfig, "test-key-123");
 
@@ -371,9 +296,6 @@ describe("conversation history persistence", () => {
     });
 
     it("passes onPermissionRequest handler when provided", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const mockPermissionHandler = vi.fn();
 
@@ -393,9 +315,6 @@ describe("conversation history persistence", () => {
     });
 
     it("handles SDK connection errors gracefully", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       mockClient.resumeSession.mockRejectedValue(
         new Error("Connection timeout")
@@ -409,76 +328,58 @@ describe("conversation history persistence", () => {
 
   describe("getLastConversationId", () => {
     it("returns session ID when one exists", async () => {
-      if (!getLastConversationId) {
-        return;
-      }
 
       mockClient.getLastSessionId.mockResolvedValue("last-session-123");
 
-      const result = await getLastConversationId();
+      const result = await getLastConversationId(validConfig);
 
       expect(result).toBe("last-session-123");
       expect(mockClient.getLastSessionId).toHaveBeenCalledOnce();
     });
 
     it("returns undefined when no sessions exist", async () => {
-      if (!getLastConversationId) {
-        return;
-      }
 
       mockClient.getLastSessionId.mockResolvedValue(undefined);
 
-      const result = await getLastConversationId();
+      const result = await getLastConversationId(validConfig);
 
       expect(result).toBeUndefined();
     });
 
     it("creates client if not already started", async () => {
-      if (!getLastConversationId) {
-        return;
-      }
 
       mockClient.getLastSessionId.mockResolvedValue(undefined);
 
-      await getLastConversationId();
+      await getLastConversationId(validConfig);
 
       expect(mockClient.start).toHaveBeenCalledOnce();
     });
 
     it("handles SDK errors gracefully", async () => {
-      if (!getLastConversationId) {
-        return;
-      }
 
       mockClient.getLastSessionId.mockRejectedValue(
         new Error("Storage error")
       );
 
-      await expect(getLastConversationId()).rejects.toThrow("Storage error");
+      await expect(getLastConversationId(validConfig)).rejects.toThrow("Storage error");
     });
   });
 
   describe("deleteConversation", () => {
     it("deletes from SDK storage", async () => {
-      if (!deleteConversation) {
-        return;
-      }
 
-      await deleteConversation("session-delete");
+      await deleteConversation("session-delete", validConfig);
 
       expect(mockClient.deleteSession).toHaveBeenCalledWith("session-delete");
     });
 
     it("removes from local sessions map", async () => {
-      if (!deleteConversation || !resumeConversation) {
-        return;
-      }
 
       // First resume a session to populate the map
       await resumeConversation("session-123", validConfig, "test-key-123");
 
       // Delete it
-      await deleteConversation("session-123");
+      await deleteConversation("session-123", validConfig);
 
       // Next resume should call SDK again (not reuse cached)
       await resumeConversation("session-123", validConfig, "test-key-123");
@@ -486,38 +387,29 @@ describe("conversation history persistence", () => {
     });
 
     it("handles gracefully when session doesn't exist", async () => {
-      if (!deleteConversation) {
-        return;
-      }
 
       mockClient.deleteSession.mockResolvedValue(undefined);
 
       // Should not throw
       await expect(
-        deleteConversation("nonexistent-session")
+        deleteConversation("nonexistent-session", validConfig)
       ).resolves.toBeUndefined();
     });
 
     it("creates client if not already started", async () => {
-      if (!deleteConversation) {
-        return;
-      }
 
-      await deleteConversation("session-delete");
+      await deleteConversation("session-delete", validConfig);
 
       expect(mockClient.start).toHaveBeenCalledOnce();
     });
 
     it("handles SDK deletion errors gracefully", async () => {
-      if (!deleteConversation) {
-        return;
-      }
 
       mockClient.deleteSession.mockRejectedValue(
         new Error("Deletion failed")
       );
 
-      await expect(deleteConversation("session-error")).rejects.toThrow(
+      await expect(deleteConversation("session-error", validConfig)).rejects.toThrow(
         "Deletion failed"
       );
     });
@@ -525,9 +417,6 @@ describe("conversation history persistence", () => {
 
   describe("integration scenarios", () => {
     it("can list, resume, and delete a conversation", async () => {
-      if (!listConversations || !resumeConversation || !deleteConversation) {
-        return;
-      }
 
       // Setup: SDK has one session
       const sdkMetadata: SDKSessionMetadata[] = [
@@ -542,7 +431,7 @@ describe("conversation history persistence", () => {
       mockClient.listSessions.mockResolvedValue(sdkMetadata);
 
       // List conversations
-      const conversations = await listConversations();
+      const conversations = await listConversations(validConfig);
       expect(conversations).toHaveLength(1);
       expect(conversations[0].sessionId).toBe("session-int-1");
 
@@ -555,32 +444,26 @@ describe("conversation history persistence", () => {
       expect(session).toBeDefined();
 
       // Delete the conversation
-      await deleteConversation("session-int-1");
+      await deleteConversation("session-int-1", validConfig);
       expect(mockClient.deleteSession).toHaveBeenCalledWith("session-int-1");
     });
 
     it("getLastConversationId returns most recent after multiple creates", async () => {
-      if (!getLastConversationId) {
-        return;
-      }
 
       mockClient.getLastSessionId.mockResolvedValue("most-recent-session");
 
-      const lastId = await getLastConversationId();
+      const lastId = await getLastConversationId(validConfig);
 
       expect(lastId).toBe("most-recent-session");
     });
 
     it("handles empty state gracefully - no conversations yet", async () => {
-      if (!listConversations || !getLastConversationId) {
-        return;
-      }
 
       mockClient.listSessions.mockResolvedValue([]);
       mockClient.getLastSessionId.mockResolvedValue(undefined);
 
-      const conversations = await listConversations();
-      const lastId = await getLastConversationId();
+      const conversations = await listConversations(validConfig);
+      const lastId = await getLastConversationId(validConfig);
 
       expect(conversations).toEqual([]);
       expect(lastId).toBeUndefined();
@@ -589,19 +472,13 @@ describe("conversation history persistence", () => {
 
   describe("error path coverage", () => {
     it("listConversations fails when SDK is unavailable", async () => {
-      if (!listConversations) {
-        return;
-      }
 
       mockClient.start.mockRejectedValue(new Error("SDK unavailable"));
 
-      await expect(listConversations()).rejects.toThrow("SDK unavailable");
+      await expect(listConversations(validConfig)).rejects.toThrow("SDK unavailable");
     });
 
     it("resumeConversation with invalid config still calls SDK", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       const invalidConfig: ExtensionConfig = {
         ...validConfig,
@@ -619,25 +496,19 @@ describe("conversation history persistence", () => {
     });
 
     it("deleteConversation handles concurrent deletion attempts", async () => {
-      if (!deleteConversation) {
-        return;
-      }
 
       // First call succeeds
       mockClient.deleteSession.mockResolvedValueOnce(undefined);
       // Second call to same session (already deleted)
       mockClient.deleteSession.mockResolvedValueOnce(undefined);
 
-      await deleteConversation("session-123");
-      await deleteConversation("session-123"); // Should not throw
+      await deleteConversation("session-123", validConfig);
+      await deleteConversation("session-123", validConfig); // Should not throw
 
       expect(mockClient.deleteSession).toHaveBeenCalledTimes(2);
     });
 
     it("resumeConversation with expired auth token fails", async () => {
-      if (!resumeConversation) {
-        return;
-      }
 
       mockClient.resumeSession.mockRejectedValue(
         new Error("Authentication failed: token expired")
