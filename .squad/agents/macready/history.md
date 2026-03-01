@@ -499,3 +499,53 @@
 **Key Insight:** The `authStatusProvider.ts` file was referenced in the original instructions but never existed on this branch — likely a planned-but-not-yet-implemented module. The `authStatus` message type IS in the table (added on another branch) and was kept.
 ---
 📌 Team update (2026-03-01T03:14:32Z): Auth UX foundation work complete — Childs & Blair fixed Entra ID error classification and sign-in flow. Status bar + webview banner now distinguish `notAuthenticated` from `error`. Ready for broader integration. — decided by Childs & Blair
+
+### 2025-07-25: Issue #28 Phase 4 Implementation Spec
+
+**Requested by:** Rob Pitcher
+
+**Work Completed:**
+- Wrote detailed implementation spec for Issue #28 (Phase 4 — Slash commands and enhanced UX)
+- Analyzed all 4 proposed features against current WebviewViewProvider architecture
+- Reviewed SDK capabilities: `systemMessage` config, `resumeSession()`, `listSessions()`, `deleteSession()`, `SessionMetadata`
+
+**Key Decisions:**
+1. **Slash commands** — webview-side parsing with prompt prepend (not SDK systemMessage). Autocomplete dropdown in chat UI.
+2. **Inline chat** — DEFERRED. Not feasible with WebviewViewProvider; requires Chat Participant API. Code actions cover 80% of the use case.
+3. **Code actions** — `CodeActionProvider` registration, new `src/codeActionProvider.ts`, actions invoke slash commands via Forge panel.
+4. **Conversation history** — leverage SDK's built-in session persistence (`resumeSession`/`listSessions`). UI for conversation list in webview. Store active conversation ID in `workspaceState`.
+
+**Recommendation:** Break #28 into 3 sub-issues (#28a slash commands → Blair, #28b code actions → Blair, #28c history persistence → Childs). Inline chat removed from scope.
+
+**Open Risk:** Need to verify whether `resumeSession` replays past messages as events — if not, webview can't show prior conversation on resume without a separate display-side message cache.
+
+### 2026-03-01: Phase 4 Scope Pivot — Tools-First Architecture
+
+**Decision:** Slash commands (#85) should be closed. The Copilot SDK (v0.1.26) is a full coding agent with built-in tools (`shell`, `read`, `write`, `url`, `mcp`). Hardcoded prompt prepends (/explain, /fix, /tests) duplicate what the model does natively. Rob Pitcher identified this — he's right.
+
+**SDK Tool Capabilities Discovered:**
+- `SessionConfig.availableTools` / `excludedTools` — whitelist/blacklist built-in tools
+- `defineTool()` — register custom tools with typed Zod schemas
+- `SessionConfig.mcpServers` — local/remote MCP server integration
+- `SessionConfig.customAgents` — sub-agents with specific tool sets
+- `SessionConfig.skillDirectories` / `disabledSkills` — skill support
+- `SessionConfig.systemMessage` — append or replace system prompt
+- `onUserInputRequest` — enables `ask_user` tool
+- Session hooks: `onPreToolUse`, `onPostToolUse`, `onUserPromptSubmitted`
+- Events: `tool.execution_progress`, `tool.execution_partial_result` (not yet consumed)
+- `PermissionRequest.kind`: `"shell" | "write" | "mcp" | "read" | "url"`
+
+**Existing Forge Tool Plumbing (already working):**
+- `onPermissionRequest` handler with auto-approve setting
+- `tool.execution_start` → `toolConfirmation` webview message
+- `tool.execution_complete` → `toolResult` webview message
+- `autoApproveTools` configuration setting
+
+**Issue Disposition:**
+- #85 (Slash commands) → Close, won't implement
+- #86 (Code actions) → Rework: remove dependency on #85, use native `session.send()` with attachments
+- #87 (Conversation history) → Keep as-is
+
+**New Phase 4 Focus:** Tool UX polish, tool control settings (availableTools/excludedTools), conversation history (#87), reworked code actions (#86), system message customization, MCP server support (stretch).
+
+**Decision file:** `.squad/decisions/inbox/macready-phase4-tool-first-pivot.md`

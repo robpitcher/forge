@@ -1443,3 +1443,4 @@ Four auth UX enhancements:
 **Impact:** First-run users see sign-in prompt; sign-in flow is seamless; auth status always visible and method-aware.
 
 ---
+
