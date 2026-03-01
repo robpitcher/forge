@@ -31,6 +31,22 @@
       "created_at": "2026-02-27T03:29:00Z",
       "legacy_named": false,
       "status": "active"
+    },
+    "palmer": {
+      "persistent_name": "Palmer",
+      "universe": "The Thing",
+      "role": "DevOps",
+      "created_at": "2026-03-01T22:24:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "fuchs": {
+      "persistent_name": "Fuchs",
+      "universe": "The Thing",
+      "role": "Technical Writer",
+      "created_at": "2026-03-01T22:24:00Z",
+      "legacy_named": false,
+      "status": "active"
     }
   }
 }

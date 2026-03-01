@@ -165,6 +165,55 @@
           "type": "boolean",
           "default": true,
           "description": "Enable MCP tool support (Model Context Protocol servers)"
+        },
+        "forge.copilot.mcpAllowRemote": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for air-gap safety."
+        },
+        "forge.copilot.mcpServers": {
+          "type": "object",
+          "default": {},
+          "description": "MCP (Model Context Protocol) server configurations. Each key is a server name. Local servers use { command, args?, env? }. Remote servers use { url, headers? } (requires allowRemoteMcp).",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["command"],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "Command to start the local MCP server process"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Arguments to pass to the server command"
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "description": "Environment variables for the server process"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "URL of the remote MCP server (HTTP/SSE endpoint)"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "description": "HTTP headers to include in requests to the remote server"
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }

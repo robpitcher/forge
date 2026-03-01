@@ -12,8 +12,10 @@ How to decide who handles what.
 | Code review | MacReady | Review PRs, check quality, suggest improvements |
 | Testing, error paths, validation | Windows | Write tests, find edge cases, verify air-gap behavior, error handling |
 | Scope & priorities | MacReady | What to build next, trade-offs, decisions |
-| Packaging & distribution (.vsix) | Blair + Childs | esbuild bundling, vsce package, sideloading |
+| Packaging & distribution (.vsix) | Palmer | esbuild bundling, vsce package, sideloading, release automation |
+| CI/CD, GitHub Actions, infrastructure | Palmer | Workflows, build pipelines, devcontainer, environment setup |
 | Configuration & settings | Blair | VS Code settings contribution, validation |
+| Documentation, README, guides | Fuchs | User docs, setup guides, API reference, changelogs, inline docs |
 | Async issue work (bugs, tests, small features) | @copilot 🤖 | Well-defined tasks matching capability profile |
 | Session logging | Scribe | Automatic — never needs routing |
 
@@ -26,6 +28,8 @@ How to decide who handles what.
 | `squad:blair` | VS Code extension work | Blair |
 | `squad:childs` | SDK integration work | Childs |
 | `squad:windows` | Testing task | Windows |
+| `squad:palmer` | DevOps / CI/CD / packaging task | Palmer |
+| `squad:fuchs` | Documentation task | Fuchs |
 | `squad:copilot` | Assign to @copilot for autonomous work (if enabled) | @copilot 🤖 |
 
 ### How Issue Assignment Works

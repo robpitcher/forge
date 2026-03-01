@@ -16,6 +16,8 @@
 | Blair | Extension Dev | `.squad/agents/blair/charter.md` | ✅ Active |
 | Childs | SDK Dev | `.squad/agents/childs/charter.md` | ✅ Active |
 | Windows | Tester | `.squad/agents/windows/charter.md` | ✅ Active |
+| Palmer | DevOps | `.squad/agents/palmer/charter.md` | ✅ Active |
+| Fuchs | Technical Writer | `.squad/agents/fuchs/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 
