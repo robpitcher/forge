@@ -145,10 +145,10 @@ async function updateAuthStatus(
     case "notAuthenticated":
       if (config.authMethod === "entraId") {
         statusBarItem.text = "$(sign-in) Forge: Sign In";
-        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI, or open Settings to configure an API key";
       } else {
         statusBarItem.text = "$(key) Forge: Set API Key";
-        statusBarItem.tooltip = "Click to set your API key";
+        statusBarItem.tooltip = "Click to set your API key, or sign in with Entra ID via Azure CLI";
       }
       break;
     case "error": {

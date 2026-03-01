@@ -353,7 +353,7 @@
       }, 3000);
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
-      banner.textContent = "🔐 Sign in to start chatting — ";
+      banner.textContent = "🔐 Set your endpoint in Settings. Sign in with Entra ID or configure an API key to start chatting. ";
       
       const signInBtn = document.createElement("button");
       signInBtn.textContent = "Sign In";
@@ -361,6 +361,13 @@
         vscode.postMessage({ command: "signIn" });
       });
       banner.appendChild(signInBtn);
+
+      const settingsBtn = document.createElement("button");
+      settingsBtn.textContent = "Settings";
+      settingsBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "openSettings" });
+      });
+      banner.appendChild(settingsBtn);
     } else if (status.state === "error") {
       banner.className = "auth-banner error";
       const rawMsg = status.message || "Unknown error";
