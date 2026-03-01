@@ -4,7 +4,6 @@
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
   const newConvBtn = document.getElementById("newConvBtn");
-  const historyBtn = document.getElementById("historyBtn");
   const attachSelectionBtn = document.getElementById("attachSelection");
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
@@ -18,7 +17,6 @@
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
-  historyBtn.addEventListener("click", toggleConversationList);
   attachSelectionBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachSelection" });
   });
@@ -312,6 +310,10 @@
         autoAttachedChipElement = null;
         autoAttachedCtx = null;
         messages = [];
+        break;
+
+      case "toggleHistory":
+        toggleConversationList();
         break;
 
       case "conversationList":
