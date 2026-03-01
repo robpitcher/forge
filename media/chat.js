@@ -353,21 +353,27 @@
       }, 3000);
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
-      banner.textContent = "🔐 Set your endpoint in Settings. Sign in with Entra ID or configure an API key to start chatting. ";
-      
-      const signInBtn = document.createElement("button");
-      signInBtn.textContent = "Sign In";
-      signInBtn.addEventListener("click", () => {
+
+      // Build inline text with clickable "Entra ID" and "configure an API key"
+      banner.appendChild(document.createTextNode("🔐 Set your endpoint in Settings. Sign in with "));
+
+      const entraLink = document.createElement("button");
+      entraLink.textContent = "Entra ID";
+      entraLink.addEventListener("click", () => {
         vscode.postMessage({ command: "signIn" });
       });
-      banner.appendChild(signInBtn);
+      banner.appendChild(entraLink);
 
-      const settingsBtn = document.createElement("button");
-      settingsBtn.textContent = "Settings";
-      settingsBtn.addEventListener("click", () => {
+      banner.appendChild(document.createTextNode(" or "));
+
+      const apiKeyLink = document.createElement("button");
+      apiKeyLink.textContent = "configure an API key";
+      apiKeyLink.addEventListener("click", () => {
         vscode.postMessage({ command: "openSettings" });
       });
-      banner.appendChild(settingsBtn);
+      banner.appendChild(apiKeyLink);
+
+      banner.appendChild(document.createTextNode(" to start chatting."));
     } else if (status.state === "error") {
       banner.className = "auth-banner error";
       const rawMsg = status.message || "Unknown error";

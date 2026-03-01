@@ -154,6 +154,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts error when endpoint is missing", async () => {
     setupProvider({
       endpoint: "",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
@@ -178,6 +179,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts error when API key is missing", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
@@ -202,6 +204,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts CLI-not-found error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
@@ -230,6 +233,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts general startup error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
@@ -261,6 +265,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on sendMessage rejection", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",
@@ -304,6 +309,7 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on session.error event", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
       model: "gpt-4.1",
       wireApi: "completions",

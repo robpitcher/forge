@@ -185,6 +185,7 @@ describe("multi-turn conversation context (SC4)", () => {
       const settings: Record<string, string> = {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",
         apiKey: "test-key-123",
+        authMethod: "apiKey",
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
