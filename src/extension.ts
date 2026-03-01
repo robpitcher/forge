@@ -17,6 +17,8 @@ import type {
   PermissionRequestResult,
   ToolExecutionStartEvent,
   ToolExecutionCompleteEvent,
+  ToolExecutionProgressEvent,
+  ToolExecutionPartialResultEvent,
   ContextItem,
 } from "./types.js";
 
@@ -495,6 +497,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubError();
         unsubToolStart();
         unsubToolComplete();
+        unsubToolProgress();
+        unsubToolPartialResult();
       };
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
@@ -524,6 +528,30 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             output: event.data.success
               ? (event.data.result?.content ?? "")
               : (event.data.error?.message ?? "Tool execution failed"),
+          });
+        }
+      });
+
+      const unsubToolProgress = session.on("tool.execution_progress", (event: ToolExecutionProgressEvent) => {
+        if (event?.data?.toolCallId && event?.data?.progressMessage) {
+          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
+          this._view?.webview.postMessage({
+            type: "toolProgress",
+            id: event.data.toolCallId,
+            tool: toolName,
+            message: event.data.progressMessage,
+          });
+        }
+      });
+
+      const unsubToolPartialResult = session.on("tool.execution_partial_result", (event: ToolExecutionPartialResultEvent) => {
+        if (event?.data?.toolCallId && event?.data?.partialOutput) {
+          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
+          this._view?.webview.postMessage({
+            type: "toolPartialResult",
+            id: event.data.toolCallId,
+            tool: toolName,
+            output: event.data.partialOutput,
           });
         }
       });
