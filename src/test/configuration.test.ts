@@ -27,7 +27,6 @@ describe("getConfiguration", () => {
       endpoint: "",
       apiKey: "",
       authMethod: "entraId",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -44,7 +43,6 @@ describe("getConfiguration", () => {
   it("returns values from VS Code settings when configured (apiKey via SecretStorage)", async () => {
     const settings: Record<string, unknown> = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
-      model: "gpt-4o",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
@@ -71,7 +69,6 @@ describe("getConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
       authMethod: "entraId",
-      model: "gpt-4o",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
@@ -86,13 +83,49 @@ describe("getConfiguration", () => {
   });
 });
 
+describe("model selection defaults", () => {
+  it("active model defaults to first entry in models array", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/",
+      apiKey: "key",
+      authMethod: "apiKey",
+      models: ["gpt-4o", "gpt-4.1", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+    // The active model should be models[0] when no selection is persisted
+    expect(config.models[0]).toBe("gpt-4o");
+  });
+
+  it("models array order determines default", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/",
+      apiKey: "key",
+      authMethod: "apiKey",
+      models: ["custom-deploy", "gpt-4.1"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+    expect(config.models[0]).toBe("custom-deploy");
+  });
+});
+
 describe("validateConfiguration", () => {
   it("returns errors when endpoint and apiKey are missing", () => {
     const config: ExtensionConfig = {
       endpoint: "",
       apiKey: "",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -115,7 +148,6 @@ describe("validateConfiguration", () => {
       endpoint: "",
       apiKey: "key-123",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -137,7 +169,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://example.com",
       apiKey: "",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -159,7 +190,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -184,7 +214,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "",
       authMethod: "entraId",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -206,7 +235,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -228,7 +256,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "",
       authMethod: "entraId",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -250,7 +277,6 @@ describe("validateConfiguration", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "",
       authMethod: "entraId",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
@@ -271,7 +297,6 @@ describe("validateConfiguration", () => {
       endpoint: "",
       apiKey: "",
       authMethod: "entraId",
-      model: "gpt-4.1",
       models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",

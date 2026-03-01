@@ -40,7 +40,6 @@ const baseConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
   models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
@@ -348,7 +347,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await getOrCreateSession("conv-mcp-1", config, "test-key-123");
+      await getOrCreateSession("conv-mcp-1", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       expect(sessionArgs.mcpServers).toBeDefined();
@@ -357,7 +356,7 @@ describe("MCP server configuration (#90)", () => {
     it("getOrCreateSession omits mcpServers when none configured", async () => {
       const config = configWith({ mcpServers: undefined });
 
-      await getOrCreateSession("conv-mcp-none", config, "test-key-123");
+      await getOrCreateSession("conv-mcp-none", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       expect(sessionArgs.mcpServers).toBeUndefined();
@@ -377,7 +376,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await getOrCreateSession("conv-mcp-map", config, "test-key-123");
+      await getOrCreateSession("conv-mcp-map", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
@@ -411,7 +410,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await resumeConversation("conv-resume-mcp", config, "test-key-123");
+      await resumeConversation("conv-resume-mcp", config, "test-key-123", "gpt-4.1");
 
       const resumeArgs = mockClient.resumeSession.mock.calls[0];
       expect(resumeArgs[0]).toBe("conv-resume-mcp");
@@ -439,7 +438,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await getOrCreateSession("conv-remote-mcp", config, "test-key-123");
+      await getOrCreateSession("conv-remote-mcp", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
@@ -460,7 +459,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await getOrCreateSession("conv-mixed-mcp", config, "test-key-123");
+      await getOrCreateSession("conv-mixed-mcp", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
@@ -486,7 +485,7 @@ describe("MCP server configuration (#90)", () => {
         },
       });
 
-      await getOrCreateSession("conv-no-headers", config, "test-key-123");
+      await getOrCreateSession("conv-no-headers", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
@@ -503,7 +502,7 @@ describe("MCP server configuration (#90)", () => {
           "valid-local": { command: "npx" },
         },
       });
-      await getOrCreateSession("conv-validated", config, "test-key-123");
+      await getOrCreateSession("conv-validated", config, "test-key-123", "gpt-4.1");
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
       expect(mcpServers["valid-local"]).toBeDefined();

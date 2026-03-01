@@ -255,16 +255,28 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
+  private _selectedModel?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage,
     private readonly _workspaceState: vscode.Memento
-  ) {}
+  ) {
+    // Restore persisted model selection
+    this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
+  }
 
   /** Set by activate() to trigger auth status refresh from within the provider. */
   public setAuthRefreshCallback(callback: () => void): void {
     this._refreshAuthStatus = callback;
+  }
+
+  /** Returns the active model: persisted selection, or first entry from models array. */
+  private _getActiveModel(models: string[]): string {
+    if (this._selectedModel && models.includes(this._selectedModel)) {
+      return this._selectedModel;
+    }
+    return models[0] ?? "gpt-4.1";
   }
 
   public postContextAttached(context: ContextItem): void {
@@ -323,7 +335,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         const status = await checkAuthStatus(config, this._secrets);
         this.postAuthStatus(status, !!config.endpoint);
         this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
-        this._view?.webview.postMessage({ type: "modelSelected", model: config.model });
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
       })
       .catch(() => {
         // Silent failure — status bar will show the error
@@ -397,11 +409,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       );
       if (confirm !== "Continue") {
         const currentConfig = await getConfigurationAsync(this._secrets);
-        this._view?.webview.postMessage({ type: "modelSelected", model: currentConfig.model });
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(currentConfig.models) });
         return;
       }
-      const vsConfig = vscode.workspace.getConfiguration("forge.copilot");
-      await vsConfig.update("model", newModel, vscode.ConfigurationTarget.Global);
+      this._selectedModel = newModel;
+      await this._workspaceState.update("forge.selectedModel", newModel);
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
@@ -504,6 +516,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         this._conversationId,
         config,
         authToken,
+        this._getActiveModel(config.models),
         this._createPermissionHandler(),
       );
     } catch (err: unknown) {
@@ -803,7 +816,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler());
+      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._createPermissionHandler());
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState

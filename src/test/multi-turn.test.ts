@@ -35,7 +35,6 @@ const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
   models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
@@ -62,16 +61,16 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("same conversation reuses session", () => {
     it("returns the same session object for the same conversationId", async () => {
-      const session1 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123");
-      const session2 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123");
+      const session1 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      const session2 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
 
       expect(session1).toBe(session2);
     });
 
     it("only calls createSession once for repeated requests", async () => {
-      await getOrCreateSession("conv-reuse", validConfig, "test-key-123");
-      await getOrCreateSession("conv-reuse", validConfig, "test-key-123");
-      await getOrCreateSession("conv-reuse", validConfig, "test-key-123");
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
@@ -85,8 +84,8 @@ describe("multi-turn conversation context (SC4)", () => {
       const mocks = [sessionA, sessionB];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123");
-      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123");
+      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123", "gpt-4.1");
+      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123", "gpt-4.1");
 
       expect(resultA).not.toBe(resultB);
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
@@ -99,8 +98,8 @@ describe("multi-turn conversation context (SC4)", () => {
       const mocks = [sessionA, sessionB];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123");
-      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123");
+      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123", "gpt-4.1");
+      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123", "gpt-4.1");
 
       await resultA.send({ prompt: "message A" });
       await resultB.send({ prompt: "message B" });
@@ -118,7 +117,7 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("session persists across messages", () => {
     it("accepts multiple sendMessage calls on the same session", async () => {
-      const session = await getOrCreateSession("conv-multi", validConfig, "test-key-123");
+      const session = await getOrCreateSession("conv-multi", validConfig, "test-key-123", "gpt-4.1");
 
       await session.send({ prompt: "first message" });
       await session.send({ prompt: "second message" });
@@ -140,10 +139,10 @@ describe("multi-turn conversation context (SC4)", () => {
     });
 
     it("returns the same session after intermediate messages", async () => {
-      const session1 = await getOrCreateSession("conv-persist", validConfig, "test-key-123");
+      const session1 = await getOrCreateSession("conv-persist", validConfig, "test-key-123", "gpt-4.1");
       await session1.send({ prompt: "turn 1" });
 
-      const session2 = await getOrCreateSession("conv-persist", validConfig, "test-key-123");
+      const session2 = await getOrCreateSession("conv-persist", validConfig, "test-key-123", "gpt-4.1");
       await session2.send({ prompt: "turn 2" });
 
       expect(session1).toBe(session2);
@@ -153,20 +152,20 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("session cleanup", () => {
     it("removeSession removes a specific session", async () => {
-      await getOrCreateSession("conv-remove", validConfig, "test-key-123");
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
       removeSession("conv-remove");
 
-      await getOrCreateSession("conv-remove", validConfig, "test-key-123");
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
 
     it("removeSession leaves other sessions intact", async () => {
-      const sessionKeep = await getOrCreateSession("conv-keep", validConfig, "test-key-123");
-      await getOrCreateSession("conv-remove", validConfig, "test-key-123");
+      const sessionKeep = await getOrCreateSession("conv-keep", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
 
       removeSession("conv-remove");
 
-      const sessionKeepAgain = await getOrCreateSession("conv-keep", validConfig, "test-key-123");
+      const sessionKeepAgain = await getOrCreateSession("conv-keep", validConfig, "test-key-123", "gpt-4.1");
       expect(sessionKeepAgain).toBe(sessionKeep);
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
@@ -192,7 +191,6 @@ describe("multi-turn conversation context (SC4)", () => {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",
         apiKey: "test-key-123",
         authMethod: "apiKey",
-        model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
       };
@@ -361,14 +359,14 @@ describe("multi-turn conversation context (SC4)", () => {
       // Create sessions sequentially to avoid client-creation race
       const sessions = [];
       for (const id of ids) {
-        sessions.push(await getOrCreateSession(id, validConfig, "test-key-123"));
+        sessions.push(await getOrCreateSession(id, validConfig, "test-key-123", "gpt-4.1"));
       }
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(5);
 
       // Each session is independently reachable and reused
       for (let i = 0; i < ids.length; i++) {
-        const refetched = await getOrCreateSession(ids[i], validConfig, "test-key-123");
+        const refetched = await getOrCreateSession(ids[i], validConfig, "test-key-123", "gpt-4.1");
         expect(refetched).toBe(sessions[i]);
       }
 
@@ -384,16 +382,16 @@ describe("multi-turn conversation context (SC4)", () => {
       const mocks = [s1, s2, s3];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const session1 = await getOrCreateSession("c1", validConfig, "test-key-123");
-      const session2 = await getOrCreateSession("c2", validConfig, "test-key-123");
-      const session3 = await getOrCreateSession("c3", validConfig, "test-key-123");
+      const session1 = await getOrCreateSession("c1", validConfig, "test-key-123", "gpt-4.1");
+      const session2 = await getOrCreateSession("c2", validConfig, "test-key-123", "gpt-4.1");
+      const session3 = await getOrCreateSession("c3", validConfig, "test-key-123", "gpt-4.1");
 
       removeSession("c2");
 
-      expect(await getOrCreateSession("c1", validConfig, "test-key-123")).toBe(session1);
-      expect(await getOrCreateSession("c3", validConfig, "test-key-123")).toBe(session3);
+      expect(await getOrCreateSession("c1", validConfig, "test-key-123", "gpt-4.1")).toBe(session1);
+      expect(await getOrCreateSession("c3", validConfig, "test-key-123", "gpt-4.1")).toBe(session3);
 
-      const session2New = await getOrCreateSession("c2", validConfig, "test-key-123");
+      const session2New = await getOrCreateSession("c2", validConfig, "test-key-123", "gpt-4.1");
       expect(session2New).not.toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledTimes(4);
     });

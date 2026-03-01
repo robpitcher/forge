@@ -5,7 +5,6 @@ export interface ExtensionConfig {
   endpoint: string;
   apiKey: string;
   authMethod: "entraId" | "apiKey";
-  model: string;
   models: string[];
   wireApi: string;
   cliPath: string;
@@ -31,7 +30,6 @@ export function getConfiguration(): ExtensionConfig {
     endpoint: config.get<string>("endpoint", ""),
     apiKey: "",
     authMethod: config.get<string>("authMethod", "entraId") as "entraId" | "apiKey",
-    model: config.get<string>("model", "gpt-4.1"),
     models: config.get<string[]>("models", ["gpt-4.1", "gpt-4o", "gpt-4o-mini"]),
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),

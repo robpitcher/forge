@@ -143,6 +143,7 @@ export async function getOrCreateSession(
   conversationId: string,
   config: ExtensionConfig,
   authToken: string,
+  model: string,
   onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
   const existing = sessions.get(conversationId);
@@ -157,7 +158,7 @@ export async function getOrCreateSession(
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
-    model: config.model,
+    model,
     provider,
     streaming: true,
     ...toolConfig,
@@ -255,6 +256,7 @@ export async function resumeConversation(
   sessionId: string,
   config: ExtensionConfig,
   authToken: string,
+  model: string,
   onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
   try {
@@ -264,7 +266,7 @@ export async function resumeConversation(
     const mcpServers = buildMcpServersConfig(config);
 
     const resumeConfig: ResumeSessionConfig = {
-      model: config.model,
+      model,
       provider,
       streaming: true,
       ...toolConfig,

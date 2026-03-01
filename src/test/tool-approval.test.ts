@@ -48,7 +48,6 @@ function setupConfig(overrides: Record<string, unknown> = {}) {
     endpoint: "https://myresource.openai.azure.com/openai/v1/",
     apiKey: "test-key-123",
     authMethod: "apiKey",
-    model: "gpt-4.1",
     models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
     wireApi: "completions",
     cliPath: "",
