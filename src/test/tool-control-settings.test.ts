@@ -1,14 +1,15 @@
 /**
  * Tool Control Settings Tests — Issue #91
  *
- * Tests the `forge.excludedTools` setting.
- * Written BEFORE Childs's implementation lands. Tests will fail until
- * the feature is merged — that's expected. Tests define the contract.
+ * Tests the individual `forge.copilot.tools.*` boolean settings.
+ * Each tool has its own checkbox, defaulting to enabled (true)
+ * except `url` which defaults to false for air-gap compliance.
  *
  * Expected behavior:
- *   - `excludedTools` defaults to `["url"]` when not configured
- *   - excludedTools is passed through to SDK SessionConfig on session creation
- *   - Empty/undefined values don't break session creation
+ *   - Individual tool booleans compute `excludedTools` array for SDK
+ *   - Default config excludes only `url`
+ *   - Disabling tools adds them to excludedTools
+ *   - All tools enabled means no excludedTools passed to SDK
  *   - Settings take effect on next conversation (no stale config)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -41,10 +42,15 @@ const baseConfig: ExtensionConfig = {
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
-function configWith(overrides: Record<string, unknown>): ExtensionConfig {
-  return { ...baseConfig, ...overrides } as ExtensionConfig;
+function configWith(overrides: Partial<ExtensionConfig>): ExtensionConfig {
+  return { ...baseConfig, ...overrides };
 }
 
 function setupVscodeConfig(settings: Record<string, unknown> = {}) {
@@ -74,22 +80,23 @@ describe("Tool control settings (#91)", () => {
   });
 
   // =========================================================================
-  // 1. Default excludedTools
+  // 1. Default tool settings
   // =========================================================================
-  describe("default excludedTools", () => {
-    it("defaults excludedTools to ['url'] when no setting is configured", async () => {
-      // getConfiguration should return excludedTools: ["url"] by default
+  describe("default tool settings", () => {
+    it("defaults url to false and all others to true", () => {
       setupVscodeConfig(); // no overrides — all defaults
 
-      const { getConfiguration } = await import("../configuration.js");
       const config = getConfiguration();
-      const configAny = config as unknown as Record<string, unknown>;
 
-      expect(configAny.excludedTools).toEqual(["url"]);
+      expect(config.toolShell).toBe(true);
+      expect(config.toolRead).toBe(true);
+      expect(config.toolWrite).toBe(true);
+      expect(config.toolUrl).toBe(false);
+      expect(config.toolMcp).toBe(true);
     });
 
-    it("passes default excludedTools to SessionConfig when no override set", async () => {
-      const config = configWith({ excludedTools: ["url"] });
+    it("passes default excludedTools (url only) to SessionConfig", async () => {
+      const config = configWith({}); // default: toolUrl=false
 
       await getOrCreateSession("conv-default-excl", config, "test-key-123");
 
@@ -99,58 +106,50 @@ describe("Tool control settings (#91)", () => {
   });
 
   // =========================================================================
-  // 2. Custom excludedTools
+  // 2. Custom tool settings
   // =========================================================================
-  describe("custom excludedTools", () => {
-    it("passes custom excludedTools array to SessionConfig", async () => {
-      const config = configWith({ excludedTools: ["url", "shell", "write"] });
+  describe("custom tool settings", () => {
+    it("excludes multiple disabled tools", async () => {
+      const config = configWith({ toolUrl: false, toolShell: false, toolWrite: false });
 
       await getOrCreateSession("conv-custom-excl", config, "test-key-123");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
-      expect(sessionArgs.excludedTools).toEqual(["url", "shell", "write"]);
+      expect(sessionArgs.excludedTools).toEqual(expect.arrayContaining(["shell", "write", "url"]));
+      expect((sessionArgs.excludedTools as string[]).length).toBe(3);
     });
 
-    it("reads excludedTools from VS Code configuration", () => {
-      setupVscodeConfig({ excludedTools: ["shell", "mcp"] });
+    it("reads tool booleans from VS Code configuration", () => {
+      setupVscodeConfig({ "tools.shell": false, "tools.mcp": false });
 
       const config = getConfiguration();
-      const configAny = config as unknown as Record<string, unknown>;
 
-      expect(configAny.excludedTools).toEqual(["shell", "mcp"]);
+      expect(config.toolShell).toBe(false);
+      expect(config.toolMcp).toBe(false);
     });
   });
 
   // =========================================================================
-  // 3. Empty and undefined values don't break session creation
+  // 3. All tools enabled — no excludedTools
   // =========================================================================
-  describe("empty and undefined values", () => {
-    it("handles empty excludedTools array without error", async () => {
-      const config = configWith({ excludedTools: [] });
+  describe("all tools enabled", () => {
+    it("does not pass excludedTools when all tools are enabled", async () => {
+      const config = configWith({ toolUrl: true }); // all true
 
-      const session = await getOrCreateSession("conv-empty-excl", config, "test-key-123");
+      const session = await getOrCreateSession("conv-all-enabled", config, "test-key-123");
 
       expect(session).toBeDefined();
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
-      expect(sessionArgs.excludedTools).toEqual([]);
+      expect(sessionArgs.excludedTools).toBeUndefined();
     });
 
-    it("handles undefined excludedTools without error", async () => {
-      const config = configWith({ excludedTools: undefined });
-
-      const session = await getOrCreateSession("conv-undef-excl", config, "test-key-123");
-
-      expect(session).toBeDefined();
-      expect(mockClient.createSession).toHaveBeenCalledOnce();
-    });
-
-    it("creates session normally when tool setting is not configured", async () => {
-      const session = await getOrCreateSession("conv-neither", baseConfig, "test-key-123");
+    it("creates session normally with all tools enabled", async () => {
+      const config = configWith({ toolUrl: true });
+      const session = await getOrCreateSession("conv-all-ok", config, "test-key-123");
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledOnce();
 
-      // Core session config should still be correct
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       expect(sessionArgs).toHaveProperty("model", "gpt-4.1");
       expect(sessionArgs).toHaveProperty("streaming", true);
@@ -161,33 +160,31 @@ describe("Tool control settings (#91)", () => {
   // 4. Settings change takes effect on next conversation
   // =========================================================================
   describe("settings change on next conversation", () => {
-    it("new conversation picks up changed excludedTools", async () => {
-      // First conversation with default excludedTools
-      const config1 = configWith({ excludedTools: ["url"] });
+    it("new conversation picks up changed tool settings", async () => {
+      // First conversation with default (url disabled)
+      const config1 = configWith({});
       await getOrCreateSession("conv-change-1", config1, "test-key-123");
 
       const firstArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
 
-      // Start a new conversation with updated excludedTools
-      const config2 = configWith({ excludedTools: ["url", "shell"] });
+      // Start a new conversation with shell also disabled
+      const config2 = configWith({ toolShell: false });
       await getOrCreateSession("conv-change-2", config2, "test-key-123");
 
       const secondArgs = mockClient.createSession.mock.calls[1][0] as Record<string, unknown>;
 
-      // Each conversation should use the config it was created with
       expect(firstArgs.excludedTools).toEqual(["url"]);
-      expect(secondArgs.excludedTools).toEqual(["url", "shell"]);
+      expect(secondArgs.excludedTools).toEqual(expect.arrayContaining(["shell", "url"]));
     });
 
     it("removed session gets fresh config on recreation", async () => {
-      const config1 = configWith({ excludedTools: ["url"] });
+      const config1 = configWith({});
       await getOrCreateSession("conv-reuse", config1, "test-key-123");
 
-      // Remove the session (simulates "new conversation" reset)
       removeSession("conv-reuse");
 
-      // Re-create with different config
-      const config2 = configWith({ excludedTools: ["shell"] });
+      // Re-create with shell disabled
+      const config2 = configWith({ toolShell: false, toolUrl: true });
       await getOrCreateSession("conv-reuse", config2, "test-key-123");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
@@ -200,14 +197,12 @@ describe("Tool control settings (#91)", () => {
     });
 
     it("cached session does NOT pick up config changes (by design)", async () => {
-      const config1 = configWith({ excludedTools: ["url"] });
+      const config1 = configWith({});
       await getOrCreateSession("conv-cached", config1, "test-key-123");
 
-      // Same conversation ID with different config — should return cached session
-      const config2 = configWith({ excludedTools: ["shell"] });
+      const config2 = configWith({ toolShell: false });
       await getOrCreateSession("conv-cached", config2, "test-key-123");
 
-      // createSession should only have been called once (cached)
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
   });

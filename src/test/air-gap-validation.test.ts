@@ -24,6 +24,11 @@ const validAzureConfig: ExtensionConfig = {
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
 describe("Air-gap validation (SC2, SC3)", () => {
@@ -160,6 +165,11 @@ describe("Air-gap validation (SC2, SC3)", () => {
         model: "gpt-4o",
         wireApi: "responses",
         cliPath: "/custom/cli",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       await getOrCreateSession("agv-custom-cfg", customConfig, "custom-key-456");
@@ -231,6 +241,11 @@ describe("Air-gap validation (SC2, SC3)", () => {
         model: "custom-model",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       await getOrCreateSession("agv-generic-endpoint", genericConfig, "private-key-789");
@@ -297,6 +312,11 @@ describe("Air-gap validation (SC2, SC3)", () => {
       const configWithCli: ExtensionConfig = {
         ...validAzureConfig,
         cliPath: "/opt/copilot-cli/bin/copilot",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       await getOrCreateClient(configWithCli);
@@ -315,6 +335,11 @@ describe("Air-gap validation (SC2, SC3)", () => {
       const configNoCli: ExtensionConfig = {
         ...validAzureConfig,
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       await getOrCreateClient(configNoCli);

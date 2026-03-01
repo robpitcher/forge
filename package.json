@@ -109,7 +109,10 @@
         },
         "forge.copilot.authMethod": {
           "type": "string",
-          "enum": ["entraId", "apiKey"],
+          "enum": [
+            "entraId",
+            "apiKey"
+          ],
           "default": "entraId",
           "description": "Authentication method. 'entraId' uses DefaultAzureCredential (recommended). 'apiKey' uses a static API key.",
           "enumDescriptions": [
@@ -122,22 +125,36 @@
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
         },
-        "forge.copilot.excludedTools": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["shell", "read", "write", "url", "mcp"],
-            "enumDescriptions": [
-              "Execute shell commands",
-              "Read files from the workspace",
-              "Write files to the workspace",
-              "Fetch URLs from the internet",
-              "Connect to MCP servers"
-            ]
-          },
-          "uniqueItems": true,
-          "default": ["url"],
-          "description": "SDK tools to disable. Default excludes 'url' for air-gap compliance. All unlisted tools are enabled."
+        "forge.copilot.systemMessage": {
+          "type": "string",
+          "default": "",
+          "description": "Custom system message to append to the default Copilot system prompt. Leave empty to use the SDK default.",
+          "editPresentation": "multilineText"
+        },
+        "forge.copilot.tools.shell": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Shell tool (execute terminal commands)"
+        },
+        "forge.copilot.tools.read": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Read tool (read file contents)"
+        },
+        "forge.copilot.tools.write": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Write tool (write/edit files)"
+        },
+        "forge.copilot.tools.url": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the URL tool (fetch web content). Disabled by default for air-gapped environments."
+        },
+        "forge.copilot.tools.mcp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable MCP tool support (Model Context Protocol servers)"
         }
       }
     }

@@ -8,7 +8,12 @@ export interface ExtensionConfig {
   wireApi: string;
   cliPath: string;
   autoApproveTools?: boolean;
-  excludedTools?: string[];
+  systemMessage?: string;
+  toolShell: boolean;
+  toolRead: boolean;
+  toolWrite: boolean;
+  toolUrl: boolean;
+  toolMcp: boolean;
 }
 
 export interface ConfigValidationError {
@@ -26,7 +31,12 @@ export function getConfiguration(): ExtensionConfig {
     wireApi: config.get<string>("wireApi", "completions"),
     cliPath: config.get<string>("cliPath", ""),
     autoApproveTools: config.get<boolean>("autoApproveTools", false),
-    excludedTools: config.get<string[]>("excludedTools", ["url"]),
+    systemMessage: config.get<string>("systemMessage", "") || undefined,
+    toolShell: config.get<boolean>("tools.shell", true),
+    toolRead: config.get<boolean>("tools.read", true),
+    toolWrite: config.get<boolean>("tools.write", true),
+    toolUrl: config.get<boolean>("tools.url", false),
+    toolMcp: config.get<boolean>("tools.mcp", true),
   };
 }
 

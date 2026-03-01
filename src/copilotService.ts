@@ -83,10 +83,16 @@ export async function getOrCreateSession(
       : { apiKey: authToken }),
     ...(isAzure && { azure: { apiVersion: "2024-10-21" } }),
   };
-  // Tool control: excludedTools blacklist. Default: ["url"] for air-gap compliance.
+  // Tool control: compute excludedTools from individual boolean settings
+  const excludedTools: string[] = [];
+  if (!config.toolShell) excludedTools.push("shell");
+  if (!config.toolRead) excludedTools.push("read");
+  if (!config.toolWrite) excludedTools.push("write");
+  if (!config.toolUrl) excludedTools.push("url");
+  if (!config.toolMcp) excludedTools.push("mcp");
   const toolConfig: Record<string, unknown> = {};
-  if (config.excludedTools !== undefined) {
-    toolConfig.excludedTools = config.excludedTools;
+  if (excludedTools.length > 0) {
+    toolConfig.excludedTools = excludedTools;
   }
 
   const session = (await copilotClient.createSession({
@@ -94,6 +100,7 @@ export async function getOrCreateSession(
     provider,
     streaming: true,
     ...toolConfig,
+    ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 

@@ -138,6 +138,11 @@ describe("createCredentialProvider", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const provider = await createCredentialProvider(config, createMockSecrets("key-from-secrets"));
@@ -153,6 +158,11 @@ describe("createCredentialProvider", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const provider = await createCredentialProvider(config, createMockSecrets());
@@ -168,6 +178,11 @@ describe("createCredentialProvider", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const provider = await createCredentialProvider(config, createMockSecrets("factory-key-456"));
@@ -186,6 +201,11 @@ describe("createCredentialProvider", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const provider = await createCredentialProvider(config, createMockSecrets());
@@ -202,6 +222,11 @@ describe("createCredentialProvider", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const provider = await createCredentialProvider(config, createMockSecrets());

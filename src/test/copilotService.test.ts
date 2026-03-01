@@ -25,6 +25,11 @@ const validConfig: ExtensionConfig = {
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
 // Configs for #27 auth method tests
@@ -96,6 +101,7 @@ describe("copilotService", () => {
           azure: { apiVersion: "2024-10-21" },
         },
         streaming: true,
+        excludedTools: ["url"],
       });
     });
 
@@ -175,9 +181,12 @@ describe("copilotService", () => {
       );
     });
 
-    it("does not pass excludedTools when not set", async () => {
-      const configWithNone = { ...validConfig, excludedTools: undefined };
-      await getOrCreateSession("conv-none", configWithNone, "test-key-123");
+    it("does not pass excludedTools when all tools enabled", async () => {
+      const configAllEnabled: ExtensionConfig = {
+        ...validConfig,
+        toolUrl: true,
+      };
+      await getOrCreateSession("conv-none", configAllEnabled, "test-key-123");
 
       const callArgs = mockClient.createSession.mock.calls[0][0];
       expect(callArgs.excludedTools).toBeUndefined();

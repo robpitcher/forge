@@ -43,6 +43,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -60,6 +65,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       } as unknown as ExtensionConfig;
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -85,6 +95,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -109,6 +124,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -133,6 +153,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -155,6 +180,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -177,6 +207,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -197,6 +232,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -217,6 +257,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(
@@ -238,6 +283,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -256,6 +306,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets(""));
@@ -274,6 +329,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets("   \t\n  "));
@@ -297,6 +357,11 @@ describe("checkAuthStatus", () => {
           model: "gpt-4.1",
           wireApi: "completions",
           cliPath: "",
+          toolShell: true,
+          toolRead: true,
+          toolWrite: true,
+          toolUrl: false,
+          toolMcp: true,
         },
         // Missing API key
         {
@@ -306,6 +371,11 @@ describe("checkAuthStatus", () => {
           model: "gpt-4.1",
           wireApi: "completions",
           cliPath: "",
+          toolShell: true,
+          toolRead: true,
+          toolWrite: true,
+          toolUrl: false,
+          toolMcp: true,
         },
       ];
 
@@ -330,6 +400,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const statusPromise = checkAuthStatus(config, createMockSecrets());
@@ -359,6 +434,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -379,6 +459,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());
@@ -401,6 +486,11 @@ describe("checkAuthStatus", () => {
         model: "gpt-4.1",
         wireApi: "completions",
         cliPath: "",
+        toolShell: true,
+        toolRead: true,
+        toolWrite: true,
+        toolUrl: false,
+        toolMcp: true,
       };
 
       const status = await checkAuthStatus(config, createMockSecrets());

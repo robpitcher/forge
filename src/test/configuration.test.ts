@@ -31,12 +31,17 @@ describe("getConfiguration", () => {
       wireApi: "completions",
       cliPath: "",
       autoApproveTools: false,
-      excludedTools: ["url"],
+      systemMessage: undefined,
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     });
   });
 
   it("returns values from VS Code settings when configured (apiKey via SecretStorage)", async () => {
-    const settings: Record<string, string> = {
+    const settings: Record<string, unknown> = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       model: "gpt-4o",
       wireApi: "responses",
@@ -68,7 +73,12 @@ describe("getConfiguration", () => {
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
       autoApproveTools: false,
-      excludedTools: ["url"],
+      systemMessage: undefined,
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     });
   });
 });
@@ -82,6 +92,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -99,6 +114,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -115,6 +135,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -131,6 +156,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -150,6 +180,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -166,6 +201,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -182,6 +222,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -198,6 +243,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -213,6 +263,11 @@ describe("validateConfiguration", () => {
       model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);

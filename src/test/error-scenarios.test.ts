@@ -37,6 +37,11 @@ const validConfig: ExtensionConfig = {
   model: "gpt-4.1",
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
 // ---------------------------------------------------------------------------
