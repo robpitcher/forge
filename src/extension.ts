@@ -27,6 +27,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
   statusBarItem.show();
   
+  // Wire auth refresh callback so provider methods can trigger status updates
+  const refreshAuth = () => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+  };
+  provider.setAuthRefreshCallback(refreshAuth);
+  
   // Initial auth status update
   updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
     // Silent failure on initial check — user will see the error when they try to use the extension
@@ -54,11 +60,20 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
   
+  // Track sign-in timeout so it can be disposed on deactivation
+  let signInTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  
   context.subscriptions.push(
     statusBarItem,
     configListener,
     authPollDisposable,
     focusListener,
+    new vscode.Disposable(() => {
+      if (signInTimeoutHandle !== undefined) {
+        clearTimeout(signInTimeoutHandle);
+        signInTimeoutHandle = undefined;
+      }
+    }),
     vscode.window.registerWebviewViewProvider("forge.chatView", provider),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
@@ -70,7 +85,11 @@ export function activate(context: vscode.ExtensionContext): void {
         terminal.sendText("az login");
         terminal.show();
         // Re-check auth after a few seconds to pick up the new token
-        setTimeout(() => {
+        if (signInTimeoutHandle !== undefined) {
+          clearTimeout(signInTimeoutHandle);
+        }
+        signInTimeoutHandle = setTimeout(() => {
+          signInTimeoutHandle = undefined;
           updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
         }, 5000);
       } else {
@@ -176,10 +195,17 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
   private _toolNames = new Map<string, string>();
 
+  private _refreshAuthStatus?: () => void;
+
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage
   ) {}
+
+  /** Set by activate() to trigger auth status refresh from within the provider. */
+  public setAuthRefreshCallback(callback: () => void): void {
+    this._refreshAuthStatus = callback;
+  }
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
@@ -229,15 +255,21 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     if (choice === "Open Settings") {
       await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
     } else if (choice === "Set API Key (secure)") {
-      const value = await vscode.window.showInputBox({
-        prompt: "Enter your API key",
-        password: true,
-        placeHolder: "Paste your Azure AI Foundry API key",
-      });
-      if (value !== undefined) {
-        await this._secrets.store("forge.copilot.apiKey", value);
-        await vscode.window.showInformationMessage("API key stored securely.");
-      }
+      await this._promptAndStoreApiKey();
+    }
+  }
+
+  /** Shared helper: prompt for API key, store in SecretStorage, refresh auth status. */
+  private async _promptAndStoreApiKey(): Promise<void> {
+    const value = await vscode.window.showInputBox({
+      prompt: "Enter your API key",
+      password: true,
+      placeHolder: "Paste your Azure AI Foundry API key",
+    });
+    if (value !== undefined) {
+      await this._secrets.store("forge.copilot.apiKey", value);
+      await vscode.window.showInformationMessage("API key stored securely.");
+      this._refreshAuthStatus?.();
     }
   }
 
@@ -265,15 +297,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } else if (message.command === "signIn") {
       await vscode.commands.executeCommand("forge.signIn");
     } else if (message.command === "setApiKey") {
-      const value = await vscode.window.showInputBox({
-        prompt: "Enter your API key",
-        password: true,
-        placeHolder: "Paste your Azure AI Foundry API key",
-      });
-      if (value !== undefined) {
-        await this._secrets.store("forge.copilot.apiKey", value);
-        await vscode.window.showInformationMessage("API key stored securely.");
-      }
+      await this._promptAndStoreApiKey();
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
