@@ -73,3 +73,11 @@ export class Disposable {
     this.callOnDispose();
   }
 }
+
+export const CodeActionKind = {
+  QuickFix: { value: "quickfix" },
+};
+
+export const languages = {
+  registerCodeActionsProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+};

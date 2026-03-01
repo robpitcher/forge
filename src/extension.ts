@@ -9,6 +9,7 @@ import {
   CopilotCliNotFoundError,
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
+import { ForgeCodeActionProvider } from "./codeActionProvider.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
@@ -144,7 +145,54 @@ export function activate(context: vscode.ExtensionContext): void {
       const ctx: ContextItem = { type: "file", filePath, languageId, content };
       provider.postContextAttached(ctx);
     }),
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: "*" },
+      new ForgeCodeActionProvider(),
+      { providedCodeActionKinds: ForgeCodeActionProvider.providedCodeActionKinds },
+    ),
+    vscode.commands.registerCommand("forge.explain", () =>
+      sendFromEditor("Explain the following code in detail.", provider)
+    ),
+    vscode.commands.registerCommand("forge.fix", () =>
+      sendFromEditor("Find and fix any bugs or issues in the following code.", provider)
+    ),
+    vscode.commands.registerCommand("forge.tests", () =>
+      sendFromEditor("Write unit tests for the following code.", provider)
+    ),
   );
+}
+
+/**
+ * Grabs the active editor selection, reveals the Forge panel, and sends
+ * a prompt with the selected code as context.
+ */
+async function sendFromEditor(instruction: string, provider: ChatViewProvider): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) { return; }
+  const selection = editor.selection;
+  const content = editor.document.getText(selection);
+  if (!content) { return; }
+
+  const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+  const startLine = selection.start.line + 1;
+  let endLine = selection.end.line + 1;
+  if (selection.end.character === 0 && selection.end.line > selection.start.line) {
+    endLine = selection.end.line;
+  }
+
+  const ctx: ContextItem = {
+    type: "selection",
+    filePath,
+    languageId: editor.document.languageId,
+    content,
+    startLine,
+    endLine,
+  };
+
+  // Reveal the Forge panel so the user sees the response
+  await vscode.commands.executeCommand("forge.chatView.focus");
+
+  provider.sendMessageWithContext(instruction, [ctx]);
 }
 
 async function updateAuthStatus(
@@ -209,6 +257,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
+  }
+
+  /** Programmatically send a message with context (used by code action commands). */
+  public sendMessageWithContext(prompt: string, context: ContextItem[]): void {
+    this._handleChatMessage(prompt, context).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    });
   }
 
   public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
