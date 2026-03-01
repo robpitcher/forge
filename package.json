@@ -103,6 +103,18 @@
           "default": "gpt-4.1",
           "description": "Model deployment name"
         },
+        "forge.copilot.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "gpt-4.1",
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "description": "Available model deployments for the model selector"
+        },
         "forge.copilot.wireApi": {
           "type": "string",
           "default": "completions",

@@ -40,6 +40,7 @@ const baseConfig: ExtensionConfig = {
   apiKey: "test-key-123",
   authMethod: "apiKey",
   model: "gpt-4.1",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
   toolShell: true,

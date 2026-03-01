@@ -155,7 +155,10 @@ describe("WebviewView chat panel", () => {
 
       const messages = getPostedMessages(mockView);
       const types = messages
-        .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+        .filter((m: unknown) => {
+          const t = (m as { type: string }).type;
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected";
+        })
         .map((m: unknown) => (m as { type: string }).type);
 
       expect(types[0]).toBe("streamStart");

@@ -8,6 +8,7 @@
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
+  const modelSelector = document.getElementById("modelSelector");
 
   let currentAssistantMessage = null;
   let isStreaming = false;
@@ -17,6 +18,9 @@
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
+  modelSelector.addEventListener("change", () => {
+    vscode.postMessage({ command: "modelChanged", model: modelSelector.value });
+  });
   attachSelectionBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachSelection" });
   });
@@ -328,6 +332,20 @@
         messages.forEach((msg) => {
           appendMessage(msg.role, msg.content);
         });
+        break;
+
+      case "modelsUpdated":
+        modelSelector.innerHTML = "";
+        (message.models || []).forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          modelSelector.appendChild(opt);
+        });
+        break;
+
+      case "modelSelected":
+        modelSelector.value = message.model;
         break;
     }
   });

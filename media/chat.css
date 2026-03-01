@@ -78,6 +78,19 @@ body {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  align-items: center;
+}
+
+#modelSelector {
+  padding: 4px 6px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 2px;
+  cursor: pointer;
+  margin-left: auto;
 }
 
 button {
