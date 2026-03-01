@@ -122,17 +122,6 @@ export interface ToolExecutionPartialResultEvent {
 }
 
 // ---------------------------------------------------------------------------
-// MCP Server configuration for local tool servers
-// ---------------------------------------------------------------------------
-
-/** Configuration for a local MCP server (stdio transport only — air-gap safe). */
-export interface McpServerConfig {
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-}
-
-// ---------------------------------------------------------------------------
 // Context items attached to prompts (workspace context)
 // ---------------------------------------------------------------------------
 

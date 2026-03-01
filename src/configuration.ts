@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { McpServerConfig } from "./types.js";
 
 export interface ExtensionConfig {
   endpoint: string;
@@ -14,6 +15,7 @@ export interface ExtensionConfig {
   toolWrite: boolean;
   toolUrl: boolean;
   toolMcp: boolean;
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 export interface ConfigValidationError {
@@ -37,6 +39,7 @@ export function getConfiguration(): ExtensionConfig {
     toolWrite: config.get<boolean>("tools.write", true),
     toolUrl: config.get<boolean>("tools.url", false),
     toolMcp: config.get<boolean>("tools.mcp", true),
+    mcpServers: config.get<Record<string, McpServerConfig>>("mcpServers") || undefined,
   };
 }
 
@@ -69,6 +72,39 @@ export function validateConfiguration(
       message:
         "Please set your API key via the ⚙️ gear menu → 'Set API Key (secure)'",
     });
+  }
+
+  if (config.mcpServers) {
+    for (const [name, server] of Object.entries(config.mcpServers)) {
+      const field = `forge.copilot.mcpServers.${name}`;
+      if (!server.command || typeof server.command !== "string") {
+        errors.push({
+          field,
+          message: `MCP server "${name}" requires a non-empty "command" string. Set the command to start the server process.`,
+        });
+      }
+      if (server.args !== undefined) {
+        if (!Array.isArray(server.args) || !server.args.every((a) => typeof a === "string")) {
+          errors.push({
+            field,
+            message: `MCP server "${name}" has invalid "args" — must be an array of strings.`,
+          });
+        }
+      }
+      if (server.env !== undefined) {
+        if (
+          typeof server.env !== "object" ||
+          server.env === null ||
+          Array.isArray(server.env) ||
+          !Object.values(server.env).every((v) => typeof v === "string")
+        ) {
+          errors.push({
+            field,
+            message: `MCP server "${name}" has invalid "env" — must be an object with string values.`,
+          });
+        }
+      }
+    }
   }
 
   return errors;
