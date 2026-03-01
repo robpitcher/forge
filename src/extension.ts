@@ -258,6 +258,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachFile");
     } else if (message.command === "openSettings") {
       await this.openSettings();
+    } else if (message.command === "openEndpointSettings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.endpoint");
     } else if (message.command === "signIn") {
       await vscode.commands.executeCommand("forge.signIn");
     } else if (message.command === "setApiKey") {

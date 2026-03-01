@@ -361,7 +361,7 @@
         const settingsLink = document.createElement("button");
         settingsLink.textContent = "Settings";
         settingsLink.addEventListener("click", () => {
-          vscode.postMessage({ command: "openSettings" });
+          vscode.postMessage({ command: "openEndpointSettings" });
         });
         banner.appendChild(settingsLink);
 
