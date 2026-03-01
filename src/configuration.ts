@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { McpServerConfig, RemoteMcpServerConfig } from "./types.js";
+import type { McpServerConfig, RemoteMcpSettings } from "./types.js";
 
 export interface ExtensionConfig {
   endpoint: string;
@@ -16,7 +16,7 @@ export interface ExtensionConfig {
   toolUrl: boolean;
   toolMcp: boolean;
   allowRemoteMcp?: boolean;
-  mcpServers?: Record<string, McpServerConfig | RemoteMcpServerConfig>;
+  mcpServers?: Record<string, McpServerConfig | RemoteMcpSettings>;
 }
 
 export interface ConfigValidationError {
@@ -41,7 +41,7 @@ export function getConfiguration(): ExtensionConfig {
     toolUrl: config.get<boolean>("tools.url", false),
     toolMcp: config.get<boolean>("tools.mcp", true),
     allowRemoteMcp: config.get<boolean>("mcpAllowRemote", false) || undefined,
-    mcpServers: config.get<Record<string, McpServerConfig | RemoteMcpServerConfig>>("mcpServers") || undefined,
+    mcpServers: config.get<Record<string, McpServerConfig | RemoteMcpSettings>>("mcpServers") || undefined,
   };
 }
 
@@ -82,6 +82,15 @@ export function validateConfiguration(
       const s = server as unknown as Record<string, unknown>;
       const hasCommand = "command" in s && s.command;
       const hasUrl = "url" in s && s.url;
+
+      if (hasCommand && hasUrl) {
+        errors.push({
+          field,
+          message: `MCP server "${name}" has both "command" and "url". Use "command" for local servers or "url" for remote servers, not both.`,
+        });
+        continue;
+      }
+
       const isRemote = hasUrl && !hasCommand;
       const isLocal = hasCommand;
 
@@ -95,7 +104,7 @@ export function validateConfiguration(
 
       if (isRemote) {
         // Remote server validation
-        const remote = server as RemoteMcpServerConfig;
+        const remote = server as RemoteMcpSettings;
         if (!config.allowRemoteMcp) {
           errors.push({
             field,

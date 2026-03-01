@@ -6,7 +6,7 @@ import type {
   MCPRemoteServerConfig,
   PermissionHandler,
   ProviderConfig,
-  RemoteMcpServerConfig,
+  RemoteMcpSettings,
   SessionMetadata,
   ConversationMetadata,
   ResumeSessionConfig,
@@ -90,7 +90,7 @@ function buildProviderConfig(config: ExtensionConfig, authToken: string): Provid
 /**
  * Builds MCP server configuration for the SDK's createSession/resumeSession.
  *
- * Maps our simplified McpServerConfig / RemoteMcpServerConfig to the SDK's
+ * Maps our simplified McpServerConfig / RemoteMcpSettings to the SDK's
  * MCPLocalServerConfig or MCPRemoteServerConfig shape. Supports both local
  * (stdio) and remote (HTTP/SSE) transports.
  */
@@ -102,7 +102,7 @@ function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocal
   const mcpServers: Record<string, MCPLocalServerConfig | MCPRemoteServerConfig> = {};
   for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
     if ('url' in serverConfig) {
-      const remote = serverConfig as RemoteMcpServerConfig;
+      const remote = serverConfig as RemoteMcpSettings;
       mcpServers[name] = {
         type: "http" as const,
         url: remote.url,

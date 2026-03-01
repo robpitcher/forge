@@ -94,6 +94,14 @@ describe("MCP server configuration (#90)", () => {
       expect(config.mcpServers).toBeUndefined();
     });
 
+    it("getConfiguration returns undefined mcpServers when empty object (VS Code default)", () => {
+      setupVscodeConfig({ mcpServers: {} });
+      const config = getConfiguration();
+      // Empty object is still truthy — getConfiguration preserves it
+      // buildMcpServersConfig handles the empty-object case
+      expect(config.mcpServers).toEqual({});
+    });
+
     it("getConfiguration reads mcpServers setting with single server", () => {
       setupVscodeConfig({
         mcpServers: {
@@ -310,6 +318,19 @@ describe("MCP server configuration (#90)", () => {
       const mcpErrors = errors.filter((e) => e.field.includes("mcpServers"));
       expect(mcpErrors).toHaveLength(0);
     });
+
+    it("validateConfiguration errors when server has both command and url", () => {
+      const config = configWith({
+        mcpServers: {
+          "ambiguous-server": { command: "node", url: "https://example.com/mcp" } as any,
+        },
+      });
+      const errors = validateConfiguration(config);
+      const mcpErrors = errors.filter((e) => e.field.includes("mcpServers"));
+      expect(mcpErrors).toHaveLength(1);
+      expect(mcpErrors[0].field).toContain("ambiguous-server");
+      expect(mcpErrors[0].message).toContain("both");
+    });
   });
 
   // =========================================================================
@@ -469,6 +490,22 @@ describe("MCP server configuration (#90)", () => {
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
       expect(mcpServers["no-headers"]).not.toHaveProperty("headers");
+    });
+
+    it("getOrCreateSession does not need to handle both command and url (caught by validation)", async () => {
+      // Ambiguous {command, url} configs are rejected by validateConfiguration()
+      // before they ever reach buildMcpServersConfig(). See the validation test:
+      // "validateConfiguration errors when server has both command and url"
+      const config = configWith({
+        allowRemoteMcp: true,
+        mcpServers: {
+          "valid-local": { command: "npx" },
+        },
+      });
+      await getOrCreateSession("conv-validated", config, "test-key-123");
+      const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
+      const mcpServers = sessionArgs.mcpServers as Record<string, Record<string, unknown>>;
+      expect(mcpServers["valid-local"]).toBeDefined();
     });
   });
 });

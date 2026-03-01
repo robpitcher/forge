@@ -38,7 +38,7 @@ export interface McpServerConfig {
 }
 
 /** Configuration for a remote (HTTP/SSE) MCP server. */
-export interface RemoteMcpServerConfig {
+export interface RemoteMcpSettings {
   url: string;
   headers?: Record<string, string>;
   command?: never;
@@ -47,7 +47,7 @@ export interface RemoteMcpServerConfig {
 }
 
 /** Union of local and remote MCP server configurations. */
-export type AnyMcpServerConfig = McpServerConfig | RemoteMcpServerConfig;
+export type AnyMcpServerConfig = McpServerConfig | RemoteMcpSettings;
 
 // ---------------------------------------------------------------------------
 // ProviderConfig — not re-exported by the SDK's public API, so defined here
