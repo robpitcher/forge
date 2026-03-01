@@ -87,6 +87,7 @@ export async function getOrCreateSession(
     model: config.model,
     provider,
     streaming: true,
+    ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 

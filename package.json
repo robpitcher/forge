@@ -109,6 +109,12 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
+        },
+        "forge.copilot.systemMessage": {
+          "type": "string",
+          "default": "",
+          "editPresentation": "multilineText",
+          "markdownDescription": "Custom system message **appended** to the SDK's default system prompt. Use this to tailor the AI's behavior (e.g., coding style, response format). Leave empty to use the SDK default. Takes effect on the next new conversation."
         }
       }
     }
