@@ -117,6 +117,7 @@ export async function getOrCreateSession(
   const toolConfig = buildToolConfig(config);
 
   const session = (await copilotClient.createSession({
+    sessionId: conversationId,
     model: config.model,
     provider,
     streaming: true,
@@ -187,9 +188,9 @@ function getSessionCount(): number {
  * 
  * Wraps the SDK's `client.listSessions()` and maps SessionMetadata to ConversationMetadata.
  */
-export async function listConversations(): Promise<ConversationMetadata[]> {
+export async function listConversations(config: ExtensionConfig): Promise<ConversationMetadata[]> {
   try {
-    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    const copilotClient = await getOrCreateClient(config);
     const sessionList: SessionMetadata[] = await copilotClient.listSessions();
     
     return sessionList.map((s) => ({
@@ -251,9 +252,9 @@ export async function resumeConversation(
  * 
  * Wraps the SDK's `client.getLastSessionId()`.
  */
-export async function getLastConversationId(): Promise<string | undefined> {
+export async function getLastConversationId(config: ExtensionConfig): Promise<string | undefined> {
   try {
-    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    const copilotClient = await getOrCreateClient(config);
     return await copilotClient.getLastSessionId();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -267,9 +268,9 @@ export async function getLastConversationId(): Promise<string | undefined> {
  * Wraps the SDK's `client.deleteSession()` and also removes the session
  * from the local sessions map if present.
  */
-export async function deleteConversation(sessionId: string): Promise<void> {
+export async function deleteConversation(sessionId: string, config: ExtensionConfig): Promise<void> {
   try {
-    const copilotClient = await getOrCreateClient({} as ExtensionConfig);
+    const copilotClient = await getOrCreateClient(config);
     await copilotClient.deleteSession(sessionId);
     
     // Remove from local map if present
