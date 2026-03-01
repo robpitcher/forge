@@ -115,7 +115,7 @@
 
     switch (message.type) {
       case "authStatus":
-        updateAuthBanner(message.status);
+        updateAuthBanner(message.status, message.hasEndpoint);
         break;
 
       case "streamStart":
@@ -328,7 +328,7 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  function updateAuthBanner(status) {
+  function updateAuthBanner(status, hasEndpoint) {
     let banner = document.getElementById("authBanner");
     if (!banner) {
       banner = document.createElement("div");
@@ -354,8 +354,24 @@
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
 
-      // Build inline text with clickable "Entra ID" and "configure an API key"
-      banner.appendChild(document.createTextNode("🔐 Set your endpoint in Settings. Sign in with "));
+      // Only show endpoint message if endpoint is not configured
+      if (!hasEndpoint) {
+        banner.appendChild(document.createTextNode("🔐 Set your endpoint in "));
+
+        const settingsLink = document.createElement("button");
+        settingsLink.textContent = "Settings";
+        settingsLink.addEventListener("click", () => {
+          vscode.postMessage({ command: "openSettings" });
+        });
+        banner.appendChild(settingsLink);
+
+        banner.appendChild(document.createTextNode(". "));
+      } else {
+        banner.appendChild(document.createTextNode("🔐 "));
+      }
+
+      // Auth options
+      banner.appendChild(document.createTextNode("Sign in with "));
 
       const entraLink = document.createElement("button");
       entraLink.textContent = "Entra ID";
@@ -369,7 +385,7 @@
       const apiKeyLink = document.createElement("button");
       apiKeyLink.textContent = "configure an API key";
       apiKeyLink.addEventListener("click", () => {
-        vscode.postMessage({ command: "openSettings" });
+        vscode.postMessage({ command: "setApiKey" });
       });
       banner.appendChild(apiKeyLink);
 

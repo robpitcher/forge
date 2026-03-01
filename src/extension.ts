@@ -159,7 +159,7 @@ async function updateAuthStatus(
     }
   }
   
-  provider.postAuthStatus(status);
+  provider.postAuthStatus(status, !!config.endpoint);
 }
 
 export async function deactivate(): Promise<void> {
@@ -183,8 +183,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "contextAttached", context });
   }
 
-  public postAuthStatus(status: AuthStatus): void {
-    this._view?.webview.postMessage({ type: "authStatus", status });
+  public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
   public resolveWebviewView(
@@ -210,8 +210,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     
     // Send initial auth status
     getConfigurationAsync(this._secrets)
-      .then((config) => checkAuthStatus(config, this._secrets))
-      .then((status) => this.postAuthStatus(status))
+      .then(async (config) => {
+        const status = await checkAuthStatus(config, this._secrets);
+        this.postAuthStatus(status, !!config.endpoint);
+      })
       .catch(() => {
         // Silent failure — status bar will show the error
       });
@@ -258,6 +260,16 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this.openSettings();
     } else if (message.command === "signIn") {
       await vscode.commands.executeCommand("forge.signIn");
+    } else if (message.command === "setApiKey") {
+      const value = await vscode.window.showInputBox({
+        prompt: "Enter your API key",
+        password: true,
+        placeHolder: "Paste your Azure AI Foundry API key",
+      });
+      if (value !== undefined) {
+        await this._secrets.store("forge.copilot.apiKey", value);
+        await vscode.window.showInformationMessage("API key stored securely.");
+      }
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
