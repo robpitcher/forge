@@ -48,10 +48,20 @@ export async function checkAuthStatus(
   }
 
   // apiKey mode — check if key exists
-  const apiKey = await secrets.get("forge.copilot.apiKey");
-  if (apiKey && apiKey.trim().length > 0) {
-    return { state: "authenticated", method: "apiKey" };
-  }
+  try {
+    const apiKey = await secrets.get("forge.copilot.apiKey");
+    if (apiKey && apiKey.trim().length > 0) {
+      return { state: "authenticated", method: "apiKey" };
+    }
 
-  return { state: "notAuthenticated", reason: "No API key set" };
+    return { state: "notAuthenticated", reason: "No API key set" };
+  } catch (error) {
+    return {
+      state: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to read API key from secret storage",
+    };
+  }
 }
