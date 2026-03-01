@@ -317,7 +317,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     // Reset dedup state so initial status always goes through
     this._lastAuthStatus = undefined;
     
-    // Send initial auth status
+    // Send initial auth status and model list
     getConfigurationAsync(this._secrets)
       .then(async (config) => {
         const status = await checkAuthStatus(config, this._secrets);
@@ -780,7 +780,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler());
+      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler(), this._currentMode);
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState
@@ -849,9 +849,16 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         <div id="conversationList" class="conversation-list hidden"></div>
         <div id="chatMessages"></div>
         <div class="input-area">
-            <div class="context-actions">
-                <button class="context-btn" id="attachSelection">📎 Selection</button>
-                <button class="context-btn" id="attachFile">📄 File</button>
+            <div class="input-top-row">
+                <div class="context-actions">
+                    <button class="context-btn" id="attachSelection">📎 Selection</button>
+                    <button class="context-btn" id="attachFile">📄 File</button>
+                </div>
+                <div class="mode-selector" id="modeSelector">
+                    <button class="mode-btn" data-mode="chat" title="Chat — read-only, no tool execution">💬 Chat</button>
+                    <button class="mode-btn active" data-mode="agent" title="Agent — full agentic mode with tools">🤖 Agent</button>
+                    <button class="mode-btn" data-mode="plan" title="Plan — agent plans before acting">📋 Plan</button>
+                </div>
             </div>
             <div id="contextChips"></div>
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>

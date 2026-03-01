@@ -8,6 +8,7 @@
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
+  const modeSelector = document.getElementById("modeSelector");
 
   let currentAssistantMessage = null;
   let isStreaming = false;
@@ -22,6 +23,17 @@
   });
   attachFileBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachFile" });
+  });
+
+  // Mode selector
+  modeSelector.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mode-btn");
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    if (!mode) return;
+    modeSelector.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    vscode.postMessage({ command: "modeChanged", mode });
   });
 
   userInput.addEventListener("keydown", (e) => {
@@ -328,6 +340,14 @@
         messages.forEach((msg) => {
           appendMessage(msg.role, msg.content);
         });
+        break;
+
+      case "modeUpdated":
+        if (message.mode && modeSelector) {
+          modeSelector.querySelectorAll(".mode-btn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.mode === message.mode);
+          });
+        }
         break;
     }
   });

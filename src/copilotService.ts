@@ -122,28 +122,68 @@ function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocal
   return mcpServers;
 }
 
+/** The three chat modes supported by the extension. */
+export type ChatMode = "chat" | "agent" | "plan";
+
+/** Tools excluded in Chat mode \u2014 read-only, no modifications. */
+const CHAT_MODE_EXCLUDED_TOOLS = ["shell", "write", "url", "mcp"];
+
+/** System message prefix prepended in Plan mode. */
+const PLAN_MODE_SYSTEM_PREFIX =
+  "Before executing any actions, first create a step-by-step plan and present it to the user for approval.";
+
 /**
- * Builds tool configuration from individual boolean settings.
+ * Builds tool configuration from individual boolean settings and the active chat mode.
  */
-function buildToolConfig(config: ExtensionConfig): Record<string, unknown> {
+export function buildToolConfig(config: ExtensionConfig, mode: ChatMode = "agent"): Record<string, unknown> {
   const excludedTools: string[] = [];
-  if (!config.toolShell) excludedTools.push("shell");
+
+  if (mode === "chat") {
+    for (const tool of CHAT_MODE_EXCLUDED_TOOLS) {
+      if (!excludedTools.includes(tool)) {
+        excludedTools.push(tool);
+      }
+    }
+  } else {
+    if (!config.toolShell) excludedTools.push("shell");
+    if (!config.toolWrite) excludedTools.push("write");
+    if (!config.toolUrl) excludedTools.push("url");
+    if (!config.toolMcp) excludedTools.push("mcp");
+  }
+
+  // Read tool is always governed by the per-tool setting
   if (!config.toolRead) excludedTools.push("read");
-  if (!config.toolWrite) excludedTools.push("write");
-  if (!config.toolUrl) excludedTools.push("url");
-  if (!config.toolMcp) excludedTools.push("mcp");
-  
+
   if (excludedTools.length > 0) {
     return { excludedTools };
   }
   return {};
 }
 
+/**
+ * Builds the system message, merging user config with mode-specific prefixes.
+ */
+function buildSystemMessage(config: ExtensionConfig, mode: ChatMode): { content: string } | undefined {
+  const parts: string[] = [];
+  if (mode === "plan") {
+    parts.push(PLAN_MODE_SYSTEM_PREFIX);
+  }
+  if (config.systemMessage) {
+    parts.push(config.systemMessage);
+  }
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return { content: parts.join("\n\n") };
+}
+
+
 export async function getOrCreateSession(
   conversationId: string,
   config: ExtensionConfig,
   authToken: string,
   onPermissionRequest?: PermissionHandler,
+  mode: ChatMode = "agent",
 ): Promise<ICopilotSession> {
   const existing = sessions.get(conversationId);
   if (existing) {
@@ -152,8 +192,9 @@ export async function getOrCreateSession(
 
   const copilotClient = await getOrCreateClient(config);
   const provider = buildProviderConfig(config, authToken);
-  const toolConfig = buildToolConfig(config);
+  const toolConfig = buildToolConfig(config, mode);
   const mcpServers = buildMcpServersConfig(config);
+  const systemMessage = buildSystemMessage(config, mode);
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
@@ -162,7 +203,7 @@ export async function getOrCreateSession(
     streaming: true,
     ...toolConfig,
     ...(mcpServers && { mcpServers }),
-    ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
+    ...(systemMessage && { systemMessage }),
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 
@@ -256,12 +297,14 @@ export async function resumeConversation(
   config: ExtensionConfig,
   authToken: string,
   onPermissionRequest?: PermissionHandler,
+  mode: ChatMode = "agent",
 ): Promise<ICopilotSession> {
   try {
     const copilotClient = await getOrCreateClient(config);
     const provider = buildProviderConfig(config, authToken);
-    const toolConfig = buildToolConfig(config);
+    const toolConfig = buildToolConfig(config, mode);
     const mcpServers = buildMcpServersConfig(config);
+    const systemMessage = buildSystemMessage(config, mode);
 
     const resumeConfig: ResumeSessionConfig = {
       model: config.model,
@@ -269,7 +312,7 @@ export async function resumeConversation(
       streaming: true,
       ...toolConfig,
       ...(mcpServers && { mcpServers }),
-      ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
+      ...(systemMessage && { systemMessage }),
       ...(onPermissionRequest && { onPermissionRequest }),
     };
 

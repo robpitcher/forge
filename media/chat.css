@@ -169,7 +169,46 @@ button:active {
 .context-actions {
   display: flex;
   gap: 8px;
+}
+
+.input-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+/* Mode Selector */
+.mode-selector {
+  display: flex;
+  gap: 2px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.mode-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.mode-btn:hover {
+  opacity: 0.9;
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.mode-btn.active {
+  opacity: 1;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
 }
 
 .context-btn {
