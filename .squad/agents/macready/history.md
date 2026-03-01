@@ -452,3 +452,34 @@
 5. Breaking signature change on `getOrCreateSession()` requires coordinated work
 
 **Decision document:** `.squad/decisions/inbox/macready-entra-auth-design.md`
+
+### 2026-02-28: Copilot Instructions — Coding Standards Expansion
+
+**Requested by:** Rob Pitcher
+
+**Work Completed:**
+- Expanded `.github/copilot-instructions.md` with 8 new sections (Project Overview, Architecture & File Ownership, Copilot SDK Conventions, TypeScript Conventions, Testing Conventions, VS Code Extension Conventions, Error Handling Standards, Security)
+- Preserved existing Branching Strategy and Squad Integration sections
+- Branch: `squad/copilot-instructions-standards`, pushed to origin
+
+**Conventions Documented:**
+1. BYOK provider config pattern (`type: "openai"`, `baseUrl`, `apiKey`/`bearerToken`, `wireApi`)
+2. Named event handler pattern (`.on(eventName, handler)` returning unsubscribe fn)
+3. `session.send({ prompt })` not `session.sendMessage()`
+4. `bearerToken` static string limitation (no refresh callback, see #27)
+5. `availableTools: []` for MVP
+6. `import type` for type-only imports, `.js` extensions in import paths
+7. Mock patterns: `DefaultAzureCredential` as class, `SecretStorage` shape, async `createCredentialProvider`
+8. WebviewView message protocol (8 extension→webview types, 2 webview→extension types)
+9. "Never throws" contract: catch ALL async ops including SecretStorage
+10. Air-gap compliance: no external calls except Azure AI Foundry endpoint
+
+**Key File Paths Referenced:**
+- `.github/copilot-instructions.md` — the file modified
+- `src/extension.ts`, `src/copilotService.ts`, `src/configuration.ts` — core modules
+- `src/auth/credentialProvider.ts`, `src/auth/authStatusProvider.ts` — auth layer
+- `src/types.ts`, `media/chat.js`, `media/chat.css` — types and webview
+- `src/test/__mocks__/`, `src/test/webview-test-helpers.ts` — test infrastructure
+- `.squad/skills/copilot-sdk-byok/SKILL.md`, `.squad/skills/copilot-sdk-cookbook/SKILL.md`, `.squad/skills/copilot-sdk-nodejs-api/SKILL.md` — SDK reference skills consulted
+
+**Decision document:** `.squad/decisions/inbox/macready-copilot-instructions-standards.md`
