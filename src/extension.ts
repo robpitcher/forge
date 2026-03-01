@@ -206,7 +206,11 @@ async function updateAuthStatus(
   switch (status.state) {
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
-      statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      if (status.method === "entraId" && status.account) {
+        statusBarItem.tooltip = `Signed in as ${status.account} (Entra ID)`;
+      } else {
+        statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      }
       statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
@@ -244,6 +248,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _toolNames = new Map<string, string>();
 
   private _refreshAuthStatus?: () => void;
+  private _lastAuthStatus?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -268,6 +273,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    // Deduplicate authStatus messages to prevent banner flashing every 30s
+    const statusKey = JSON.stringify({ status, hasEndpoint: !!hasEndpoint });
+    if (this._lastAuthStatus === statusKey) {
+      return; // Status unchanged, skip posting to webview
+    }
+    this._lastAuthStatus = statusKey;
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
@@ -291,6 +302,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
+    
+    // Reset dedup state so initial status always goes through
+    this._lastAuthStatus = undefined;
     
     // Send initial auth status
     getConfigurationAsync(this._secrets)
