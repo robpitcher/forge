@@ -16,8 +16,6 @@ import type {
   SessionErrorEvent,
   PermissionRequest,
   PermissionRequestResult,
-  ToolExecutionStartEvent,
-  ToolExecutionCompleteEvent,
   ContextItem,
 } from "./types.js";
 
@@ -245,7 +243,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _isProcessing = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
-  private _toolNames = new Map<string, string>();
 
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
@@ -563,8 +560,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubDelta();
         unsubIdle();
         unsubError();
-        unsubToolStart();
-        unsubToolComplete();
       };
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
@@ -572,28 +567,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           this._view?.webview.postMessage({
             type: "streamDelta",
             content: event.data.deltaContent,
-          });
-        }
-      });
-
-      const unsubToolStart = session.on("tool.execution_start", (event: ToolExecutionStartEvent) => {
-        if (event?.data?.toolCallId && event?.data?.toolName) {
-          this._toolNames.set(event.data.toolCallId, event.data.toolName);
-        }
-      });
-
-      const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
-        if (event?.data?.toolCallId) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
-          this._toolNames.delete(event.data.toolCallId);
-          this._view?.webview.postMessage({
-            type: "toolResult",
-            id: event.data.toolCallId,
-            tool: toolName,
-            status: event.data.success ? "success" : "error",
-            output: event.data.success
-              ? (event.data.result?.content ?? "")
-              : (event.data.error?.message ?? "Tool execution failed"),
           });
         }
       });
@@ -680,7 +653,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       resolver(false);
     }
     this._pendingPermissions.clear();
-    this._toolNames.clear();
   }
 
   private _postError(message: string): void {

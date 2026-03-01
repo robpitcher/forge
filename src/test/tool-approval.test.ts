@@ -9,8 +9,7 @@
  *   1. Session created WITHOUT `availableTools: []` (tools enabled)
  *   2. SDK emits permission request → extension forwards to webview as `toolConfirmation`
  *   3. User approves/denies in webview → extension calls SDK confirmation API
- *   4. SDK emits `tool.execution_complete` → extension posts `toolResult` to webview
- *   5. `autoApproveTools` config bypasses the webview prompt
+ *   4. `autoApproveTools` config bypasses the webview prompt
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as vscode from "vscode";
@@ -340,28 +339,7 @@ describe("Tool approval flow (#25)", () => {
   });
 
   // =========================================================================
-  // 4. Tool result rendering
-  // =========================================================================
-  describe("tool result rendering", () => {
-    it.todo(
-      "posts toolResult with success status after tool.execution_complete with success=true"
-      // Expected: SDK emits tool.execution_complete event with
-      // { data: { toolCallId: "tc-1", success: true, result: { content: "..." } } }
-      // → extension posts { type: "toolResult", toolCallId: "tc-1",
-      // success: true, content: "..." } to webview.
-    );
-
-    it.todo(
-      "posts toolResult with error status after tool.execution_complete with success=false"
-      // Expected: SDK emits tool.execution_complete with
-      // { data: { toolCallId: "tc-1", success: false, error: { message: "denied" } } }
-      // → extension posts { type: "toolResult", toolCallId: "tc-1",
-      // success: false, error: "denied" } to webview.
-    );
-  });
-
-  // =========================================================================
-  // 5. Edge cases
+  // 4. Edge cases
   // =========================================================================
   describe("edge cases", () => {
     it.todo(
