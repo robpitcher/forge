@@ -2,6 +2,7 @@ import { ExtensionConfig } from "./configuration.js";
 import type {
   CopilotClient,
   ICopilotSession,
+  MCPLocalServerConfig,
   PermissionHandler,
   ProviderConfig,
   SessionMetadata,
@@ -85,6 +86,30 @@ function buildProviderConfig(config: ExtensionConfig, authToken: string): Provid
 }
 
 /**
+ * Builds MCP server configuration for the SDK's createSession/resumeSession.
+ *
+ * Maps our simplified McpServerConfig to the SDK's MCPLocalServerConfig shape.
+ * Only "local" (stdio) transport is supported — air-gap safe, no remote servers.
+ */
+function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocalServerConfig> | undefined {
+  if (!config.mcpServers || Object.keys(config.mcpServers).length === 0) {
+    return undefined;
+  }
+
+  const mcpServers: Record<string, MCPLocalServerConfig> = {};
+  for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+    mcpServers[name] = {
+      type: "local" as const,
+      command: serverConfig.command,
+      args: serverConfig.args ?? [],
+      tools: ["*"],
+      ...(serverConfig.env && { env: serverConfig.env }),
+    };
+  }
+  return mcpServers;
+}
+
+/**
  * Builds tool configuration from individual boolean settings.
  */
 function buildToolConfig(config: ExtensionConfig): Record<string, unknown> {
@@ -115,6 +140,7 @@ export async function getOrCreateSession(
   const copilotClient = await getOrCreateClient(config);
   const provider = buildProviderConfig(config, authToken);
   const toolConfig = buildToolConfig(config);
+  const mcpServers = buildMcpServersConfig(config);
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
@@ -122,6 +148,7 @@ export async function getOrCreateSession(
     provider,
     streaming: true,
     ...toolConfig,
+    ...(mcpServers && { mcpServers }),
     ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
@@ -221,12 +248,14 @@ export async function resumeConversation(
     const copilotClient = await getOrCreateClient(config);
     const provider = buildProviderConfig(config, authToken);
     const toolConfig = buildToolConfig(config);
+    const mcpServers = buildMcpServersConfig(config);
 
     const resumeConfig: ResumeSessionConfig = {
       model: config.model,
       provider,
       streaming: true,
       ...toolConfig,
+      ...(mcpServers && { mcpServers }),
       ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
       ...(onPermissionRequest && { onPermissionRequest }),
     };

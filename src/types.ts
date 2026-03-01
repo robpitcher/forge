@@ -19,10 +19,22 @@ export type {
   SessionMetadata,
   SessionListFilter,
   ResumeSessionConfig,
+  MCPLocalServerConfig,
 } from "@github/copilot-sdk";
 
 // Re-export the SDK's CopilotClient class type — it already covers start/stop/createSession.
 export type CopilotClient = SDKCopilotClient;
+
+// ---------------------------------------------------------------------------
+// MCP server configuration (#90)
+// ---------------------------------------------------------------------------
+
+/** Configuration for a local MCP server. */
+export interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
 
 // ---------------------------------------------------------------------------
 // ProviderConfig — not re-exported by the SDK's public API, so defined here
@@ -107,6 +119,17 @@ export interface ToolExecutionPartialResultEvent {
     toolCallId: string;
     partialOutput: string;
   };
+}
+
+// ---------------------------------------------------------------------------
+// MCP Server configuration for local tool servers
+// ---------------------------------------------------------------------------
+
+/** Configuration for a local MCP server (stdio transport only — air-gap safe). */
+export interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
