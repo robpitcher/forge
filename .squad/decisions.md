@@ -2086,3 +2086,40 @@ updateAuthStatus(...).catch((err) => {
 3. Replace all `console.warn/error` with OutputChannel
 4. Add await + try-catch to all async cleanup operations
 5. Update error messages to be actionable (already mostly done, but verify consistency)
+
+---
+
+### 2026-03-10: Update Endpoint Examples to `.services.ai.azure.com` Format
+
+**By:** Fuchs (Technical Writer)  
+**Requestor:** Rob Pitcher
+
+## Summary
+
+Updated all documentation example URLs from the legacy `.openai.azure.com` domain to the current Azure AI Foundry generic format `.services.ai.azure.com`. This brings documentation in sync with Azure's current endpoint naming conventions.
+
+## Files Changed
+
+1. **README.md** — 3 endpoint examples in Quick Start, Core Settings, and Example Configuration sections
+2. **docs/configuration-reference.md** — 15+ endpoint examples across Settings Reference, Wire API Setting, Endpoint URL Format (including Anatomy section), API Key Retrieval, Example Configurations, and Troubleshooting sections
+3. **.github/copilot-instructions.md** — 1 example in BYOK Provider Config comment (line 98)
+4. **specs/PRD-airgapped-copilot-vscode-extension.md** — 1 example in FR6 settings table (line 170)
+
+## Rationale
+
+- `.services.ai.azure.com` is Azure's current generic endpoint format for AI Foundry
+- `.openai.azure.com` examples were creating confusion in air-gapped deployment scenarios
+- Both domains are valid Azure endpoints; the SDK's `isAzure` regex (`/\.azure\.com/i`) matches both
+- Rob confirmed `.services.ai.azure.com` is the standard format today
+
+## Backward Compatibility
+
+Added clarifying note in configuration-reference.md explaining both `.services.ai.azure.com` and `.openai.azure.com` endpoints are valid Azure endpoints and will continue to work. Documentation now emphasizes the current standard without breaking existing deployments.
+
+---
+
+### Update endpoint example URL to services.ai.azure.com
+**By:** Blair
+**Date:** 2025-07-24
+**What:** Updated user-facing example endpoint URL from `https://myresource.openai.azure.com/` to `https://myresource.services.ai.azure.com/` in `package.json` settings description and `src/configuration.ts` validation error message. The `isAzure` regex (`/\.azure\.com/i`) was intentionally left unchanged — it matches both formats, so no logic change was needed. This is a docs-only change to reflect Azure AI Foundry's current generic endpoint format.
+**Why:** Azure AI Foundry now uses `services.ai.azure.com` as the standard endpoint format. The old `openai.azure.com` still works but is no longer the recommended example for new users.
