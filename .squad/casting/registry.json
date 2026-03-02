@@ -47,6 +47,22 @@
       "created_at": "2026-03-01T22:24:00Z",
       "legacy_named": false,
       "status": "active"
+    },
+    "norris": {
+      "persistent_name": "Norris",
+      "universe": "The Thing",
+      "role": "Security Specialist",
+      "created_at": "2026-03-02T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "copper": {
+      "persistent_name": "Copper",
+      "universe": "The Thing",
+      "role": "Code Reviewer",
+      "created_at": "2026-03-02T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
     }
   }
 }

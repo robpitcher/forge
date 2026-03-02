@@ -9,7 +9,9 @@ How to decide who handles what.
 | Architecture, scope, trade-offs | MacReady | Extension structure, SDK integration patterns, session lifecycle design |
 | VS Code Extension API, chat participant, streaming UI | Blair | Chat participant registration, response rendering, cancellation handling |
 | Copilot SDK, BYOK config, session management | Childs | CopilotClient lifecycle, session creation, provider config, SDK events |
-| Code review | MacReady | Review PRs, check quality, suggest improvements |
+| Code review (quality, patterns, bugs) | Copper | Code quality, error handling, TypeScript patterns, dead code |
+| Security review, auth audit, CSP | Norris | XSS prevention, secret handling, auth flow, dependency vulns, air-gap compliance |
+| Architecture review | MacReady | Review PRs, check quality, suggest improvements |
 | Testing, error paths, validation | Windows | Write tests, find edge cases, verify air-gap behavior, error handling |
 | Scope & priorities | MacReady | What to build next, trade-offs, decisions |
 | Packaging & distribution (.vsix) | Palmer | esbuild bundling, vsce package, sideloading, release automation |
@@ -30,6 +32,8 @@ How to decide who handles what.
 | `squad:windows` | Testing task | Windows |
 | `squad:palmer` | DevOps / CI/CD / packaging task | Palmer |
 | `squad:fuchs` | Documentation task | Fuchs |
+| `squad:norris` | Security review task | Norris |
+| `squad:copper` | Code quality review task | Copper |
 | `squad:copilot` | Assign to @copilot for autonomous work (if enabled) | @copilot 🤖 |
 
 ### How Issue Assignment Works

@@ -18,6 +18,8 @@
 | Windows | Tester | `.squad/agents/windows/charter.md` | ✅ Active |
 | Palmer | DevOps | `.squad/agents/palmer/charter.md` | ✅ Active |
 | Fuchs | Technical Writer | `.squad/agents/fuchs/charter.md` | ✅ Active |
+| Norris | Security Specialist | `.squad/agents/norris/charter.md` | ✅ Active |
+| Copper | Code Reviewer | `.squad/agents/copper/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 
