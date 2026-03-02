@@ -152,24 +152,24 @@
     );
     steps.appendChild(step1);
 
-    // Step 2: Auth
+    // Step 2: Model
     const step2 = createSetupStep(
-      2, hasAuth,
+      2, hasModels,
+      "Add a model",
+      "Configure your model deployment name(s)",
+      [{ label: "Open Model Settings", command: "openModelSettings" }]
+    );
+    steps.appendChild(step2);
+
+    // Step 3: Auth
+    const step3 = createSetupStep(
+      3, hasAuth,
       "Authenticate",
       "Sign in with Entra ID or provide an API key",
       [
         { label: "Sign in with Entra ID", command: "signIn" },
         { label: "Set API Key", command: "setApiKey" },
       ]
-    );
-    steps.appendChild(step2);
-
-    // Step 3: Model
-    const step3 = createSetupStep(
-      3, hasModels,
-      "Add a model",
-      "Configure your model deployment name(s)",
-      [{ label: "Open Model Settings", command: "openSettings" }]
     );
     steps.appendChild(step3);
 
