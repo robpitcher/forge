@@ -24,6 +24,14 @@ export const window = {
   showQuickPick: vi.fn().mockResolvedValue(undefined),
   showInputBox: vi.fn().mockResolvedValue(undefined),
   showInformationMessage: vi.fn().mockResolvedValue(undefined),
+  createOutputChannel: vi.fn().mockReturnValue({
+    appendLine: vi.fn(),
+    append: vi.fn(),
+    clear: vi.fn(),
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  }),
   createStatusBarItem: vi.fn().mockReturnValue({
     text: "",
     tooltip: "",

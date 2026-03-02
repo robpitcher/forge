@@ -95,7 +95,7 @@
         "forge.copilot.endpoint": {
           "type": "string",
           "default": "",
-          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
+          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/)"
         },
         "forge.copilot.models": {
           "type": "array",

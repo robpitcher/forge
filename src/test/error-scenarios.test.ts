@@ -355,3 +355,157 @@ describe("Error: WebviewView error paths", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// M24 — _rewriteAuthError tests (private method tested via error message output)
+// ---------------------------------------------------------------------------
+describe("Error: auth error rewriting (_rewriteAuthError)", () => {
+  let mockSession: ReturnType<typeof createMockSession>;
+  let mockClient: MockClient;
+  let capturedProvider: {
+    resolveWebviewView: (
+      view: unknown,
+      context: unknown,
+      token: unknown
+    ) => void;
+  };
+  let mockView: MockWebviewView;
+
+  function setupRewriteProvider(settings: Record<string, string>, secretApiKey?: string) {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn(
+        (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
+      ),
+    } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+
+    const mockExtContext = {
+      subscriptions: [] as { dispose: () => void }[],
+      extensionUri: { toString: () => "mock-ext-uri" },
+      secrets: {
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
+        ),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+      workspaceState: {
+        get: vi.fn().mockReturnValue(undefined),
+        update: vi.fn().mockResolvedValue(undefined),
+        keys: vi.fn().mockReturnValue([]),
+      },
+    };
+    activate(mockExtContext as unknown as import("vscode").ExtensionContext);
+
+    const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+    capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+
+    mockView = createMockWebviewView();
+    capturedProvider.resolveWebviewView(
+      mockView,
+      createMockResolveContext(),
+      createMockCancellationToken()
+    );
+  }
+
+  const providerSettings = {
+    endpoint: "https://example.com",
+    authMethod: "apiKey",
+    apiKey: "",
+    wireApi: "completions",
+    cliPath: "",
+  };
+
+  beforeEach(() => {
+    mockSession = createMockSession();
+    mockClient = createMockClient(mockSession);
+    setMockClient(mockClient);
+  });
+
+  afterEach(async () => {
+    await stopClient();
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
+  });
+
+  it("rewrites error containing '401' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Request failed with status 401"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("gear icon"))).toBe(true);
+  });
+
+  it("rewrites error containing 'unauthorized' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Unauthorized access to resource"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+  });
+
+  it("rewrites error containing 'authorization' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Authorization header is missing"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+  });
+
+  it("does not rewrite errors without auth keywords", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Network timeout after 30s"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("Network timeout after 30s"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("API key is missing"))).toBe(false);
+  });
+
+  it("rewrites error containing '/login' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Redirect to /login required"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+  });
+});

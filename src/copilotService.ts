@@ -72,6 +72,8 @@ function buildProviderConfig(config: ExtensionConfig, authToken: string): Provid
   // Auth strategy:
   // - apiKey mode: static API key passed as `apiKey` in ProviderConfig.
   // - entraId mode: bearer token from DefaultAzureCredential passed as `bearerToken`.
+  //   NOTE: bearerToken is static — Entra ID tokens expire after ~1hr.
+  //   Long sessions may need session rotation. Tracked in #27.
   //   Session-per-conversation means token refresh at session creation is sufficient
   //   (~1 hr token lifetime).
   // TODO(#27): If Copilot SDK adds native Entra / managed-identity support, refactor
@@ -111,6 +113,7 @@ function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocal
         ...(remote.headers && { headers: remote.headers }),
       };
     } else {
+      console.warn(`[forge] MCP server "${name}" configured with command: ${serverConfig.command}`);
       mcpServers[name] = {
         type: "local" as const,
         command: serverConfig.command,
@@ -126,7 +129,7 @@ function buildMcpServersConfig(config: ExtensionConfig): Record<string, MCPLocal
 /**
  * Builds tool configuration from individual boolean settings.
  */
-function buildToolConfig(config: ExtensionConfig): Record<string, unknown> {
+function buildToolConfig(config: ExtensionConfig): { excludedTools?: string[] } {
   const excludedTools: string[] = [];
   if (!config.toolShell) excludedTools.push("shell");
   if (!config.toolRead) excludedTools.push("read");
@@ -172,11 +175,16 @@ export async function getOrCreateSession(
     ...(onPermissionRequest && { onPermissionRequest }),
   })) as unknown as ICopilotSession;
 
+  if (typeof session.send !== 'function' || typeof session.on !== 'function') {
+    throw new Error('SDK session shape mismatch — check @github/copilot-sdk version');
+  }
+
   sessions.set(conversationId, session);
   sessionConfigHashes.set(conversationId, configHash);
   return session;
 }
 
+/** Removes session from cache WITHOUT aborting. Use destroySession() for clean cleanup. */
 export function removeSession(conversationId: string): void {
   sessions.delete(conversationId);
   sessionConfigHashes.delete(conversationId);
@@ -227,10 +235,6 @@ export async function destroyAllSessions(): Promise<void> {
   await Promise.all(abortPromises);
   sessions.clear();
   sessionConfigHashes.clear();
-}
-
-function getSessionCount(): number {
-  return sessions.size;
 }
 
 /**
@@ -288,6 +292,10 @@ export async function resumeConversation(
       sessionId,
       resumeConfig
     )) as unknown as ICopilotSession;
+
+    if (typeof session.send !== 'function' || typeof session.on !== 'function') {
+      throw new Error('SDK session shape mismatch — check @github/copilot-sdk version');
+    }
 
     // Store in local sessions map so it can be managed alongside new sessions
     sessions.set(sessionId, session);

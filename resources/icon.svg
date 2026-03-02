@@ -1,5 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 2L3 7v6c0 5.25 3.75 10.14 9 11.25C17.25 23.14 21 18.25 21 13V7l-9-5z"/>
-  <circle cx="12" cy="11" r="2"/>
-  <path d="M12 13v3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <!-- Anvil: top plate with horn -->
+  <path d="M3 13 L7 12 L18 12 L18 14 L7 14 Z"/>
+  <!-- Anvil: tapered body -->
+  <path d="M9 14 L16 14 L15.5 18 L9.5 18 Z"/>
+  <!-- Anvil: base -->
+  <path d="M7 18 L18 18 L18 20 L7 20 Z"/>
+  <!-- Hammer handle -->
+  <path d="M12 11 L17 6 L18 7 L13 12 Z"/>
+  <!-- Hammer head -->
+  <path d="M15.5 3.5 L19.5 7.5 L18.5 8.5 L14.5 4.5 Z"/>
+  <!-- Sparks -->
+  <path d="M9 9 L10 8 L11 9 L10 10 Z"/>
+  <path d="M7.2 10.5 L8 9.7 L8.8 10.5 L8 11.3 Z"/>
+  <path d="M10.7 6.5 L11.5 5.7 L12.3 6.5 L11.5 7.3 Z"/>
 </svg>

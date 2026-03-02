@@ -13,13 +13,19 @@ Six domain reviewers audited the entire Forge codebase on `claude-opus-4.6`. The
 
 **Totals across all reviewers:**
 
-| Severity | Count |
-|----------|-------|
-| 🔴 Critical | 4 |
-| 🟠 High | 9 |
-| 🟡 Medium | 25 |
-| 🟢 Low | 11 |
-| ℹ️ Info | 10 |
+| Severity | Count | Resolved | Deferred |
+|----------|-------|----------|----------|
+| 🔴 Critical | 4 | 2 ✅ | 2 → #103/#104 |
+| 🟠 High | 9 | 5 ✅ | 4 → #103/#104 |
+| 🟡 Medium | 25 | 25 ✅ | 0 |
+| 🟢 Low | 11 | 0 | — |
+| ℹ️ Info | 10 | 0 | — |
+
+**Resolution PRs:**
+- PR #113 — Critical + High fixes (merged)
+- PR #114 — All 25 Medium fixes (open)
+- C1, C2, H7, H8 — Deferred to #103 (CI) and #104 (Release pipeline)
+- H5, H6 — Follow-up work (webview message queuing)
 
 ---
 
