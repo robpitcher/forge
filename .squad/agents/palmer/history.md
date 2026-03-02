@@ -22,3 +22,9 @@
 - **tsconfig `declaration: true` is unnecessary** — esbuild bundles, tsc only typechecks with `--noEmit`.
 - **TypeScript strict mode enabled** — all good. 198 tests passing, typecheck clean.
 - **Next actions:** Fix all 4 CI workflows (npm ci + build + lint + typecheck + npm test), add .vsix packaging to releases, fix endpoint example, add clean step to package script.
+
+### CI Workflow — ready_for_review trigger (Issue #104)
+- **Added `ready_for_review` to `pull_request.types`** in `.github/workflows/ci.yml` so CI runs when draft PRs are marked ready for review.
+- **Key file:** `.github/workflows/ci.yml` — the replacement CI pipeline (replaces broken `squad-ci.yml` which used `node --test`).
+- **Pipeline order:** npm ci → lint → typecheck → build → test. This is the correct full validation sequence.
+- **Branch triggers kept broad:** `pull_request` on `[dev, main]`, `push` on `[dev]`. Do not narrow — this workflow is the primary CI for all PRs.

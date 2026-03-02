@@ -16,9 +16,9 @@ vi.mock("../auth/authStatusProvider.js", () => ({
 }));
 
 describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let commandCallbacks: Record<string, (...args: any[]) => any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let capturedProvider: any;
 
   function setupValidConfig() {
@@ -82,7 +82,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
 
     // Capture command registrations
     vi.mocked(vscode.commands.registerCommand).mockImplementation(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (command: string, callback: (...args: any[]) => any) => {
         commandCallbacks[command] = callback;
         return { dispose: vi.fn() };
@@ -130,7 +130,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     vi.mocked(vscode.commands.registerCommand).mockClear();
     vi.mocked(vscode.commands.executeCommand).mockClear();
     vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (vscode.window as any).activeTextEditor = undefined;
   });
 
@@ -142,7 +142,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
 
   describe("no active editor", () => {
     it("returns early without focusing the chat view", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = undefined;
       vi.mocked(vscode.commands.executeCommand).mockClear();
 
@@ -156,7 +156,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
 
   describe("empty selection", () => {
     it("returns early when selection is zero-length in a non-empty document", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "",
         fullDocText: "const x = 1;\nconst y = 2;",
@@ -177,7 +177,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
 
   describe("active editor with selection", () => {
     it("forge.explain sends correct instruction and context", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "const x = 1;",
         languageId: "typescript",
@@ -206,7 +206,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("forge.fix sends fix instruction", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "buggy code",
       });
@@ -221,7 +221,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("forge.tests sends tests instruction", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "function add(a, b) { return a + b; }",
       });
@@ -240,7 +240,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("context includes correct startLine and endLine (1-based)", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "some code",
         startLine: 10,
@@ -260,7 +260,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("adjusts endLine when selection ends at character 0 of a later line", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "line of code",
         startLine: 2,
@@ -280,7 +280,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("passes filePath from workspace.asRelativePath", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor({
         text: "code",
         uriPath: "file:///workspace/src/utils.ts",
@@ -296,7 +296,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     });
 
     it("focuses the Forge chat view before sending", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (vscode.window as any).activeTextEditor = createMockEditor();
 
       await commandCallbacks["forge.explain"]();
