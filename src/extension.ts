@@ -866,7 +866,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, "media", "chat.css")
     );
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media", "chat.js")
+      vscode.Uri.joinPath(this._extensionUri, "dist", "chat.js")
     );
 
     const nonce = crypto.randomUUID();

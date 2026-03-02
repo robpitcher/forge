@@ -1,4 +1,13 @@
 (function () {
+  const { marked } = require("marked");
+  const DOMPurify = require("dompurify");
+
+  // Configure marked for chat rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+  });
+
   const vscode = acquireVsCodeApi();
   const chatMessages = document.getElementById("chatMessages");
   const userInput = document.getElementById("userInput");
@@ -11,6 +20,7 @@
   const modelSelector = document.getElementById("modelSelector");
 
   let currentAssistantMessage = null;
+  let currentAssistantRawText = "";
   let isStreaming = false;
   let pendingContext = [];
   let lastAutoAttachedContent = null;
@@ -177,7 +187,14 @@
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "message-content";
-    contentDiv.textContent = content;
+
+    if (role === "assistant") {
+      contentDiv.classList.add("markdown-body");
+      contentDiv.innerHTML = renderMarkdown(content);
+      addCopyButtons(contentDiv);
+    } else {
+      contentDiv.textContent = content;
+    }
 
     messageDiv.appendChild(roleLabel);
     messageDiv.appendChild(contentDiv);
@@ -219,12 +236,43 @@
     return "…/" + parts.slice(-2).join("/");
   }
 
+  function renderMarkdown(text) {
+    if (!text) return "";
+    return DOMPurify.sanitize(marked.parse(text));
+  }
+
+  function addCopyButtons(container) {
+    const preBlocks = container.querySelectorAll("pre");
+    preBlocks.forEach((pre) => {
+      if (pre.querySelector(".code-copy-btn")) return;
+      const btn = document.createElement("button");
+      btn.className = "code-copy-btn";
+      btn.type = "button";
+      btn.title = "Copy code";
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5z"/></svg>';
+      btn.addEventListener("click", () => {
+        const code = pre.querySelector("code");
+        const text = code ? code.textContent : pre.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.innerHTML = '<span class="code-copy-feedback">Copied!</span>';
+          setTimeout(() => {
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5z"/></svg>';
+          }, 2000);
+        });
+      });
+      pre.appendChild(btn);
+    });
+  }
+
   function appendDelta(content) {
     if (!currentAssistantMessage) {
       const { contentDiv } = appendMessage("assistant", "");
       currentAssistantMessage = contentDiv;
+      currentAssistantRawText = "";
     }
-    currentAssistantMessage.textContent += content;
+    currentAssistantRawText += content;
+    currentAssistantMessage.innerHTML = renderMarkdown(currentAssistantRawText);
+    addCopyButtons(currentAssistantMessage);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
@@ -238,6 +286,7 @@
 
       case "streamStart":
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = true;
         setInputEnabled(false);
         break;
@@ -247,10 +296,11 @@
         break;
 
       case "streamEnd":
-        if (currentAssistantMessage && currentAssistantMessage.textContent) {
-          messages.push({ role: "assistant", content: currentAssistantMessage.textContent });
+        if (currentAssistantRawText) {
+          messages.push({ role: "assistant", content: currentAssistantRawText });
         }
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = false;
         setInputEnabled(true);
         break;
@@ -306,6 +356,7 @@
       case "conversationReset":
         chatMessages.innerHTML = "";
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = false;
         setInputEnabled(true);
         pendingContext = [];
@@ -334,18 +385,22 @@
         });
         break;
 
-      case "modelsUpdated":
+      case "modelsUpdated": {
         modelSelector.innerHTML = "";
-        (message.models || []).forEach((m) => {
+        const models = message.models || [];
+        models.forEach((m) => {
           const opt = document.createElement("option");
           opt.value = m;
           opt.textContent = m;
           modelSelector.appendChild(opt);
         });
         break;
+      }
 
       case "modelSelected":
-        modelSelector.value = message.model;
+        if (message.model) {
+          modelSelector.value = message.model;
+        }
         break;
     }
   });
