@@ -70,10 +70,6 @@ Use the model dropdown in the chat UI to switch between configured deployment na
 - `Write a unit test for this code`
 - `What are the performance implications?`
 
-### Stop generation
-
-Click the stop button (⏹) in the sidebar to cancel in-flight requests.
-
 ## Architecture
 
 ```mermaid

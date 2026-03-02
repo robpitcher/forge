@@ -263,7 +263,7 @@ To verify your endpoint URL is correct:
 
 2. Test connectivity from your machine:
    ```bash
-   curl -I https://your-endpoint-url/openai/deployments \
+   curl -I "https://your-endpoint-url/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
    
@@ -498,7 +498,7 @@ Then use the ⚙️ gear icon to set your API key securely.
 
 | Problem | Solution |
 |---------|----------|
-| **"Connection refused"** | Verify your endpoint URL is correct and does not include `/openai/v1/` (the SDK appends this automatically). Test with: `curl https://your-endpoint.openai.azure.com/openai/deployments -H "api-key: your-key"` |
+| **"Connection refused"** | Verify your endpoint URL is correct and does not include `/openai/v1/` (the SDK appends this automatically). Test with: `curl "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" -H "api-key: your-key"` |
 | **"Timeout"** | Check network connectivity to Azure. Verify firewall rules allow outbound HTTPS. Check if your VPN/proxy requires special configuration. |
 | **"403 Forbidden"** | Your API key may be expired or incorrect. Verify in Azure Portal and regenerate if needed. |
 
@@ -526,13 +526,13 @@ Then use the ⚙️ gear icon to set your API key securely.
 
 1. Verify connectivity:
    ```bash
-   curl -I https://your-endpoint.openai.azure.com/openai/deployments \
+   curl -I "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
 
 2. Verify deployment exists:
    ```bash
-   curl https://your-endpoint.openai.azure.com/openai/deployments \
+   curl "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
 
