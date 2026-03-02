@@ -377,9 +377,10 @@ describe("multi-turn conversation context (SC4)", () => {
       const s1 = createMockSession();
       const s2 = createMockSession();
       const s3 = createMockSession();
+      const s4 = createMockSession();
 
       let idx = 0;
-      const mocks = [s1, s2, s3];
+      const mocks = [s1, s2, s3, s4];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
       const session1 = await getOrCreateSession("c1", validConfig, "test-key-123", "gpt-4.1");

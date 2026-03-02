@@ -19,7 +19,7 @@ vi.mock("@github/copilot-sdk", () =>
 );
 
 const validConfig: ExtensionConfig = {
-  endpoint: "https://myresource.openai.azure.com/openai/v1/",
+  endpoint: "https://myresource.openai.azure.com/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
   models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
