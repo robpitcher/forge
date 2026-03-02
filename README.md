@@ -22,11 +22,11 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to sidebar    │  │
+│  │   Creates session → Streams deltas to sidebar       │  │
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Copilot CLI (server mode, local process)    │  │
+│  │   Copilot Language Server (local process via SDK)   │  │
 │  └────────────────────┬────────────────────────────────┘  │
 └───────────────────────┼──────────────────────────────────┘
                         │ HTTPS (private network)
@@ -36,13 +36,25 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 └──────────────────────────────────────────────────────────┘
 ```
 
+### Source Files
+
+- **`src/extension.ts`** — VS Code extension activation, WebviewViewProvider, status bar, message handling
+- **`src/copilotService.ts`** — CopilotClient lifecycle management, BYOK session creation, session reuse map
+- **`src/configuration.ts`** — VS Code settings reader and validation for required fields
+- **`src/types.ts`** — TypeScript type definitions for SDK interfaces
+- **`src/auth/credentialProvider.ts`** — Auth abstraction (Entra ID / API Key)
+- **`src/auth/authStatusProvider.ts`** — Auth status polling and status bar updates
+- **`src/codeActionProvider.ts`** — Editor code actions (Explain, Fix, Write Tests)
+- **`media/chat.js`** — Webview UI logic
+- **`media/chat.css`** — Webview styles
+
 ---
 
 ## Prerequisites
 
 - **VS Code** 1.93 or later
 - **Node.js** 20.19.0+ (for development/build)
-- **Copilot CLI** v0.0.418+ ([installation guide](https://github.com/github/copilot-cli) or air-gapped distribution)
+- **Copilot Language Server** binary ([copilot-language-server](https://github.com/github/copilot-cli) or air-gapped distribution)
 - **Azure AI Foundry** endpoint (OpenAI-compatible API)
 
 ---
@@ -52,7 +64,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/robpitcher/forge.git
-   cd enclave
+   cd forge
    ```
 
 2. **Install dependencies:**
@@ -77,51 +89,58 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
 ---
 
-## Configuration
-
-Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
-
-| Setting | Required | Default | Description |
-|---------|----------|---------|-------------|
-| `forge.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `forge.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
-| `forge.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
-| `forge.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
-
-**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
-
-### Example Configuration
-
-```json
-{
-  "forge.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
-  "forge.copilot.model": "gpt-4.1",
-  "forge.copilot.wireApi": "completions"
-}
-```
-
-**API Key Setup:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)" to enter your API key via a masked password input. The key is stored securely in VS Code SecretStorage and never appears in settings.json.
-
----
-
 ## Quick Start
 
-1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments).
+1. **Install the Copilot Language Server** on your machine (transfer the binary via approved media for air-gapped environments).
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
    | Setting | Description |
    |---------|-------------|
-   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
-   | `forge.copilot.model` | Model deployment name (default: `gpt-4.1`) |
+   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+   | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
+   | `forge.copilot.models` | Available model deployments (default: `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]`) |
 
-   **API Key:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
+   **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
 
-3. **Open Forge:** Click the Forge icon in the VS Code bottom panel (next to Terminal and Output)
+3. **Open Forge:** Click the Forge icon in the VS Code sidebar
 
-4. **Send a message:** Type a message in the input field, then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS)
+4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
 
 5. **Multi-turn conversations:** The chat maintains session context within the same session
+
+---
+
+## Features
+
+### Authentication Methods
+
+Forge supports two authentication methods, controlled by `forge.copilot.authMethod`:
+
+- **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
+- **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for air-gapped environments without Entra ID.
+
+### Chat Modes
+
+Forge provides three chat modes, selectable via the mode dropdown in the UI:
+
+| Mode | Description |
+|------|-------------|
+| **Chat** | Conversation only — no tool access |
+| **Agent** | Tools enabled — shell commands, file read/write, URL fetch, MCP servers |
+| **Plan** | Creates implementation plans for complex tasks |
+
+### Code Actions
+
+Right-click on code or use the editor lightbulb menu (💡) to access:
+
+- **Explain with Forge** — Get an explanation of selected code
+- **Fix with Forge** — Ask Forge to fix selected code
+- **Write Tests with Forge** — Generate tests for selected code
+
+### Model Selector
+
+Use the model dropdown in the chat UI to switch between configured models. Models are configured via `forge.copilot.models`.
 
 ---
 
@@ -129,9 +148,9 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ### Start a chat
 
-1. Click the Forge icon in the VS Code bottom panel (next to Terminal and Output) to open the Forge chat
+1. Click the Forge icon in the VS Code sidebar to open the Forge chat
 2. Type your message in the input field
-3. Click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit
+3. Press **Enter** to send (Shift+Enter for newline)
 
 ### Example prompts
 
@@ -142,6 +161,74 @@ Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
 ### Stop generation
 
 Click the stop button (⏹) in the sidebar to cancel in-flight requests.
+
+---
+
+## Configuration
+
+Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
+
+### Core Settings
+
+| Setting | Type | Required | Default | Description |
+|---------|------|----------|---------|-------------|
+| `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+| `forge.copilot.models` | `string[]` | No | `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` | Available model deployments for the model selector. First entry is the default. |
+| `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
+| `forge.copilot.cliPath` | `string` | No | `""` | Path to copilot-language-server binary (if not on PATH) |
+| `forge.copilot.authMethod` | `string` | No | `"entraId"` | Auth method: `"entraId"` (DefaultAzureCredential) or `"apiKey"` |
+| `forge.copilot.systemMessage` | `string` | No | `""` | Custom system message appended to the default Copilot system prompt |
+
+### Tool Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `forge.copilot.autoApproveTools` | `boolean` | `false` | Auto-approve tool executions without confirmation |
+| `forge.copilot.tools.shell` | `boolean` | `true` | Enable the Shell tool (execute terminal commands) |
+| `forge.copilot.tools.read` | `boolean` | `true` | Enable the Read tool (read file contents) |
+| `forge.copilot.tools.write` | `boolean` | `true` | Enable the Write tool (write/edit files) |
+| `forge.copilot.tools.url` | `boolean` | `false` | Enable the URL tool (fetch web content) |
+| `forge.copilot.tools.mcp` | `boolean` | `true` | Enable MCP tool support (Model Context Protocol servers) |
+
+### MCP Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `forge.copilot.mcpAllowRemote` | `boolean` | `false` | Allow remote (HTTP/SSE) MCP servers |
+| `forge.copilot.mcpServers` | `object` | `{}` | MCP server configurations (see below) |
+
+**MCP Server Configuration:**
+
+```json
+{
+  "forge.copilot.mcpServers": {
+    "my-local-server": {
+      "command": "npx",
+      "args": ["-y", "@my/mcp-server"],
+      "env": { "API_KEY": "..." }
+    },
+    "my-remote-server": {
+      "url": "http://internal-host:3000/sse",
+      "headers": { "Authorization": "Bearer ..." }
+    }
+  }
+}
+```
+
+### Example Configuration
+
+```json
+{
+  "forge.copilot.endpoint": "https://myresource.openai.azure.com/",
+  "forge.copilot.authMethod": "entraId",
+  "forge.copilot.models": ["gpt-4.1", "gpt-4o"],
+  "forge.copilot.wireApi": "completions"
+}
+```
+
+> **Note:** The SDK auto-appends `/openai/v1/` for `.azure.com` endpoints — do not include this path in your endpoint URL.
+
+**API Key Setup:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)" to enter your API key via a masked password input. The key is stored securely in VS Code SecretStorage and never appears in settings.json.
 
 ---
 
@@ -186,56 +273,6 @@ npm run package
 ```
 
 Creates `forge-0.1.0.vsix` for sideloading or distribution.
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                      VS Code                              │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │         Forge Sidebar (WebviewView)               │  │
-│  │   User types prompt → sees streamed markdown reply  │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │                                    │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Extension Host (our extension)              │  │
-│  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to sidebar    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │ JSON-RPC (stdio)                   │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Copilot CLI (server mode, local process)    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-└───────────────────────┼──────────────────────────────────┘
-                        │ HTTPS (private network)
-                        ▼
-┌──────────────────────────────────────────────────────────┐
-│           Azure AI Foundry (Private Endpoint)             │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Source files
-
-- **`src/extension.ts`** — VS Code extension activation, chat participant registration, request handler, streaming response logic, and user cancellation
-- **`src/copilotService.ts`** — CopilotClient lifecycle management, BYOK session creation with Azure AI Foundry configuration, session reuse map
-- **`src/configuration.ts`** — VS Code settings reader and validation for required fields
-- **`src/types.ts`** — TypeScript type definitions for SDK interfaces
-
----
-
-## Configuration Reference
-
-| Setting | Type | Required | Default | Description |
-|---------|------|----------|---------|-------------|
-| `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
-| `forge.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
-| `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
-| `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
-
-**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
 
 ---
 
