@@ -11,4 +11,6 @@
 
 ## Learnings
 
-(New team member — no learnings yet)
+- **PR #116 review fixes (README.md):** Addressed 5 review comments — renamed "Copilot Language Server" to "Copilot CLI" throughout (architecture diagram, prerequisites, quick start, settings table), and marked the Chat Modes section as a planned feature since no `ChatMode` type or mode selector UI exists in the codebase. The binary is `copilot` v0.0.418+ from `github/copilot-cli`.
+- **Terminology:** The local process spawned by the SDK is called "Copilot CLI", not "Copilot Language Server". Use "Copilot CLI" consistently in all docs.
+- **Chat Modes are planned, not shipped:** No mode selector exists in `media/chat.js` and no `ChatMode` type exists in `src/copilotService.ts`. The extension currently defaults to Agent mode.
