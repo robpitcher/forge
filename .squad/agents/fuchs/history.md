@@ -46,3 +46,13 @@
 - Key learning: deployment names and model names can differ in Foundry (e.g., deployment `my-gpt4` may host model `gpt-4o`)
 
 📌 Team update (2026-03-02T15:11:14Z): Models config consolidated — changed `forge.copilot.models` default to empty array. README repositioned to lead with organizational control (private endpoints, data sovereignty, compliance) over "air-gapped" framing. Both decisions merged to decisions.md. — decided by Fuchs & Blair
+
+---
+
+**📌 Session: Icon Addition to README Header**
+
+- ✅ Added Forge icon (`resources/icon.png`) to top of README.md
+- Centered layout using `<div align="center">` with 128px × 128px dimensions
+- Icon placed before `# Forge` heading for visual appeal
+- Approach: Simple HTML markup compatible with GitHub markdown rendering
+- No changes to existing content — only prepended the icon element

@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="resources/icon.png" alt="Forge" width="128" height="128">
+</div>
+
 # Forge
 
 A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. All inference stays within your Azure tenant. No GitHub authentication required. Works in air-gapped and compliance-driven environments.
