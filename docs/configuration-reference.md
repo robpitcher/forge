@@ -184,7 +184,7 @@ Windows:
 ```
 
 **When to use this:**
-- You downloaded the Copilot CLI to a custom location (see [Installation Guide](installation-guide.md))
+- You downloaded the Copilot CLI to a custom location (see [Copilot CLI repository](https://github.com/github/copilot-cli))
 - You do not have permission to install the CLI globally on your machine
 - You want to use a specific version of the CLI
 
@@ -553,6 +553,6 @@ Then use the gear icon to set your API key securely.
 2. **Retrieve credentials** from Azure Portal → your AI resource → "Keys and endpoint"
 3. **Use deployment name** (not model name) in the `model` setting
 4. **Test connectivity** by opening a chat in VS Code and typing a message
-5. **For air-gapped environments**, follow the [Installation Guide](installation-guide.md) for the Copilot CLI
+5. **For air-gapped environments**, see the [Copilot CLI repository](https://github.com/github/copilot-cli) for Copilot CLI installation instructions
 
 For additional help, consult your platform/DevOps team or Azure documentation.

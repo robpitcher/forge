@@ -7,15 +7,15 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 ## Prerequisites
 
 - **VS Code** 1.93 or later
-- **Node.js** 20.19.0+ (for development/build)
-- **GitHub Copilot CLI** binary (`copilot` v0.0.418+ from [github/copilot-cli](https://github.com/github/copilot-cli); you can override the path via `forge.copilot.cliPath`)
-- **Azure AI Foundry** endpoint (OpenAI-compatible API)
+- **[GitHub Copilot CLI](https://github.com/github/copilot-cli)** binary
+- **[Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)** (`az`) — Required for Entra ID authentication (recommended for most environments)
+- **Azure AI Foundry** endpoint
 
 ## Quick Start
 
 1. **Install the Forge extension** — download the `.vsix` from [GitHub Releases](https://github.com/robpitcher/forge/releases) and sideload it (see [Installation](#installation) for details).
 
-2. **Install the Copilot CLI** on your machine. See [docs/installation-guide.md](docs/installation-guide.md) for detailed, installation steps.
+2. **Install the Copilot CLI** on your machine. See the [Copilot CLI repository](https://github.com/github/copilot-cli) for installation instructions.
 
 3. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
