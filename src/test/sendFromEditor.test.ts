@@ -38,6 +38,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
 
   function createMockEditor(options: {
     text?: string;
+    fullDocText?: string;
     languageId?: string;
     uriPath?: string;
     startLine?: number;
@@ -46,24 +47,28 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     endChar?: number;
   } = {}) {
     const text = options.text ?? "const x = 1;";
+    const fullDocText = options.fullDocText ?? `FULL DOC: ${text}`;
     const languageId = options.languageId ?? "typescript";
     const uriPath = options.uriPath ?? "file:///test.ts";
+    const selection = {
+      start: {
+        line: options.startLine ?? 0,
+        character: options.startChar ?? 0,
+      },
+      end: {
+        line: options.endLine ?? 0,
+        character: options.endChar ?? text.length,
+      },
+    };
     return {
       document: {
-        getText: vi.fn().mockReturnValue(text),
+        getText: vi.fn().mockImplementation((range?: unknown) =>
+          range ? text : fullDocText,
+        ),
         languageId,
         uri: { toString: () => uriPath },
       },
-      selection: {
-        start: {
-          line: options.startLine ?? 0,
-          character: options.startChar ?? 0,
-        },
-        end: {
-          line: options.endLine ?? 0,
-          character: options.endChar ?? text.length,
-        },
-      },
+      selection,
     };
   }
 
@@ -150,9 +155,16 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
   });
 
   describe("empty selection", () => {
-    it("returns early when getText returns empty string", async () => {
+    it("returns early when selection is zero-length in a non-empty document", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (vscode.window as any).activeTextEditor = createMockEditor({ text: "" });
+      (vscode.window as any).activeTextEditor = createMockEditor({
+        text: "",
+        fullDocText: "const x = 1;\nconst y = 2;",
+        startLine: 0,
+        startChar: 5,
+        endLine: 0,
+        endChar: 5,
+      });
       vi.mocked(vscode.commands.executeCommand).mockClear();
 
       await commandCallbacks["forge.explain"]();
