@@ -72,59 +72,35 @@ Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                      VS Code                              │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │         Forge Sidebar (WebviewView)                 │  │
-│  │   User types prompt → sees streamed markdown reply  │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │                                   │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Extension Host (our extension)              │  │
-│  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to sidebar       │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │ JSON-RPC (stdio)                  │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │   Copilot CLI (local stdio process via SDK)         │  │
-│  └────────────────────┬────────────────────────────────┘  │
-└───────────────────────┼──────────────────────────────────┘
-                        │ HTTPS (private network)
-                        ▼
-┌──────────────────────────────────────────────────────────┐
-│           Azure AI Foundry (Private Endpoint)            │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph vscode["VS Code"]
+        sidebar["Forge Sidebar<br/>(WebviewView)"]
+        exthost["Extension Host<br/>Config · CopilotClient"]
+        creds["Credential Provider<br/>Entra ID / API Key"]
+        cli["Copilot CLI<br/>(local subprocess)"]
+    end
+
+    azure["Azure AI Foundry<br/>(Private Endpoint)"]
+
+    sidebar <-->|"postMessage"| exthost
+    exthost -.->|"getToken()"| creds
+    exthost <-->|"JSON-RPC (stdio)"| cli
+    cli -->|"HTTPS (private network)"| azure
 ```
 
 ## Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/robpitcher/forge.git
-   cd forge
-   ```
+### From GitHub Releases (recommended for air-gapped environments)
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+1. Download the latest `.vsix` file from [GitHub Releases](https://github.com/robpitcher/forge/releases)
+2. In VS Code, open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+3. Click `...` → **Install from VSIX...**
+4. Select the downloaded `.vsix` file
 
-3. **Build the extension:**
-   ```bash
-   npm run build
-   ```
+### From VS Code Marketplace
 
-4. **Package as `.vsix` (for sideloading):**
-   ```bash
-   npm run package
-   ```
-
-5. **Sideload into VS Code:**
-   - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-   - Click "..." menu → "Install from VSIX"
-   - Select `forge-0.1.0.vsix`
+Search for "Forge" in the VS Code Extensions marketplace and click **Install**.
 
 ## Configuration
 
@@ -196,6 +172,8 @@ Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 ## Development
 
+**Recommended environment:** The included `.devcontainer/devcontainer.json` provides a pre-configured development setup with Node.js, Git, GitHub CLI, and Azure CLI. Open in [GitHub Codespaces](https://github.com/codespaces/new?repo=robpitcher/forge) or [VS Code Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for a seamless setup.
+
 ### Build
 
 ```bash
@@ -236,18 +214,6 @@ npm run package
 ```
 
 Creates `forge-0.1.0.vsix` for sideloading or distribution.
-
----
-
-## Building from Source
-
-```sh
-npm install
-npm run build
-npm run package
-```
-
-This produces `forge-0.1.0.vsix` in the project root.
 
 ---
 
