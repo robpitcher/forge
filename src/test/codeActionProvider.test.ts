@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import * as vscode from "vscode";
 import { ForgeCodeActionProvider } from "../codeActionProvider.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Range = vscode.Range as any;
 
 function makeRange(start: number, end: number): vscode.Range {
