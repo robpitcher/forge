@@ -601,3 +601,5 @@ Thorough audit of all documentation files for consistency, accuracy, and positio
 - The `forge.copilot.model` → `forge.copilot.models` rename was the biggest drift — the config reference was never updated when the setting changed from singular string to array.
 - Endpoint URL format documentation was actively harmful — telling users to include `/openai/v1/` would cause double-pathing since the SDK auto-appends it.
 - "Air-gapped" as primary positioning was cleaned from README earlier but leaked through in package.json descriptions and docs.
+
+📌 Team update (2026-03-02T22:30:00Z): Welcome Screen State Management Pattern and design decision finalized — decided by Blair + Windows (postConfigStatus implementation and clear API key feature merged)
