@@ -1877,3 +1877,212 @@ Our local type `RemoteMcpServerConfig` is renamed to `RemoteMcpSettings` to avoi
 
 Ambiguous MCP server configs (`{command, url}`) are now rejected at the **validation layer** (`validateConfiguration()`), not silently handled at the mapper layer (`buildMcpServersConfig()`). Validation gives actionable error messages; mapper-layer skipping is silent and confusing.
 
+# Decision: getText mocks must be argument-aware
+
+**Date:** 2026-03-02
+**Decided by:** Windows (Tester)
+**Context:** PR #119 review feedback on sendFromEditor.test.ts
+
+## Decision
+
+When mocking `document.getText()` in VS Code editor tests, always use `mockImplementation` with argument discrimination — not `mockReturnValue`. The mock must return different values depending on whether a range/selection argument is provided:
+
+```typescript
+getText: vi.fn().mockImplementation((range?: unknown) =>
+  range ? selectionText : fullDocumentText,
+)
+```
+
+## Rationale
+
+The production code calls `getText(selection)` to get only the selected text. A constant `mockReturnValue` makes the test pass regardless of whether `getText()` or `getText(selection)` is called — silently hiding regressions where the code forgets to pass the selection argument.
+
+## Scope
+
+Applies to all test files that mock VS Code `TextDocument.getText()`.
+
+
+---
+
+### Code Block Copy Button Pattern
+
+**Author:** Blair (Extension Dev)  
+**Date:** 2025-07-25  
+**Status:** Implemented  
+
+## Context
+
+Chat messages render markdown via `marked.parse()`. Code blocks (`<pre>`) need a copy-to-clipboard button for usability.
+
+## Decision
+
+- Copy button injection is a standalone `addCopyButtons(container)` function called after every markdown render pass (both complete messages and streaming deltas).
+- Uses inline SVG icon — CSP-safe, no external resources.
+- Uses `navigator.clipboard.writeText()` which works in VS Code webviews.
+- Button uses `position: absolute` inside a `position: relative` `<pre>`, hidden by default (`opacity: 0`), visible on `pre:hover`.
+- Duplicate guard: checks for existing `.code-copy-btn` before injecting (important since streaming re-renders the full DOM each delta).
+
+## Consequences
+
+- Any future code that renders markdown into the chat (e.g. conversation restore, tool results) should call `addCopyButtons()` on the rendered container.
+- The SVG icon markup is duplicated (initial render + reset after "Copied!" feedback) — acceptable for a small inline SVG.
+
+---
+
+### Sanitize markdown HTML with DOMPurify
+
+**Date:** 2025-07-25  
+**Author:** Blair (Extension Dev)  
+**Status:** Implemented  
+
+## Context
+
+PR #109 introduced `marked.parse()` for rendering assistant messages as HTML. Copilot's PR review flagged that the parsed output was assigned directly to `innerHTML` without sanitization, creating a cross-site scripting (XSS) risk. If the AI model returns content containing malicious HTML or script tags, they would execute in the webview.
+
+## Decision
+
+Added `dompurify` as a dependency and wrapped all `marked.parse()` calls with `DOMPurify.sanitize()` in the centralized `renderMarkdown()` function. Using DOMPurify's default configuration, which preserves all standard HTML elements needed for markdown (code blocks, tables, headings, lists, links) while stripping dangerous content (scripts, event handlers, etc.).
+
+## Implications
+
+- All markdown-to-HTML rendering goes through a single sanitized path
+- New code that renders markdown should use `renderMarkdown()` — never call `marked.parse()` directly for innerHTML assignment
+- DOMPurify is bundled into `dist/chat.js` via the existing esbuild browser/IIFE build — no separate script tag needed
+- Default DOMPurify config is sufficient; no custom allowlist maintained
+
+---
+
+### Webview JS Bundling with esbuild
+
+**Date:** 2026-03-01  
+**Author:** Blair  
+**Context:** Issue #100 — markdown rendering required importing `marked` in the webview JS  
+
+## Decision
+
+Webview JavaScript (`media/chat.js`) is now bundled via esbuild as a second entry point (`dist/chat.js`, platform: browser, format: IIFE). This enables `require()` imports of npm packages in webview code.
+
+## Rationale
+
+- The webview JS was previously loaded as a raw script — no imports possible
+- Adding `marked` for markdown rendering required a bundling step
+- Using esbuild (already our bundler) avoids adding a second tool
+- The browser/IIFE output is CSP-compliant (no eval, no inline scripts)
+- Air-gap safe: marked is bundled inline, no CDN required
+
+## Impact
+
+- **All squad members**: When adding npm packages to webview code, they're automatically bundled
+- **Build output**: `dist/chat.js` now exists alongside `dist/extension.js`
+- **Source of truth**: `media/chat.js` remains the source file; `dist/chat.js` is the build artifact
+- **Extension manifest**: Webview HTML references `dist/chat.js`, not `media/chat.js`
+
+---
+
+### Model Config Simplification — Single `models[]` Setting
+
+**By:** Blair (Extension Dev)  
+**Issue:** #81  
+**PR:** #111  
+
+## Decision
+
+Consolidated two model settings (`forge.copilot.model` + `forge.copilot.models`) into one: `forge.copilot.models` (array). The active model defaults to `models[0]` and is persisted in `workspaceState` when the user selects a different model from the dropdown.
+
+## Changes
+
+- `forge.copilot.model` (singular) removed from `package.json` and `ExtensionConfig`
+- Active model tracked via `workspaceState.get("forge.selectedModel")` — not a user-facing setting
+- `copilotService.getOrCreateSession()` and `resumeConversation()` accept `model` as an explicit parameter
+- `_getActiveModel(models)` validates persisted selection against current models array
+
+## Rationale
+
+- Users configure ONE thing (the list of available models), not two
+- The "active" model is runtime state, not configuration — belongs in workspaceState
+- If a user removes a model from their array after selecting it, the extension gracefully falls back to `models[0]`
+- Service layer accepts model as parameter for clearer separation of concerns
+
+---
+
+### 2026-03-01T23:36Z: User directive
+
+**By:** Rob Pitcher (via Copilot)  
+**What:** Never merge a PR without asking Rob first. Humans merge PRs for this project — Squad must not auto-merge.  
+**Why:** User request — captured for team memory  
+
+---
+
+### Error Handling Standards
+
+**Proposed by:** Copper  
+**Date:** 2026-03-02  
+**Context:** Issue #112 code quality review  
+
+## Problem
+
+The codebase has inconsistent error handling patterns, particularly around:
+- When to use `.catch(() => {})` (fire-and-forget)
+- Where to log errors for debugging
+- How to surface actionable errors to users
+
+Examples of issues found:
+- `updateAuthStatus().catch(() => {})` in callbacks swallows SecretStorage failures
+- `console.warn/error` logs go to Extension Host output channel, not the extension's own channel
+- Missing await on async cleanup operations
+
+## Proposed Standards
+
+### 1. Fire-and-forget `.catch(() => {})` Policy
+
+**Allowed:**
+- Status bar updates triggered by polling/timers (non-critical)
+- Background telemetry or analytics
+
+**Not allowed:**
+- User-initiated actions (message sends, settings changes, auth operations)
+- Resource cleanup operations (session destruction, event unsubscription)
+- Any operation whose failure should be visible to the user or developer
+
+**Minimum requirement:** All `.catch(() => {})` must log to output channel:
+```typescript
+updateAuthStatus(...).catch((err) => {
+  outputChannel.appendLine(`[error] Auth status update failed: ${err}`);
+});
+```
+
+### 2. Logging Standards
+
+- **Create OutputChannel in activate()**: `vscode.window.createOutputChannel("Forge")`
+- **Replace all `console.warn/error`** with `outputChannel.appendLine(...)`
+- **Format:** `[level] context: message`
+  - Levels: `[debug]`, `[info]`, `[warn]`, `[error]`
+  - Context: function name or operation (e.g., "session creation", "auth check")
+
+### 3. Async Cleanup
+
+- **Always await async cleanup operations** (`destroySession`, `session.abort()`, `client.stop()`)
+- **Wrap in try-catch and log failures** — don't let cleanup errors crash the cleanup path
+- **Use finally blocks** for critical cleanup (event unsubscription, timeout clearing)
+
+### 4. User-Facing Error Messages
+
+- **Actionable:** Tell the user what to do, not just what went wrong
+  - ❌ "Error: 401 Unauthorized"
+  - ✅ "Authentication failed. Click ⚙️ to check your API key."
+- **Rewrite SDK errors** to point at settings or sign-in commands
+- **Include context** for auth errors (which auth method is configured, what the user should check)
+
+## Impact
+
+- Improves debuggability for users and maintainers
+- Prevents silent failures in critical paths
+- Establishes clear contract for when errors can be swallowed vs. must be handled
+
+## Action Items
+
+1. Create OutputChannel in activate() and pass to modules that need logging
+2. Audit all `.catch(() => {})` callsites and add logging
+3. Replace all `console.warn/error` with OutputChannel
+4. Add await + try-catch to all async cleanup operations
+5. Update error messages to be actionable (already mostly done, but verify consistency)
