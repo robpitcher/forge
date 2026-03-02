@@ -2319,3 +2319,12 @@ Centralizing the fix in `updateAuthStatus()` ensures all code paths send both me
 **By:** Rob Pitcher (via Copilot)
 **What:** For issue #120 first-run experience, use the "replace chat area" approach (Option B) — full-screen welcome/setup wizard that replaces the chat area when config is incomplete. The inline message approach (Option A) is rejected.
 **Why:** User tested both mockup branches and preferred the replace-area UX.
+
+### API Key Storage Must Sync authMethod Setting
+
+**By:** Blair  
+**Date:** 2026-03-02  
+**What:** When storing an API key via `_promptAndStoreApiKey()`, the extension now also updates `forge.copilot.authMethod` to `"apiKey"` (Global scope). When clearing via `_clearApiKey()`, it reverts to `"entraId"`. This ensures `checkAuthStatus` evaluates the correct credential type. Any future code path that programmatically sets/clears an API key must maintain this invariant.  
+**Why:** Without this sync, `checkAuthStatus` always evaluated Entra ID auth (the default), making the welcome screen stuck after API key entry.  
+**Impact:** Auth method now correctly follows API key storage state. Sign-in flow and welcome screen state are synchronized.  
+**Related:** Issue #81 (auth UX), `.squad/log/2026-03-02T23-30-apikey-authmethod-fix.md`
