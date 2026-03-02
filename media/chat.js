@@ -1,5 +1,6 @@
 (function () {
   const { marked } = require("marked");
+  const DOMPurify = require("dompurify");
 
   // Configure marked for chat rendering
   marked.setOptions({
@@ -233,7 +234,7 @@
 
   function renderMarkdown(text) {
     if (!text) return "";
-    return marked.parse(text);
+    return DOMPurify.sanitize(marked.parse(text));
   }
 
   function addCopyButtons(container) {
