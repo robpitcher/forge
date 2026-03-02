@@ -1,0 +1,72 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Forge Architecture Overview",
+  "description": "A walkthrough of the Forge VS Code extension — AI chat for air-gapped environments via Azure AI Foundry.",
+  "steps": [
+    {
+      "file": "package.json",
+      "line": 23,
+      "description": "**Extension Manifest** — `contributes` declares the activitybar view container, chat view, slash commands, configuration settings (endpoint, auth method, models), and keybindings. This is the entry point VS Code reads to register everything Forge provides."
+    },
+    {
+      "file": "src/extension.ts",
+      "line": 33,
+      "description": "**activate()** — Extension entry point. Registers the `ChatViewProvider` as a `WebviewViewProvider`, sets up the status bar item for auth status, registers commands (new conversation, attach selection/file, set API key), and wires up the `ForgeCodeActionProvider`."
+    },
+    {
+      "file": "src/extension.ts",
+      "line": 381,
+      "description": "**_handleMessage()** — Dispatches incoming webview messages by `command` type. Routes `sendMessage` to the chat handler, `attachSelection`/`attachFile` to context-gathering commands, `newConversation` to session reset, and `toolResponse` to tool approval/rejection."
+    },
+    {
+      "file": "src/extension.ts",
+      "line": 488,
+      "description": "**_handleChatMessage()** — Core chat flow. Loads config, validates it, creates a credential provider, obtains an SDK session, attaches event listeners for `assistant.message_delta` / `session.idle` / `session.error`, then calls `session.send()` to stream a response back to the webview."
+    },
+    {
+      "file": "src/copilotService.ts",
+      "line": 66,
+      "description": "**buildProviderConfig()** — Constructs the BYOK provider object for the Copilot SDK. Sets `type: \"azure\"` for `.azure.com` endpoints, chooses between `apiKey` (static key) and `bearerToken` (Entra ID token), and configures `wireApi` (`\"completions\"` or `\"responses\"`)."
+    },
+    {
+      "file": "src/copilotService.ts",
+      "line": 132,
+      "description": "**buildToolConfig()** — Translates per-tool boolean settings (shell, read, write, url, mcp) into an `excludedTools` array for the SDK session. This controls which agentic tools the model is allowed to invoke during a conversation."
+    },
+    {
+      "file": "src/copilotService.ts",
+      "line": 167,
+      "description": "**Session creation** — `copilotClient.createSession()` is called with the model name, provider config, tool config, optional MCP servers, and an optional custom system message. Sessions are cached by conversation ID and reused for multi-turn chat."
+    },
+    {
+      "file": "src/configuration.ts",
+      "line": 27,
+      "description": "**getConfiguration()** — Reads all `forge.copilot.*` settings from VS Code's workspace configuration. API keys are never stored here — they live in `SecretStorage` and are loaded separately by `getConfigurationAsync()`."
+    },
+    {
+      "file": "src/auth/credentialProvider.ts",
+      "line": 58,
+      "description": "**createCredentialProvider()** — Factory that returns either an `EntraIdCredentialProvider` (using `DefaultAzureCredential` from `@azure/identity`, dynamically imported) or an `ApiKeyCredentialProvider` (reading the key from `SecretStorage`). The auth method is set in extension settings."
+    },
+    {
+      "file": "src/auth/authStatusProvider.ts",
+      "line": 25,
+      "description": "**checkAuthStatus()** — Probes whether the user is authenticated. For Entra ID it attempts `getToken()` to detect `az login` state; for API Key it checks `SecretStorage`. Returns a status object (`authenticated` / `notAuthenticated`) with a human-readable reason. Never throws."
+    },
+    {
+      "file": "src/codeActionProvider.ts",
+      "line": 7,
+      "description": "**ForgeCodeActionProvider** — Registers Quick Fix code actions (\"Explain with Forge\", \"Fix with Forge\", \"Write Tests with Forge\") that appear in the lightbulb menu when text is selected. Each action sends the selection to the chat view with a pre-filled prompt."
+    },
+    {
+      "file": "media/chat.js",
+      "line": 305,
+      "description": "**Webview message handler** — Listens for messages from the extension host via `window.addEventListener(\"message\", ...)`. Handles `streamStart`, `streamDelta`, `streamEnd`, `error`, `authStatus`, `contextAttached`, and `toolConfirmation` events to drive the chat UI."
+    },
+    {
+      "file": "media/chat.css",
+      "line": 1,
+      "description": "**Theme integration** — All colors and fonts use VS Code CSS custom properties (`var(--vscode-*)`) so the chat UI automatically adapts to light, dark, and high-contrast themes. No hardcoded colors — the webview inherits the user's editor theme."
+    }
+  ]
+}
