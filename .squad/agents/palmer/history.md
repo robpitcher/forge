@@ -28,3 +28,5 @@
 - **Key file:** `.github/workflows/ci.yml` — the replacement CI pipeline (replaces broken `squad-ci.yml` which used `node --test`).
 - **Pipeline order:** npm ci → lint → typecheck → build → test. This is the correct full validation sequence.
 - **Branch triggers kept broad:** `pull_request` on `[dev, main]`, `push` on `[dev]`. Do not narrow — this workflow is the primary CI for all PRs.
+
+📌 Team update (2026-03-02T13:36:00Z): Release pipeline fixes completed — annotated tags now used in release.yml, legacy squad-release.yml removed. PR #117 merged to dev. Commit 8d9f8fb verified.

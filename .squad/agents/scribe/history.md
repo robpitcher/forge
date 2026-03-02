@@ -8,3 +8,5 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+📌 Team update (2026-03-02T13:36:00Z): Palmer fixed release.yml to use annotated tags, removed legacy squad-release.yml, PR #117 merged to dev. Commit 8d9f8fb pushed — release pipeline now fully functional.
