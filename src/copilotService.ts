@@ -14,6 +14,7 @@ import type {
 
 let client: CopilotClient | undefined;
 const sessions = new Map<string, ICopilotSession>();
+const sessionConfigHashes = new Map<string, string>();
 
 export class CopilotCliNotFoundError extends Error {
   constructor(message: string) {
@@ -146,9 +147,13 @@ export async function getOrCreateSession(
   model: string,
   onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
+  const configHash = config.endpoint + "|" + config.authMethod + "|" + model + "|" + config.wireApi + "|" + authToken;
   const existing = sessions.get(conversationId);
   if (existing) {
-    return existing;
+    if (sessionConfigHashes.get(conversationId) === configHash) {
+      return existing;
+    }
+    await destroySession(conversationId);
   }
 
   const copilotClient = await getOrCreateClient(config);
@@ -168,11 +173,13 @@ export async function getOrCreateSession(
   })) as unknown as ICopilotSession;
 
   sessions.set(conversationId, session);
+  sessionConfigHashes.set(conversationId, configHash);
   return session;
 }
 
 export function removeSession(conversationId: string): void {
   sessions.delete(conversationId);
+  sessionConfigHashes.delete(conversationId);
 }
 
 export async function destroySession(conversationId: string): Promise<void> {
@@ -190,6 +197,7 @@ export async function destroySession(conversationId: string): Promise<void> {
   }
 
   sessions.delete(conversationId);
+  sessionConfigHashes.delete(conversationId);
 }
 
 export async function destroyAllSessions(): Promise<void> {
@@ -218,6 +226,7 @@ export async function destroyAllSessions(): Promise<void> {
 
   await Promise.all(abortPromises);
   sessions.clear();
+  sessionConfigHashes.clear();
 }
 
 function getSessionCount(): number {
@@ -319,6 +328,7 @@ export async function deleteConversation(sessionId: string, config: ExtensionCon
     
     // Remove from local map if present
     sessions.delete(sessionId);
+    sessionConfigHashes.delete(sessionId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(
@@ -336,4 +346,10 @@ export async function stopClient(): Promise<void> {
       client = undefined;
     }
   }
+}
+
+export function resetClient(): void {
+  client = undefined;
+  sessions.clear();
+  sessionConfigHashes.clear();
 }

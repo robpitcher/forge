@@ -21,6 +21,7 @@ import type {
   PermissionRequestResult,
   ToolExecutionProgressEvent,
   ToolExecutionPartialResultEvent,
+  ToolExecutionCompleteEvent,
   ContextItem,
 } from "./types.js";
 
@@ -226,7 +227,7 @@ async function updateAuthStatus(
         statusBarItem.tooltip = "Click to sign in with Azure CLI";
       } else {
         statusBarItem.text = "$(key) Forge: Set API Key";
-        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+        statusBarItem.tooltip = "Click to set your API key";
       }
       break;
     case "error": {
@@ -474,12 +475,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {
     if (this._isProcessing) { return; }
+    this._isProcessing = true;
 
     let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
     try {
       config = await getConfigurationAsync(this._secrets);
     } catch {
       this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
+      this._isProcessing = false;
       return;
     }
     const validationErrors = validateConfiguration(config);
@@ -488,10 +491,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       for (const error of validationErrors) {
         this._postError(error.message);
       }
+      this._isProcessing = false;
       return;
     }
 
-    const credentialProvider = await createCredentialProvider(config, this._secrets);
+    let credentialProvider;
+    try {
+      credentialProvider = await createCredentialProvider(config, this._secrets);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(`Failed to initialize authentication: ${message}. Click ⚙️ to check your auth settings.`);
+      this._isProcessing = false;
+      return;
+    }
     let authToken: string;
     try {
       authToken = await credentialProvider.getToken();
@@ -507,6 +519,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       } else {
         this._postError(`Authentication failed: ${message}`);
       }
+      this._isProcessing = false;
       return;
     }
 
@@ -526,12 +539,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         const message = err instanceof Error ? err.message : String(err);
         this._postError(`Failed to start Copilot service: ${message}`);
       }
+      this._isProcessing = false;
       return;
     }
 
     const enrichedPrompt = this._buildPromptWithContext(prompt, context);
 
-    this._isProcessing = true;
     try {
       // Add user message to cache
       this._conversationMessages.push({ role: "user", content: prompt });
@@ -663,7 +676,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       });
 
-      const unsubToolComplete = session.on("tool.execution_complete", (event: any) => {
+      const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
         const toolCallId = event?.data?.toolCallId;
         if (toolCallId && this._view) {
           this._view.webview.postMessage({

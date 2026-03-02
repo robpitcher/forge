@@ -78,6 +78,26 @@ export const CodeActionKind = {
   QuickFix: { value: "quickfix" },
 };
 
+export class CodeAction {
+  command?: { command: string; title: string };
+  constructor(
+    public title: string,
+    public kind?: typeof CodeActionKind.QuickFix,
+  ) {}
+}
+
+export class Range {
+  constructor(
+    public start: any = {},
+    public end: any = {},
+  ) {}
+  get isEmpty(): boolean {
+    return this.start === this.end;
+  }
+}
+
+export class Selection extends Range {}
+
 export const languages = {
   registerCodeActionsProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
 };
