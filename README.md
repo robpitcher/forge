@@ -253,10 +253,11 @@ Rebuilds on file changes.
 ### Linting
 
 ```bash
-npm run lint
+npm run lint        # ESLint
+npm run lint:types  # TypeScript type-checking (tsc --noEmit)
 ```
 
-Type-checks code with TypeScript.
+Lints source code with ESLint. Use `lint:types` for TypeScript type-checking.
 
 ### Testing
 
