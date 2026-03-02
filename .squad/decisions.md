@@ -2268,3 +2268,54 @@ The `!important` ensures it overrides any `display` rule from other classes (e.g
 - Tests updated to filter `configStatus` from message-type assertions.
 
 
+
+# Welcome Screen State Management Pattern
+
+**Decided:** 2026-03-02
+
+## Context
+
+The welcome screen UI state machine relies on `configStatus` messages to track completion of setup steps and trigger auto-transitions (e.g., step 3 ✅ when user authenticates). Initially, `configStatus` was only sent during webview initialization (`resolveWebviewView`, `webviewReady`). Auth/config mutations went through `updateAuthStatus()` which only sent `authStatus` messages.
+
+## Decision
+
+**All auth/config state changes must send BOTH `authStatus` AND `configStatus` messages.**
+
+The standalone `updateAuthStatus()` function now calls:
+1. `provider.postAuthStatus(status, !!config.endpoint)` (existing)
+2. `provider.postConfigStatus(!!config.endpoint, status.state === "authenticated", config.models.length > 0)` (new)
+
+This covers all mutation paths automatically:
+- 30s auth poll
+- Config change listener
+- Webview focus listener
+- Sign-in timeout handler
+- API key storage via `_refreshAuthStatus`
+
+## Rationale
+
+Centralizing the fix in `updateAuthStatus()` ensures all code paths send both messages without requiring 5 separate patches. The `postConfigStatus` method does NOT deduplicate — the welcome screen logic needs to re-evaluate state on every update, even if values haven't changed.
+
+## Alternatives Rejected
+
+- ❌ **Send configStatus only in auth poll** — doesn't cover config changes (endpoint, models), sign-in timeout, or API key storage
+- ❌ **Deduplicate configStatus like authStatus** — welcome screen logic needs fresh state on every change for correct transitions
+
+## Impact
+
+- Welcome screen now auto-transitions when users complete setup steps
+- Auth banner and welcome screen state stay synchronized
+- No race conditions between welcome screen and status bar
+
+## Affected Files
+
+- `src/extension.ts` — `updateAuthStatus()`, `postConfigStatus()` method
+
+## Related
+
+- Issue #123 (welcome screen auto-detect bugs)
+- `.squad/decisions.md` lines 126-147 (welcome UI options)
+### 2026-03-02T18:06Z: Design decision — welcome screen style
+**By:** Rob Pitcher (via Copilot)
+**What:** For issue #120 first-run experience, use the "replace chat area" approach (Option B) — full-screen welcome/setup wizard that replaces the chat area when config is incomplete. The inline message approach (Option A) is rejected.
+**Why:** User tested both mockup branches and preferred the replace-area UX.
