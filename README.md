@@ -13,9 +13,11 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
 ## Quick Start
 
-1. **Install the Copilot CLI** on your machine. See [docs/installation-guide.md](docs/installation-guide.md) for detailed, installation steps.
+1. **Install the Forge extension** — download the `.vsix` from [GitHub Releases](https://github.com/robpitcher/forge/releases) and sideload it (see [Installation](#installation) for details).
 
-2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
+2. **Install the Copilot CLI** on your machine. See [docs/installation-guide.md](docs/installation-guide.md) for detailed, installation steps.
+
+3. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
    | Setting | Description |
    |---------|-------------|
@@ -25,11 +27,11 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
    **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
 
-3. **Open Forge:** Click the Forge icon in the VS Code sidebar
+4. **Open Forge:** Click the Forge icon in the VS Code sidebar
 
-4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
+5. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
 
-5. **Multi-turn conversations:** The chat maintains session context within the same session
+6. **Multi-turn conversations:** The chat maintains session context within the same session
 
 ## Features
 
@@ -100,7 +102,7 @@ graph TD
 
 ### From VS Code Marketplace
 
-Search for "Forge" in the VS Code Extensions marketplace and click **Install**.
+> *VS Code Marketplace availability is planned for a future release. For now, install via GitHub Releases above.*
 
 ## Configuration
 
