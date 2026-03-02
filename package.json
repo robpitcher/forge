@@ -1,7 +1,7 @@
 {
   "name": "forge",
   "displayName": "Forge",
-  "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+  "description": "AI chat routed through your own Azure AI Foundry endpoint — private, self-managed, no external dependencies",
   "version": "0.1.0",
   "publisher": "robpitcher",
   "repository": {
@@ -102,12 +102,8 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "gpt-4.1",
-            "gpt-4o",
-            "gpt-4o-mini"
-          ],
-          "description": "Available model deployments for the model selector. The first entry is the default active model."
+          "default": [],
+          "description": "Available model deployments for the model selector. Values must match your Azure AI Foundry model deployment name (not the model name, as they can differ). The first entry is the default active model."
         },
         "forge.copilot.wireApi": {
           "type": "string",
