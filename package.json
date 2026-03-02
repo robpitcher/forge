@@ -129,7 +129,7 @@
           "description": "Authentication method. 'entraId' uses DefaultAzureCredential (recommended). 'apiKey' uses a static API key.",
           "enumDescriptions": [
             "Use Azure Entra ID (DefaultAzureCredential) for authentication. Recommended for environments with Azure AD.",
-            "Use a static API key stored in VS Code SecretStorage. Use for air-gapped environments without Entra ID."
+            "Use a static API key stored in VS Code SecretStorage. Use for environments without Entra ID."
           ]
         },
         "forge.copilot.autoApproveTools": {
@@ -161,7 +161,7 @@
         "forge.copilot.tools.url": {
           "type": "boolean",
           "default": false,
-          "description": "Enable the URL tool (fetch web content). Disabled by default for air-gapped environments."
+          "description": "Enable the URL tool (fetch web content). Disabled by default for restricted environments."
         },
         "forge.copilot.tools.mcp": {
           "type": "boolean",
@@ -171,7 +171,7 @@
         "forge.copilot.mcpAllowRemote": {
           "type": "boolean",
           "default": false,
-          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for air-gap safety."
+          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for network safety."
         },
         "forge.copilot.mcpServers": {
           "type": "object",
