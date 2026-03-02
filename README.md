@@ -15,25 +15,25 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring
 
 ## Quick Start
 
+Ensure you've installed the [prerequisites](#prerequisites) before starting.
+
 1. **Install the Forge extension** — download the `.vsix` from [GitHub Releases](https://github.com/robpitcher/forge/releases) and sideload it (see [Installation](#installation) for details).
 
-2. **Install the Copilot CLI** on your machine. See the [Copilot CLI repository](https://github.com/github/copilot-cli) for installation instructions.
-
-3. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
+2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
    | Setting | Description |
    |---------|-------------|
    | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
    | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
-   | `forge.copilot.models` | Deployment names from your Azure AI Foundry (default: `[]`, e.g., `["gpt-4.1", "gpt-4o"]`) |
+   | `forge.copilot.models` | Deployment names from your Azure AI Foundry (e.g., `["gpt-4.1", "gpt-4o"]`) |
 
    **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
 
-4. **Open Forge:** Click the Forge icon in the VS Code sidebar
+3. **Open Forge:** Click the Forge icon in the VS Code sidebar
 
-5. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
+4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
 
-6. **Multi-turn conversations:** The chat maintains session context within the same session
+5. **Multi-turn conversations:** The chat maintains session context within the same session
 
 ## Features
 
