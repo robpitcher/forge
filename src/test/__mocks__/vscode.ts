@@ -10,6 +10,10 @@ export const workspace = {
     get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
   }),
   onDidChangeConfiguration: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  asRelativePath: vi.fn((pathOrUri: unknown) => {
+    const str = typeof pathOrUri === "string" ? pathOrUri : String(pathOrUri);
+    return str.replace(/^file:\/\/\//, "");
+  }),
 };
 
 export const chat = {
