@@ -4,6 +4,7 @@
 
   const COPY_FEEDBACK_MS = 2000;
   const AUTH_BANNER_DISMISS_MS = 3000;
+  const RENDER_THROTTLE_MS = 50;
 
   // Configure marked for chat rendering
   marked.setOptions({
@@ -275,7 +276,8 @@
           setTimeout(() => {
             btn.innerHTML = copyIcon;
           }, COPY_FEEDBACK_MS);
-        }).catch(() => {
+        }).catch((err) => {
+          console.error("Clipboard write failed:", err);
           btn.innerHTML = '<span class="code-copy-feedback">Copy failed</span>';
           setTimeout(() => { btn.innerHTML = copyIcon; }, COPY_FEEDBACK_MS);
         });
@@ -297,7 +299,7 @@
       addCopyButtons(currentAssistantMessage);
       chatMessages.scrollTop = chatMessages.scrollHeight;
       renderTimeout = null;
-    }, 50);
+    }, RENDER_THROTTLE_MS);
   }
 
   window.addEventListener("message", (event) => {

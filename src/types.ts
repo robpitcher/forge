@@ -78,6 +78,12 @@ export interface ProviderConfig {
 // Event payload types used by this extension
 // ---------------------------------------------------------------------------
 
+/** Payload for `assistant.message` events. */
+export interface AssistantMessageEvent {
+  type: "assistant.message";
+  data: { content: string };
+}
+
 /** Payload for `assistant.message_delta` events. */
 export interface MessageDeltaEvent {
   type: "assistant.message_delta";

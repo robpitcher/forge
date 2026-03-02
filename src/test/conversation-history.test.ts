@@ -52,7 +52,7 @@ vi.mock("../auth/credentialProvider.js", () => ({
 }));
 
 const validConfig: ExtensionConfig = {
-  endpoint: "https://myresource.openai.azure.com/openai/v1/",
+  endpoint: "https://myresource.openai.azure.com/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
   models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
@@ -567,7 +567,7 @@ describe("conversation history webview handlers", () => {
 
   function setupProvider() {
     const settings: Record<string, string> = {
-      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      endpoint: "https://myresource.openai.azure.com/",
       authMethod: "apiKey",
       wireApi: "completions",
       cliPath: "",

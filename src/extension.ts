@@ -16,6 +16,7 @@ import { ForgeCodeActionProvider } from "./codeActionProvider.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
+  AssistantMessageEvent,
   SessionErrorEvent,
   PermissionRequest,
   PermissionRequestResult,
@@ -44,15 +45,15 @@ export function activate(context: vscode.ExtensionContext): void {
   provider.setAuthRefreshCallback(refreshAuth);
   
   // Initial auth status update
-  updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
-    // Silent failure on initial check — user will see the error when they try to use the extension
+  updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
+    outputChannel.appendLine(`Initial auth status check failed: ${err}`);
   });
   
   // Listen for config changes
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("forge.copilot")) {
-      updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {
-        // Silent failure on config change
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
+        outputChannel.appendLine(`Auth status update on config change failed: ${err}`);
       });
     }
   });
@@ -658,7 +659,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         unsubToolComplete();
       };
 
-      const unsubMessage = session.on("assistant.message", (event: any) => {
+      const unsubMessage = session.on("assistant.message", (event: AssistantMessageEvent) => {
         if (event?.data?.content) {
           accumulatedContent = event.data.content;
         }
