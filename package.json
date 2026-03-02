@@ -17,9 +17,8 @@
     "AI",
     "Chat"
   ],
-  "activationEvents": [
-    "onView:forge.chatView"
-  ],
+  "activationEvents": [],
+  "icon": "resources/icon.png",
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
