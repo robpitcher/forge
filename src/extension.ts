@@ -286,7 +286,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     if (this._selectedModel && models.includes(this._selectedModel)) {
       return this._selectedModel;
     }
-    return models[0] ?? "gpt-4.1";
+    return models[0] ?? "";
   }
 
   public postContextAttached(context: ContextItem): void {
@@ -346,6 +346,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         this.postAuthStatus(status, !!config.endpoint);
         this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
         this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
+        this._view?.webview.postMessage({
+          type: "configStatus",
+          hasEndpoint: !!config.endpoint,
+          hasAuth: status.state === "authenticated",
+          hasModels: config.models.length > 0,
+        });
       })
       .catch(() => {
         // Silent failure — status bar will show the error
@@ -923,6 +929,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 <body>
     <div class="container">
         <div id="conversationList" class="conversation-list hidden"></div>
+        <div id="welcomeScreen" class="welcome-screen hidden">
+          <!-- Populated by JS when configuration is incomplete -->
+        </div>
         <div id="chatMessages"></div>
         <div class="input-area">
             <div class="context-actions">

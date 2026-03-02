@@ -149,14 +149,14 @@ describe("WebviewView chat panel", () => {
       // Allow async handlers to complete
       await vi.waitFor(() => {
         const messages = getPostedMessages(mockView);
-        expect(messages.length).toBeGreaterThanOrEqual(4);
+        expect(messages.length).toBeGreaterThanOrEqual(8);
       });
 
       const messages = getPostedMessages(mockView);
       const types = messages
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected";
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus";
         })
         .map((m: unknown) => (m as { type: string }).type);
 

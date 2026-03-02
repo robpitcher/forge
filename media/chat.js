@@ -30,6 +30,7 @@
   let lastAutoAttachedContent = null;
   let messages = [];
   let renderTimeout = null;
+  let configIsComplete = false;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -103,6 +104,129 @@
     autoAttachedChipElement = null;
     autoAttachedCtx = null;
     vscode.postMessage(msg);
+  }
+
+  function applyConfigStatus(hasEndpoint, hasAuth, hasModels) {
+    const welcomeScreen = document.getElementById("welcomeScreen");
+    const inputArea = document.querySelector(".input-area");
+    configIsComplete = hasEndpoint && hasAuth && hasModels;
+
+    if (!configIsComplete) {
+      welcomeScreen.classList.remove("hidden");
+      chatMessages.classList.add("hidden");
+      inputArea.classList.add("hidden");
+      renderWelcomeScreen(welcomeScreen, hasEndpoint, hasAuth, hasModels);
+    } else {
+      welcomeScreen.classList.add("hidden");
+      chatMessages.classList.remove("hidden");
+      inputArea.classList.remove("hidden");
+    }
+  }
+
+  function renderWelcomeScreen(container, hasEndpoint, hasAuth, hasModels) {
+    container.innerHTML = "";
+
+    const icon = document.createElement("div");
+    icon.className = "welcome-icon";
+    icon.textContent = "🔨";
+    container.appendChild(icon);
+
+    const title = document.createElement("h1");
+    title.textContent = "Welcome to Forge";
+    container.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "AI chat powered by your Azure AI Foundry endpoint — private, secure, yours.";
+    container.appendChild(subtitle);
+
+    const steps = document.createElement("div");
+    steps.className = "setup-steps";
+
+    // Step 1: Endpoint
+    const step1 = createSetupStep(
+      1, hasEndpoint,
+      "Connect your endpoint",
+      "Point Forge to your Azure AI Foundry resource",
+      [{ label: "Open Endpoint Settings", command: "openEndpointSettings" }]
+    );
+    steps.appendChild(step1);
+
+    // Step 2: Auth
+    const step2 = createSetupStep(
+      2, hasAuth,
+      "Authenticate",
+      "Sign in with Entra ID or provide an API key",
+      [
+        { label: "Sign in with Entra ID", command: "signIn" },
+        { label: "Set API Key", command: "setApiKey" },
+      ]
+    );
+    steps.appendChild(step2);
+
+    // Step 3: Model
+    const step3 = createSetupStep(
+      3, hasModels,
+      "Add a model",
+      "Configure your model deployment name(s)",
+      [{ label: "Open Model Settings", command: "openSettings" }]
+    );
+    steps.appendChild(step3);
+
+    container.appendChild(steps);
+
+    const helpDiv = document.createElement("div");
+    helpDiv.className = "help-link";
+    helpDiv.appendChild(document.createTextNode("Need help? "));
+    const helpBtn = document.createElement("button");
+    helpBtn.textContent = "View documentation";
+    helpBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "openDocs" });
+    });
+    helpDiv.appendChild(helpBtn);
+    container.appendChild(helpDiv);
+  }
+
+  function createSetupStep(number, completed, title, description, actions) {
+    const step = document.createElement("div");
+    step.className = "setup-step" + (completed ? " completed" : "");
+
+    const indicator = document.createElement("div");
+    indicator.className = "step-indicator";
+    if (completed) {
+      indicator.textContent = "✅";
+    } else {
+      const circle = document.createElement("div");
+      circle.className = "step-number";
+      circle.textContent = String(number);
+      indicator.appendChild(circle);
+    }
+    step.appendChild(indicator);
+
+    const content = document.createElement("div");
+    content.className = "step-content";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = title;
+    content.appendChild(h3);
+
+    const p = document.createElement("p");
+    p.textContent = description;
+    content.appendChild(p);
+
+    if (!completed) {
+      actions.forEach(({ label, command }) => {
+        const btn = document.createElement("button");
+        btn.textContent = label;
+        btn.addEventListener("click", () => {
+          vscode.postMessage({ command });
+        });
+        content.appendChild(btn);
+      });
+    }
+
+    step.appendChild(content);
+    return step;
   }
 
   function newConversation() {
@@ -391,7 +515,9 @@
 
       case "conversationReset":
         resetUIState();
-        chatMessages.innerHTML = "";
+        if (configIsComplete) {
+          chatMessages.innerHTML = "";
+        }
         messages = [];
         break;
 
@@ -416,12 +542,23 @@
       case "modelsUpdated": {
         modelSelector.innerHTML = "";
         const models = message.models || [];
-        models.forEach((m) => {
+        if (models.length === 0) {
           const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
+          opt.value = "";
+          opt.textContent = "No models configured";
+          opt.disabled = true;
+          opt.selected = true;
           modelSelector.appendChild(opt);
-        });
+          modelSelector.disabled = true;
+        } else {
+          modelSelector.disabled = false;
+          models.forEach((m) => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            modelSelector.appendChild(opt);
+          });
+        }
         break;
       }
 
@@ -430,6 +567,11 @@
           modelSelector.value = message.model;
         }
         break;
+
+      case "configStatus": {
+        applyConfigStatus(message.hasEndpoint, message.hasAuth, message.hasModels);
+        break;
+      }
 
       case "toolTimeout": {
         const card = document.querySelector(`.tool-confirmation[data-tool-id="${CSS.escape(message.id)}"]`);
