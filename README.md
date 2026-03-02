@@ -26,7 +26,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │  └────────────────────┬────────────────────────────────┘  │
 │                       │ JSON-RPC (stdio)                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
-│  │   Copilot Language Server (local process via SDK)   │  │
+│  │   Copilot CLI (local stdio process via SDK)          │  │
 │  └────────────────────┬────────────────────────────────┘  │
 └───────────────────────┼──────────────────────────────────┘
                         │ HTTPS (private network)
@@ -54,7 +54,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
 - **VS Code** 1.93 or later
 - **Node.js** 20.19.0+ (for development/build)
-- **Copilot Language Server** binary ([copilot-language-server](https://github.com/github/copilot-cli) or air-gapped distribution)
+- **GitHub Copilot CLI** binary (`copilot` v0.0.418+ from [github/copilot-cli](https://github.com/github/copilot-cli) or air-gapped distribution; you can override the path via `forge.copilot.cliPath`)
 - **Azure AI Foundry** endpoint (OpenAI-compatible API)
 
 ---
@@ -91,7 +91,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 
 ## Quick Start
 
-1. **Install the Copilot Language Server** on your machine (transfer the binary via approved media for air-gapped environments).
+1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments). See [docs/installation-guide.md](docs/installation-guide.md) for detailed, air-gapped installation steps.
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
@@ -120,9 +120,9 @@ Forge supports two authentication methods, controlled by `forge.copilot.authMeth
 - **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
 - **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for air-gapped environments without Entra ID.
 
-### Chat Modes
+### Chat Modes *(planned)*
 
-Forge provides three chat modes, selectable via the mode dropdown in the UI:
+> **Note:** Chat modes are not yet exposed in the UI. The extension currently operates in Agent mode by default. A mode selector is planned for a future release.
 
 | Mode | Description |
 |------|-------------|
@@ -175,7 +175,7 @@ Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
 | `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
 | `forge.copilot.models` | `string[]` | No | `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` | Available model deployments for the model selector. First entry is the default. |
 | `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
-| `forge.copilot.cliPath` | `string` | No | `""` | Path to copilot-language-server binary (if not on PATH) |
+| `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
 | `forge.copilot.authMethod` | `string` | No | `"entraId"` | Auth method: `"entraId"` (DefaultAzureCredential) or `"apiKey"` |
 | `forge.copilot.systemMessage` | `string` | No | `""` | Custom system message appended to the default Copilot system prompt |
 
