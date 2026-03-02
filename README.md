@@ -70,8 +70,6 @@ Use the model dropdown in the chat UI to switch between configured models. Model
 
 Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
----
-
 ## Architecture
 
 ```
@@ -100,8 +98,6 @@ Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 └──────────────────────────────────────────────────────────┘
 ```
 
----
-
 ## Installation
 
 1. **Clone the repository:**
@@ -129,8 +125,6 @@ Click the stop button (⏹) in the sidebar to cancel in-flight requests.
    - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Click "..." menu → "Install from VSIX"
    - Select `forge-0.1.0.vsix`
-
----
 
 ## Configuration
 

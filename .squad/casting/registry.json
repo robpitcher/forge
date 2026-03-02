@@ -63,6 +63,14 @@
       "created_at": "2026-03-02T00:00:00Z",
       "legacy_named": false,
       "status": "active"
+    },
+    "nauls": {
+      "persistent_name": "Nauls",
+      "universe": "The Thing",
+      "role": "Diagram Artist",
+      "created_at": "2026-03-02T14:35:00Z",
+      "legacy_named": false,
+      "status": "active"
     }
   }
 }
