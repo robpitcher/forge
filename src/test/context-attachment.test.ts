@@ -44,7 +44,7 @@ function setupConfig(overrides: Record<string, unknown> = {}) {
     endpoint: "https://myresource.openai.azure.com/openai/v1/",
     apiKey: "test-key-123",
     authMethod: "apiKey",
-    model: "gpt-4.1",
+    models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
     wireApi: "completions",
     cliPath: "",
     autoApproveTools: false,
@@ -304,7 +304,10 @@ describe("Context attachment (#26)", () => {
     });
 
     const types = getPostedMessages(mockView)
-      .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+      .filter((m: unknown) => {
+        const t = (m as { type: string }).type;
+        return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected";
+      })
       .map((m: unknown) => (m as { type: string }).type);
     expect(types[0]).toBe("streamStart");
     expect(types).toContain("streamDelta");

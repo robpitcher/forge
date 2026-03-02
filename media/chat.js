@@ -17,6 +17,7 @@
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
+  const modelSelector = document.getElementById("modelSelector");
 
   let currentAssistantMessage = null;
   let currentAssistantRawText = "";
@@ -27,6 +28,9 @@
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
+  modelSelector.addEventListener("change", () => {
+    vscode.postMessage({ command: "modelChanged", model: modelSelector.value });
+  });
   attachSelectionBtn.addEventListener("click", () => {
     vscode.postMessage({ command: "attachSelection" });
   });

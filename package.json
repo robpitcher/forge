@@ -98,10 +98,17 @@
           "default": "",
           "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
         },
-        "forge.copilot.model": {
-          "type": "string",
-          "default": "gpt-4.1",
-          "description": "Model deployment name"
+        "forge.copilot.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "gpt-4.1",
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "description": "Available model deployments for the model selector. The first entry is the default active model."
         },
         "forge.copilot.wireApi": {
           "type": "string",

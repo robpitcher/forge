@@ -22,7 +22,7 @@ const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
   toolShell: true,
@@ -88,7 +88,7 @@ describe("copilotService", () => {
 
   describe("getOrCreateSession", () => {
     it("creates a session with correct config", async () => {
-      const session = await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      const session = await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledWith({
@@ -107,18 +107,26 @@ describe("copilotService", () => {
     });
 
     it("reuses existing session for same conversationId", async () => {
-      const session1 = await getOrCreateSession("conv-1", validConfig, "test-key-123");
-      const session2 = await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      const session1 = await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
+      const session2 = await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
 
       expect(session1).toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
 
     it("creates separate sessions for different conversationIds", async () => {
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
-      await getOrCreateSession("conv-2", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-2", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses model parameter instead of config for session creation", async () => {
+      await getOrCreateSession("conv-model-param", validConfig, "test-key-123", "gpt-4o-mini");
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o-mini" })
+      );
     });
 
     // --- #27 auth method tests ---
@@ -126,7 +134,7 @@ describe("copilotService", () => {
     // They will pass once Childs updates getOrCreateSession to accept authToken.
 
     it("passes bearerToken on ProviderConfig when authMethod is 'entraId'", async () => {
-      await getOrCreateSession("conv-entra", entraIdConfig, "entra-bearer-token-xyz");
+      await getOrCreateSession("conv-entra", entraIdConfig, "entra-bearer-token-xyz", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -141,7 +149,7 @@ describe("copilotService", () => {
     });
 
     it("passes apiKey on ProviderConfig when authMethod is 'apiKey'", async () => {
-      await getOrCreateSession("conv-apikey", apiKeyConfig, "my-api-key-secret");
+      await getOrCreateSession("conv-apikey", apiKeyConfig, "my-api-key-secret", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -156,7 +164,7 @@ describe("copilotService", () => {
     });
 
     it("sets azure provider config correctly with entraId auth", async () => {
-      await getOrCreateSession("conv-entra-azure", entraIdConfig, "azure-token");
+      await getOrCreateSession("conv-entra-azure", entraIdConfig, "azure-token", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -173,7 +181,7 @@ describe("copilotService", () => {
 
     it("passes excludedTools to createSession when configured", async () => {
       const configWithExcluded = { ...validConfig, excludedTools: ["url"] };
-      await getOrCreateSession("conv-excluded", configWithExcluded, "test-key-123");
+      await getOrCreateSession("conv-excluded", configWithExcluded, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -187,7 +195,7 @@ describe("copilotService", () => {
         ...validConfig,
         toolUrl: true,
       };
-      await getOrCreateSession("conv-none", configAllEnabled, "test-key-123");
+      await getOrCreateSession("conv-none", configAllEnabled, "test-key-123", "gpt-4.1");
 
       const callArgs = mockClient.createSession.mock.calls[0][0];
       expect(callArgs.excludedTools).toBeUndefined();
@@ -196,9 +204,9 @@ describe("copilotService", () => {
 
   describe("removeSession", () => {
     it("removes a session so next call creates a new one", async () => {
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
       removeSession("conv-1");
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
@@ -206,7 +214,7 @@ describe("copilotService", () => {
 
   describe("stopClient", () => {
     it("stops client and clears sessions", async () => {
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
 
       await stopClient();
 
@@ -222,7 +230,7 @@ describe("copilotService", () => {
     });
 
     it("clears sessions so they are recreated", async () => {
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
       await stopClient();
 
       // Re-setup mock for new client
@@ -230,7 +238,7 @@ describe("copilotService", () => {
       const newMockClient = createMockClient(newMockSession);
       setMockClient(newMockClient);
 
-      await getOrCreateSession("conv-1", validConfig, "test-key-123");
+      await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
       expect(newMockClient.createSession).toHaveBeenCalledOnce();
     });
   });

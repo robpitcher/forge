@@ -32,7 +32,7 @@ const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
   toolShell: true,
@@ -164,7 +164,8 @@ describe("conversation history persistence", () => {
       const session = await resumeConversation(
         "session-1",
         validConfig,
-        "test-key-123"
+        "test-key-123",
+        "gpt-4.1"
       );
 
       expect(session).toBeDefined();
@@ -184,7 +185,7 @@ describe("conversation history persistence", () => {
 
     it("applies correct provider config for azure endpoints", async () => {
 
-      await resumeConversation("session-azure", validConfig, "test-key-123");
+      await resumeConversation("session-azure", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.resumeSession).toHaveBeenCalledWith(
         "session-azure",
@@ -204,7 +205,7 @@ describe("conversation history persistence", () => {
         endpoint: "https://api.openai.com/v1/",
       };
 
-      await resumeConversation("session-openai", openaiConfig, "test-key-123");
+      await resumeConversation("session-openai", openaiConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.resumeSession).toHaveBeenCalledWith(
         "session-openai",
@@ -218,7 +219,7 @@ describe("conversation history persistence", () => {
 
     it("applies apiKey auth when authMethod is apiKey", async () => {
 
-      await resumeConversation("session-apikey", validConfig, "my-api-key");
+      await resumeConversation("session-apikey", validConfig, "my-api-key", "gpt-4.1");
 
       const callArgs = mockClient.resumeSession.mock.calls[0][1];
       expect(callArgs.provider.apiKey).toBe("my-api-key");
@@ -227,7 +228,7 @@ describe("conversation history persistence", () => {
 
     it("applies bearerToken auth when authMethod is entraId", async () => {
 
-      await resumeConversation("session-entra", entraIdConfig, "entra-token-xyz");
+      await resumeConversation("session-entra", entraIdConfig, "entra-token-xyz", "gpt-4.1");
 
       const callArgs = mockClient.resumeSession.mock.calls[0][1];
       expect(callArgs.provider.bearerToken).toBe("entra-token-xyz");
@@ -245,7 +246,8 @@ describe("conversation history persistence", () => {
       await resumeConversation(
         "session-tools",
         configWithExcluded,
-        "test-key-123"
+        "test-key-123",
+        "gpt-4.1"
       );
 
       expect(mockClient.resumeSession).toHaveBeenCalledWith(
@@ -261,7 +263,8 @@ describe("conversation history persistence", () => {
       const session1 = await resumeConversation(
         "session-reuse",
         validConfig,
-        "test-key-123"
+        "test-key-123",
+        "gpt-4.1"
       );
       
       // Second call with same session ID should call SDK again
@@ -269,7 +272,8 @@ describe("conversation history persistence", () => {
       const session2 = await resumeConversation(
         "session-reuse",
         validConfig,
-        "test-key-123"
+        "test-key-123",
+        "gpt-4.1"
       );
 
       expect(session1).toBeDefined();
@@ -284,13 +288,13 @@ describe("conversation history persistence", () => {
       );
 
       await expect(
-        resumeConversation("nonexistent", validConfig, "test-key-123")
+        resumeConversation("nonexistent", validConfig, "test-key-123", "gpt-4.1")
       ).rejects.toThrow();
     });
 
     it("creates client if not already started", async () => {
 
-      await resumeConversation("session-1", validConfig, "test-key-123");
+      await resumeConversation("session-1", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.start).toHaveBeenCalledOnce();
     });
@@ -303,6 +307,7 @@ describe("conversation history persistence", () => {
         "session-perms",
         validConfig,
         "test-key-123",
+        "gpt-4.1",
         mockPermissionHandler
       );
 
@@ -321,7 +326,7 @@ describe("conversation history persistence", () => {
       );
 
       await expect(
-        resumeConversation("session-error", validConfig, "test-key-123")
+        resumeConversation("session-error", validConfig, "test-key-123", "gpt-4.1")
       ).rejects.toThrow("Connection timeout");
     });
   });
@@ -376,13 +381,13 @@ describe("conversation history persistence", () => {
     it("removes from local sessions map", async () => {
 
       // First resume a session to populate the map
-      await resumeConversation("session-123", validConfig, "test-key-123");
+      await resumeConversation("session-123", validConfig, "test-key-123", "gpt-4.1");
 
       // Delete it
       await deleteConversation("session-123", validConfig);
 
       // Next resume should call SDK again (not reuse cached)
-      await resumeConversation("session-123", validConfig, "test-key-123");
+      await resumeConversation("session-123", validConfig, "test-key-123", "gpt-4.1");
       expect(mockClient.resumeSession).toHaveBeenCalledTimes(2);
     });
 
@@ -439,7 +444,8 @@ describe("conversation history persistence", () => {
       const session = await resumeConversation(
         "session-int-1",
         validConfig,
-        "test-key-123"
+        "test-key-123",
+        "gpt-4.1"
       );
       expect(session).toBeDefined();
 
@@ -487,7 +493,7 @@ describe("conversation history persistence", () => {
 
       // Implementation doesn't validate endpoint — SDK would fail
       // We're testing that the wrapper doesn't crash pre-SDK
-      await resumeConversation("session-bad", invalidConfig, "test-key-123");
+      await resumeConversation("session-bad", invalidConfig, "test-key-123", "gpt-4.1");
       
       expect(mockClient.resumeSession).toHaveBeenCalledWith(
         "session-bad",
@@ -515,7 +521,7 @@ describe("conversation history persistence", () => {
       );
 
       await expect(
-        resumeConversation("session-auth", entraIdConfig, "expired-token")
+        resumeConversation("session-auth", entraIdConfig, "expired-token", "gpt-4.1")
       ).rejects.toThrow("token expired");
     });
   });

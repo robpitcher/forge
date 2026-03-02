@@ -255,16 +255,28 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
+  private _selectedModel?: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage,
     private readonly _workspaceState: vscode.Memento
-  ) {}
+  ) {
+    // Restore persisted model selection
+    this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
+  }
 
   /** Set by activate() to trigger auth status refresh from within the provider. */
   public setAuthRefreshCallback(callback: () => void): void {
     this._refreshAuthStatus = callback;
+  }
+
+  /** Returns the active model: persisted selection, or first entry from models array. */
+  private _getActiveModel(models: string[]): string {
+    if (this._selectedModel && models.includes(this._selectedModel)) {
+      return this._selectedModel;
+    }
+    return models[0] ?? "gpt-4.1";
   }
 
   public postContextAttached(context: ContextItem): void {
@@ -322,6 +334,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       .then(async (config) => {
         const status = await checkAuthStatus(config, this._secrets);
         this.postAuthStatus(status, !!config.endpoint);
+        this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
       })
       .catch(() => {
         // Silent failure — status bar will show the error
@@ -385,6 +399,27 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._conversationId = `conv-${crypto.randomUUID()}`;
       this._conversationMessages = [];
       this._view?.webview.postMessage({ type: "conversationReset" });
+    } else if (message.command === "modelChanged") {
+      const newModel = message.model as string;
+      if (!newModel) { return; }
+      const confirm = await vscode.window.showWarningMessage(
+        "Changing models will reset the current conversation. Continue?",
+        { modal: true },
+        "Continue"
+      );
+      if (confirm !== "Continue") {
+        const currentConfig = await getConfigurationAsync(this._secrets);
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(currentConfig.models) });
+        return;
+      }
+      this._selectedModel = newModel;
+      await this._workspaceState.update("forge.selectedModel", newModel);
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+      this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
+      this._view?.webview.postMessage({ type: "conversationReset" });
+      this._view?.webview.postMessage({ type: "modelSelected", model: newModel });
     } else if (message.command === "chatFocused") {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -481,6 +516,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         this._conversationId,
         config,
         authToken,
+        this._getActiveModel(config.models),
         this._createPermissionHandler(),
       );
     } catch (err: unknown) {
@@ -780,7 +816,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._createPermissionHandler());
+      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._createPermissionHandler());
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState
@@ -858,6 +894,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             <div class="button-row">
                 <button id="sendBtn">Send</button>
                 <button id="newConvBtn">New Conversation</button>
+                <select id="modelSelector" title="Select model deployment"></select>
             </div>
         </div>
     </div>

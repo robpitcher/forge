@@ -34,7 +34,7 @@ const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
   toolShell: true,
@@ -130,6 +130,11 @@ describe("Error: WebviewView error paths", () => {
         delete: vi.fn().mockResolvedValue(undefined),
         onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       },
+      workspaceState: {
+        get: vi.fn().mockReturnValue(undefined),
+        update: vi.fn().mockResolvedValue(undefined),
+        keys: vi.fn().mockReturnValue([]),
+      },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
 
@@ -161,7 +166,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");
@@ -186,7 +190,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "https://example.com",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     });
@@ -211,7 +214,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "https://example.com",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");
@@ -240,7 +242,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "https://example.com",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");
@@ -272,7 +273,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "https://example.com",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");
@@ -316,7 +316,6 @@ describe("Error: WebviewView error paths", () => {
       endpoint: "https://example.com",
       authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");

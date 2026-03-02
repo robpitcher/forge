@@ -44,7 +44,6 @@ describe("WebviewView chat panel", () => {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
       authMethod: "apiKey",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     };
@@ -155,7 +154,10 @@ describe("WebviewView chat panel", () => {
 
       const messages = getPostedMessages(mockView);
       const types = messages
-        .filter((m: unknown) => (m as { type: string }).type !== "authStatus")
+        .filter((m: unknown) => {
+          const t = (m as { type: string }).type;
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected";
+        })
         .map((m: unknown) => (m as { type: string }).type);
 
       expect(types[0]).toBe("streamStart");

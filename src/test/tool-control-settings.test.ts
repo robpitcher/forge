@@ -39,7 +39,7 @@ const baseConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
   authMethod: "apiKey",
-  model: "gpt-4.1",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
   toolShell: true,
@@ -98,7 +98,7 @@ describe("Tool control settings (#91)", () => {
     it("passes default excludedTools (url only) to SessionConfig", async () => {
       const config = configWith({}); // default: toolUrl=false
 
-      await getOrCreateSession("conv-default-excl", config, "test-key-123");
+      await getOrCreateSession("conv-default-excl", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       expect(sessionArgs.excludedTools).toEqual(["url"]);
@@ -112,7 +112,7 @@ describe("Tool control settings (#91)", () => {
     it("excludes multiple disabled tools", async () => {
       const config = configWith({ toolUrl: false, toolShell: false, toolWrite: false });
 
-      await getOrCreateSession("conv-custom-excl", config, "test-key-123");
+      await getOrCreateSession("conv-custom-excl", config, "test-key-123", "gpt-4.1");
 
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
       expect(sessionArgs.excludedTools).toEqual(expect.arrayContaining(["shell", "write", "url"]));
@@ -136,7 +136,7 @@ describe("Tool control settings (#91)", () => {
     it("does not pass excludedTools when all tools are enabled", async () => {
       const config = configWith({ toolUrl: true }); // all true
 
-      const session = await getOrCreateSession("conv-all-enabled", config, "test-key-123");
+      const session = await getOrCreateSession("conv-all-enabled", config, "test-key-123", "gpt-4.1");
 
       expect(session).toBeDefined();
       const sessionArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
@@ -145,7 +145,7 @@ describe("Tool control settings (#91)", () => {
 
     it("creates session normally with all tools enabled", async () => {
       const config = configWith({ toolUrl: true });
-      const session = await getOrCreateSession("conv-all-ok", config, "test-key-123");
+      const session = await getOrCreateSession("conv-all-ok", config, "test-key-123", "gpt-4.1");
 
       expect(session).toBeDefined();
       expect(mockClient.createSession).toHaveBeenCalledOnce();
@@ -163,13 +163,13 @@ describe("Tool control settings (#91)", () => {
     it("new conversation picks up changed tool settings", async () => {
       // First conversation with default (url disabled)
       const config1 = configWith({});
-      await getOrCreateSession("conv-change-1", config1, "test-key-123");
+      await getOrCreateSession("conv-change-1", config1, "test-key-123", "gpt-4.1");
 
       const firstArgs = mockClient.createSession.mock.calls[0][0] as Record<string, unknown>;
 
       // Start a new conversation with shell also disabled
       const config2 = configWith({ toolShell: false });
-      await getOrCreateSession("conv-change-2", config2, "test-key-123");
+      await getOrCreateSession("conv-change-2", config2, "test-key-123", "gpt-4.1");
 
       const secondArgs = mockClient.createSession.mock.calls[1][0] as Record<string, unknown>;
 
@@ -179,13 +179,13 @@ describe("Tool control settings (#91)", () => {
 
     it("removed session gets fresh config on recreation", async () => {
       const config1 = configWith({});
-      await getOrCreateSession("conv-reuse", config1, "test-key-123");
+      await getOrCreateSession("conv-reuse", config1, "test-key-123", "gpt-4.1");
 
       removeSession("conv-reuse");
 
       // Re-create with shell disabled
       const config2 = configWith({ toolShell: false, toolUrl: true });
-      await getOrCreateSession("conv-reuse", config2, "test-key-123");
+      await getOrCreateSession("conv-reuse", config2, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
 
@@ -198,10 +198,10 @@ describe("Tool control settings (#91)", () => {
 
     it("cached session does NOT pick up config changes (by design)", async () => {
       const config1 = configWith({});
-      await getOrCreateSession("conv-cached", config1, "test-key-123");
+      await getOrCreateSession("conv-cached", config1, "test-key-123", "gpt-4.1");
 
       const config2 = configWith({ toolShell: false });
-      await getOrCreateSession("conv-cached", config2, "test-key-123");
+      await getOrCreateSession("conv-cached", config2, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
