@@ -16,3 +16,11 @@
 - **Chat Modes are planned, not shipped:** No mode selector exists in `media/chat.js` and no `ChatMode` type exists in `src/copilotService.ts`. The extension currently defaults to Agent mode.
 - **README documentation updates:** Replaced developer-focused Installation section (clone/build workflow) with user-focused two-path install guide (GitHub Releases for air-gapped envs, VS Code Marketplace). Added devcontainer note at top of Development section highlighting pre-configured setup for Codespaces/Dev Containers. Removed redundant "Building from Source" section. Architecture section untouched per Nauls ownership.
 - **Installation guide consolidation (decision: remove docs/installation-guide.md):** Removed out-of-scope Copilot CLI installation instructions from docs. Users now refer directly to the upstream [Copilot CLI repo](https://github.com/github/copilot-cli). Added Azure CLI (`az`) as a required prerequisite in README (with note it's for Entra ID auth). Updated all references in configuration-reference.md to point to Copilot CLI repo. This aligns with air-gapped deployment philosophy: minimize duplicated upstream docs, always link to canonical sources.
+
+---
+
+**📌 Session: 2026-03-02T15:01:28Z**
+
+- ✅ Decision merged: "Remove Copilot CLI Installation Guide from Docs" 
+- All references updated to link upstream; Copilot CLI now canonical source
+- Azure CLI added as prerequisite (Entra ID auth support)
