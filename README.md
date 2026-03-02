@@ -1,10 +1,74 @@
 # Forge
 
-A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without internet connectivity or GitHub authentication.
+A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without requiring internet connectivity or GitHub authentication.
 
 The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode to route all model inference to a private **Azure AI Foundry** endpoint.
 
-> 📄 See [specs/PRD-airgapped-copilot-vscode-extension.md](specs/PRD-airgapped-copilot-vscode-extension.md) for the full Product Requirements Document.
+## Prerequisites
+
+- **VS Code** 1.93 or later
+- **Node.js** 20.19.0+ (for development/build)
+- **GitHub Copilot CLI** binary (`copilot` v0.0.418+ from [github/copilot-cli](https://github.com/github/copilot-cli); you can override the path via `forge.copilot.cliPath`)
+- **Azure AI Foundry** endpoint (OpenAI-compatible API)
+
+## Quick Start
+
+1. **Install the Copilot CLI** on your machine. See [docs/installation-guide.md](docs/installation-guide.md) for detailed, installation steps.
+
+2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
+
+   | Setting | Description |
+   |---------|-------------|
+   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+   | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
+   | `forge.copilot.models` | Available model deployments (default: `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]`) |
+
+   **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
+
+3. **Open Forge:** Click the Forge icon in the VS Code sidebar
+
+4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
+
+5. **Multi-turn conversations:** The chat maintains session context within the same session
+
+## Features
+
+### Authentication Methods
+
+Forge supports two authentication methods, controlled by `forge.copilot.authMethod`:
+
+- **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
+- **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for environments without Entra ID.
+
+### Code Actions
+
+Right-click on code or use the editor lightbulb menu (💡) to access:
+
+- **Explain with Forge** — Get an explanation of selected code
+- **Fix with Forge** — Ask Forge to fix selected code
+- **Write Tests with Forge** — Generate tests for selected code
+
+### Model Selector
+
+Use the model dropdown in the chat UI to switch between configured models. Models are configured via `forge.copilot.models`.
+
+## Usage
+
+### Start a chat
+
+1. Click the Forge icon in the VS Code sidebar to open the Forge chat
+2. Type your message in the input field
+3. Press **Enter** to send (Shift+Enter for newline)
+
+### Example prompts
+
+- `Explain how this function works`
+- `Write a unit test for this code`
+- `What are the performance implications?`
+
+### Stop generation
+
+Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
 ---
 
@@ -18,44 +82,23 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
 │  │         Forge Sidebar (WebviewView)                 │  │
 │  │   User types prompt → sees streamed markdown reply  │  │
 │  └────────────────────┬────────────────────────────────┘  │
-│                       │                                    │
+│                       │                                   │
 │  ┌────────────────────▼────────────────────────────────┐  │
 │  │         Extension Host (our extension)              │  │
 │  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
 │  │   Creates session → Streams deltas to sidebar       │  │
 │  └────────────────────┬────────────────────────────────┘  │
-│                       │ JSON-RPC (stdio)                   │
+│                       │ JSON-RPC (stdio)                  │
 │  ┌────────────────────▼────────────────────────────────┐  │
-│  │   Copilot CLI (local stdio process via SDK)          │  │
+│  │   Copilot CLI (local stdio process via SDK)         │  │
 │  └────────────────────┬────────────────────────────────┘  │
 └───────────────────────┼──────────────────────────────────┘
                         │ HTTPS (private network)
                         ▼
 ┌──────────────────────────────────────────────────────────┐
-│           Azure AI Foundry (Private Endpoint)             │
+│           Azure AI Foundry (Private Endpoint)            │
 └──────────────────────────────────────────────────────────┘
 ```
-
-### Source Files
-
-- **`src/extension.ts`** — VS Code extension activation, WebviewViewProvider, status bar, message handling
-- **`src/copilotService.ts`** — CopilotClient lifecycle management, BYOK session creation, session reuse map
-- **`src/configuration.ts`** — VS Code settings reader and validation for required fields
-- **`src/types.ts`** — TypeScript type definitions for SDK interfaces
-- **`src/auth/credentialProvider.ts`** — Auth abstraction (Entra ID / API Key)
-- **`src/auth/authStatusProvider.ts`** — Auth status polling and status bar updates
-- **`src/codeActionProvider.ts`** — Editor code actions (Explain, Fix, Write Tests)
-- **`media/chat.js`** — Webview UI logic
-- **`media/chat.css`** — Webview styles
-
----
-
-## Prerequisites
-
-- **VS Code** 1.93 or later
-- **Node.js** 20.19.0+ (for development/build)
-- **GitHub Copilot CLI** binary (`copilot` v0.0.418+ from [github/copilot-cli](https://github.com/github/copilot-cli) or air-gapped distribution; you can override the path via `forge.copilot.cliPath`)
-- **Azure AI Foundry** endpoint (OpenAI-compatible API)
 
 ---
 
@@ -86,81 +129,6 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
    - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Click "..." menu → "Install from VSIX"
    - Select `forge-0.1.0.vsix`
-
----
-
-## Quick Start
-
-1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments). See [docs/installation-guide.md](docs/installation-guide.md) for detailed, air-gapped installation steps.
-
-2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
-
-   | Setting | Description |
-   |---------|-------------|
-   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
-   | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
-   | `forge.copilot.models` | Available model deployments (default: `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]`) |
-
-   **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
-
-3. **Open Forge:** Click the Forge icon in the VS Code sidebar
-
-4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
-
-5. **Multi-turn conversations:** The chat maintains session context within the same session
-
----
-
-## Features
-
-### Authentication Methods
-
-Forge supports two authentication methods, controlled by `forge.copilot.authMethod`:
-
-- **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
-- **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for air-gapped environments without Entra ID.
-
-### Chat Modes *(planned)*
-
-> **Note:** Chat modes are not yet exposed in the UI. The extension currently operates in Agent mode by default. A mode selector is planned for a future release.
-
-| Mode | Description |
-|------|-------------|
-| **Chat** | Conversation only — no tool access |
-| **Agent** | Tools enabled — shell commands, file read/write, URL fetch, MCP servers |
-| **Plan** | Creates implementation plans for complex tasks |
-
-### Code Actions
-
-Right-click on code or use the editor lightbulb menu (💡) to access:
-
-- **Explain with Forge** — Get an explanation of selected code
-- **Fix with Forge** — Ask Forge to fix selected code
-- **Write Tests with Forge** — Generate tests for selected code
-
-### Model Selector
-
-Use the model dropdown in the chat UI to switch between configured models. Models are configured via `forge.copilot.models`.
-
----
-
-## Usage
-
-### Start a chat
-
-1. Click the Forge icon in the VS Code sidebar to open the Forge chat
-2. Type your message in the input field
-3. Press **Enter** to send (Shift+Enter for newline)
-
-### Example prompts
-
-- `Explain how this function works`
-- `Write a unit test for this code`
-- `What are the performance implications?`
-
-### Stop generation
-
-Click the stop button (⏹) in the sidebar to cancel in-flight requests.
 
 ---
 
