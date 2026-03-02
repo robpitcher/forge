@@ -24,3 +24,23 @@
 - ✅ Decision merged: "Remove Copilot CLI Installation Guide from Docs" 
 - All references updated to link upstream; Copilot CLI now canonical source
 - Azure CLI added as prerequisite (Entra ID auth support)
+
+---
+
+**📌 Session: README Repositioning**
+
+- ✅ Repositioned README and package.json away from "air-gapped" as headline framing
+- New lead: organizational control over inference, private endpoints, no external dependencies
+- "Air-gapped" retained as one scenario alongside sovereign cloud and compliance environments
+- Rob's preference: straightforward, technical language — no marketing jargon
+- package.json `description` field updated to match new positioning
+
+---
+
+**📌 Session: Deployment Name Clarification**
+
+- ✅ Clarified `forge.copilot.models` throughout README: values must match Azure AI Foundry **deployment names**, not underlying model names
+- Updated default from `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` to `[]` (empty array) across Quick Start and Core Settings tables
+- Kept example config unchanged — it shows a realistic configured setup
+- Model Selector section updated to mention deployment names and the distinction
+- Key learning: deployment names and model names can differ in Foundry (e.g., deployment `my-gpt4` may host model `gpt-4o`)

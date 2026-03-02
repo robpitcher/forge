@@ -1,8 +1,8 @@
 # Forge
 
-A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without requiring internet connectivity or GitHub authentication.
+A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. No external dependencies. No GitHub authentication required. Works in air-gapped, sovereign cloud, and compliance-driven environments.
 
-The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode to route all model inference to a private **Azure AI Foundry** endpoint.
+The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint within your Azure tenant.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode t
    |---------|-------------|
    | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
    | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
-   | `forge.copilot.models` | Available model deployments (default: `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]`) |
+   | `forge.copilot.models` | Deployment names from your Azure AI Foundry (default: `[]`, e.g., `["gpt-4.1", "gpt-4o"]`) |
 
    **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
 
@@ -52,7 +52,7 @@ Right-click on code or use the editor lightbulb menu (💡) to access:
 
 ### Model Selector
 
-Use the model dropdown in the chat UI to switch between configured models. Models are configured via `forge.copilot.models`.
+Use the model dropdown in the chat UI to switch between configured deployment names. Models are configured via `forge.copilot.models` — values must match the **deployment name** in Azure AI Foundry, not the underlying model name.
 
 ## Usage
 
@@ -93,7 +93,7 @@ graph TD
 
 ## Installation
 
-### From GitHub Releases (recommended for air-gapped environments)
+### From GitHub Releases (recommended for restricted or air-gapped networks)
 
 1. Download the latest `.vsix` file from [GitHub Releases](https://github.com/robpitcher/forge/releases)
 2. In VS Code, open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
@@ -113,7 +113,7 @@ Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
 | `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
-| `forge.copilot.models` | `string[]` | No | `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` | Available model deployments for the model selector. First entry is the default. |
+| `forge.copilot.models` | `string[]` | No | `[]` | Azure AI Foundry deployment names for the model selector. Must match the deployment name in Foundry, not the underlying model name. First entry is the default. |
 | `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
 | `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
 | `forge.copilot.authMethod` | `string` | No | `"entraId"` | Auth method: `"entraId"` (DefaultAzureCredential) or `"apiKey"` |
