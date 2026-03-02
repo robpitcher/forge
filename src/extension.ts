@@ -101,14 +101,34 @@ export function activate(context: vscode.ExtensionContext): void {
         const terminal = vscode.window.createTerminal("Azure Sign In");
         terminal.sendText("az login");
         terminal.show();
-        // Re-check auth after a few seconds to pick up the new token
+        // Poll auth status every 5s for up to 60s to catch az login completion
         if (signInTimeoutHandle !== undefined) {
           clearTimeout(signInTimeoutHandle);
         }
-        signInTimeoutHandle = setTimeout(() => {
-          signInTimeoutHandle = undefined;
-          updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
-        }, SIGN_IN_RECHECK_MS);
+        let signInChecksRemaining = 12; // 12 × 5s = 60s
+        const scheduleSignInRecheck = () => {
+          if (signInChecksRemaining <= 0) {
+            signInTimeoutHandle = undefined;
+            return;
+          }
+          signInChecksRemaining--;
+          signInTimeoutHandle = setTimeout(async () => {
+            try {
+              await updateAuthStatus(statusBarItem, provider, context.secrets);
+              // Stop polling once auth succeeds
+              const cfg = await getConfigurationAsync(context.secrets);
+              const status = await checkAuthStatus(cfg, context.secrets);
+              if (status.state === "authenticated") {
+                signInTimeoutHandle = undefined;
+                return;
+              }
+            } catch (err) {
+              outputChannel.appendLine(`Auth status update failed: ${err}`);
+            }
+            scheduleSignInRecheck();
+          }, SIGN_IN_RECHECK_MS);
+        };
+        scheduleSignInRecheck();
       } else {
         await provider.openSettings();
       }
@@ -249,6 +269,7 @@ async function updateAuthStatus(
   }
   
   provider.postAuthStatus(status, !!config.endpoint);
+  provider.postConfigStatus(!!config.endpoint, status.state === "authenticated", config.models.length > 0);
 }
 
 export async function deactivate(): Promise<void> {
@@ -315,6 +336,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
+  public postConfigStatus(hasEndpoint: boolean, hasAuth: boolean, hasModels: boolean): void {
+    this._view?.webview.postMessage({
+      type: "configStatus",
+      hasEndpoint,
+      hasAuth,
+      hasModels,
+    });
+  }
+
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -345,13 +375,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public async openSettings(): Promise<void> {
     const choice = await vscode.window.showQuickPick(
-      ["Open Settings", "Set API Key (secure)"],
+      ["Open Settings", "Set API Key (secure)", "Clear API Key"],
       { placeHolder: "Forge Configuration" }
     );
     if (choice === "Open Settings") {
       await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
     } else if (choice === "Set API Key (secure)") {
       await this._promptAndStoreApiKey();
+    } else if (choice === "Clear API Key") {
+      await this._clearApiKey();
     }
   }
 
@@ -364,9 +396,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     if (value !== undefined) {
       await this._secrets.store("forge.copilot.apiKey", value);
+      // Switch auth method to apiKey so checkAuthStatus looks in the right place
+      await vscode.workspace.getConfiguration("forge.copilot").update("authMethod", "apiKey", vscode.ConfigurationTarget.Global);
       await vscode.window.showInformationMessage("API key stored securely.");
       this._refreshAuthStatus?.();
     }
+  }
+
+  private async _clearApiKey(): Promise<void> {
+    await this._secrets.delete("forge.copilot.apiKey");
+    // Revert to Entra ID since there's no API key anymore
+    await vscode.workspace.getConfiguration("forge.copilot").update("authMethod", "entraId", vscode.ConfigurationTarget.Global);
+    await vscode.window.showInformationMessage("API key cleared.");
+    this._refreshAuthStatus?.();
   }
 
   private async _handleMessage(message: { command: string; [key: string]: unknown }): Promise<void> {
@@ -398,6 +440,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.signIn");
     } else if (message.command === "setApiKey") {
       await this._promptAndStoreApiKey();
+    } else if (message.command === "clearApiKey") {
+      await this._clearApiKey();
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
@@ -477,6 +521,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._handleResumeConversation(message.sessionId as string);
     } else if (message.command === "deleteConversation") {
       await this._handleDeleteConversation(message.sessionId as string);
+    } else if (message.command === "openDocs") {
+      await vscode.env.openExternal(vscode.Uri.parse("https://github.com/robpitcher/forge?tab=readme-ov-file#forge"));
     }
   }
 
