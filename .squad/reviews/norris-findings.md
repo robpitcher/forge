@@ -1,12 +1,12 @@
 # Security Review — Norris
 
-**Date:** 2026-03-02
-**Scope:** Full codebase audit for issue #112
+**Date:** 2026-03-02 (updated 2026-07-14)
+**Scope:** Full codebase audit for issue #112 — comprehensive re-audit
 **Files Reviewed:** src/extension.ts, src/copilotService.ts, src/configuration.ts, src/types.ts, src/auth/credentialProvider.ts, src/auth/authStatusProvider.ts, src/codeActionProvider.ts, media/chat.js, media/chat.css, package.json, esbuild.config.mjs
 
 ## Summary
 
-The Forge codebase demonstrates **solid security fundamentals** — CSP is well-configured with nonce-based script loading, DOMPurify sanitizes all markdown-rendered HTML, secrets use VS Code SecretStorage, and there are zero npm audit vulnerabilities. The main concerns are around CSS selector injection in querySelector calls using unsanitized SDK-provided IDs, the bearer token refresh gap inherent to the Copilot SDK's static-string-only `bearerToken` field, and missing endpoint URL validation. No critical vulnerabilities were found.
+The Forge codebase maintains a **strong security posture**. CSP uses nonce-based script loading with `default-src 'none'`, DOMPurify sanitizes all markdown-rendered HTML, secrets use VS Code SecretStorage exclusively, and `npm audit` reports zero vulnerabilities. New features (conversation history, model selector, tool progress, code actions, auth banner) follow existing safe patterns. No critical or high-severity vulnerabilities found. Four medium-severity defense-in-depth findings remain from the initial audit, plus one new medium finding on conversation history `sessionId` validation.
 
 ## Findings
 
@@ -18,7 +18,7 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
   ```js
   document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
   ```
-  The `message.id` originates from SDK `toolCallId` values (or `crypto.randomUUID()` fallback). While the extension host controls these values (src/extension.ts:650, 660, 671, 720), a malformed `toolCallId` from the SDK containing `"]` could break the selector or cause unexpected DOM lookups.
+  The `message.id` originates from SDK `toolCallId` values (or `crypto.randomUUID()` fallback). While the extension host controls these values (src/extension.ts:648, 658, 668, 720), a malformed `toolCallId` from the SDK containing `"]` could break the selector or cause unexpected DOM lookups.
 - **Impact:** If a crafted `toolCallId` contained CSS selector metacharacters like `"]`, it could cause the selector to match unintended elements or throw. This is defense-in-depth — the SDK likely produces safe IDs, but the code should not assume this.
 - **Remediation:** Use `CSS.escape(message.id)` before interpolation:
   ```js
@@ -59,27 +59,65 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
 - **Impact:** If an attacker can modify workspace-level `.vscode/settings.json` (e.g., via a malicious git repo clone), they could configure an MCP server with arbitrary commands that execute when Forge activates. This is analogous to VS Code's own terminal and task trust prompts.
 - **Remediation:** Consider adding a trust prompt before spawning MCP servers from workspace settings (similar to VS Code's "Do you trust the authors of this workspace?"). At minimum, log which MCP commands are being spawned. The `autoApproveTools: false` default helps, but MCP server *startup* is not gated by tool approval.
 
+### 🟡 Medium: Conversation History `sessionId` Not Format-Validated
+
+- **Location:** src/extension.ts:469, 471, 781-840, 842-861
+- **Category:** Input Validation / Trust Boundary
+- **Description:** The `resumeConversation` and `deleteConversation` webview message handlers receive `sessionId` as an untyped value from the webview (`message.sessionId as string`). The only validation is `if (!sessionId)` (empty/falsy check). The raw string is passed directly to the SDK's `resumeSession()` and `deleteSession()` methods and used as a `workspaceState` cache key (`forge.messages.${sessionId}`).
+- **Impact:** A compromised or buggy webview could send arbitrary strings as `sessionId`, potentially causing unexpected SDK behavior or polluting workspaceState with keys containing special characters. Practical risk is low since the webview is sandboxed and extension-controlled, but this violates the trust boundary principle of validating all inputs from less-trusted contexts.
+- **Remediation:** Validate `sessionId` format before use — e.g., ensure it matches a UUID or expected pattern:
+  ```typescript
+  if (!sessionId || typeof sessionId !== "string" || sessionId.length > 100) {
+    this._postError("Invalid session ID");
+    return;
+  }
+  ```
+
 ### 🟢 Low: `innerHTML` with Static Content (No Risk)
 
-- **Location:** media/chat.js:129, 135, 252, 257, 259
+- **Location:** media/chat.js:83, 92, 95, 125, 129, 135, 252, 257, 259, 357, 363, 379, 389, 499, 590
 - **Category:** XSS
-- **Description:** Several `innerHTML` assignments use static HTML strings (e.g., the SVG copy button, conversation list header, "No saved conversations" message). These are safe because no user data is interpolated.
+- **Description:** Many `innerHTML` assignments either clear content (`= ""`) or use static HTML strings (SVG copy button, conversation list header, "No saved conversations"). These are safe because no user data is interpolated. The `conversationReset` handler (line 357) and `conversationResumed` handler (line 379) safely clear before re-rendering via `appendMessage`.
 - **Impact:** None — these are safe patterns.
-- **Remediation:** No action needed. For consistency, consider using `createElement` for the conversation list header (line 135), but this is cosmetic.
+- **Remediation:** No action needed.
 
 ### 🟢 Low: `renderMarkdown()` Properly Sanitized
 
 - **Location:** media/chat.js:239-242, 193, 274
 - **Category:** XSS
-- **Description:** All markdown rendering goes through `DOMPurify.sanitize(marked.parse(text))`. This is the correct pattern. The sanitized output is assigned via `innerHTML` at lines 193 and 274. Both `marked` (v17.0.3) and `dompurify` (v3.3.1) are current versions.
+- **Description:** All markdown rendering goes through `DOMPurify.sanitize(marked.parse(text))`. This is the correct pattern. The sanitized output is assigned via `innerHTML` at lines 193 and 274. Both `marked` (v17.0.3) and `dompurify` (v3.3.1) are current versions. The `conversationResumed` handler (line 383-385) re-renders restored assistant messages through `appendMessage`, which uses this same safe path.
 - **Impact:** XSS risk from AI-generated markdown content is properly mitigated.
 - **Remediation:** No action needed. Continue to ensure all new innerHTML assignments with dynamic content use this `renderMarkdown()` path.
 
-### 🟢 Low: Tool Confirmation Params Display Uses `textContent`
+### 🟢 Low: Tool Confirmation & Progress Display Uses Safe DOM APIs
 
-- **Location:** media/chat.js:443, 478
+- **Location:** media/chat.js:443, 478, 519-577
 - **Category:** XSS
-- **Description:** Tool confirmation card renders the tool name (`header.textContent = ...`) and params (`params.textContent = ...`) using `textContent`, which is safe against XSS. The `formatParamValue` function truncates long values to prevent DoS. Good pattern.
+- **Description:** Tool confirmation card renders tool name and params using `textContent`, safe against XSS. The `formatParamValue` function truncates long values to prevent DoS. Tool progress indicators (line 537-540) set label text via `textContent`. Partial result output (line 574) appends via `createTextNode`. All safe patterns.
+- **Impact:** None.
+- **Remediation:** No action needed.
+
+### 🟢 Low: Conversation List Renders Safely
+
+- **Location:** media/chat.js:124-178
+- **Category:** XSS
+- **Description:** `renderConversationList` creates DOM elements programmatically. Conversation summaries (line 150) and timestamps (line 154) use `textContent`. Delete buttons (line 160-162) use `textContent`. The only `innerHTML` is a static string for the "No saved conversations" message (line 129) and the header (line 135). Safe pattern.
+- **Impact:** None.
+- **Remediation:** No action needed.
+
+### 🟢 Low: Auth Banner Renders Safely
+
+- **Location:** media/chat.js:580-655
+- **Category:** XSS
+- **Description:** `updateAuthBanner` creates interactive elements (buttons) using `createElement` and `textContent`/`createTextNode`. The error message is truncated to 80 chars and rendered via `textContent` (line 646). No user-controlled data reaches `innerHTML`.
+- **Impact:** None.
+- **Remediation:** No action needed.
+
+### 🟢 Low: Model Selector Renders Safely
+
+- **Location:** media/chat.js:389-398
+- **Category:** XSS
+- **Description:** The `modelsUpdated` handler creates `<option>` elements using `createElement` and sets `opt.textContent = m`. Model names come from the extension host's config. Safe pattern.
 - **Impact:** None.
 - **Remediation:** No action needed.
 
@@ -96,6 +134,7 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
   - No CDN or external sources — air-gap compliant
   - Nonce generated via `crypto.randomUUID()` — sufficient entropy
   - `img-src` is not whitelisted, which means markdown images from AI responses won't render (acceptable for air-gap compliance)
+  - No `eval()`, `Function()`, or dynamic code execution found anywhere in the codebase
 - **Impact:** Positive — this is a strong CSP.
 - **Remediation:** No action needed.
 
@@ -107,8 +146,9 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
   - `getConfigurationAsync()` reads keys only from `secrets.get("forge.copilot.apiKey")`
   - `_promptAndStoreApiKey()` stores via `secrets.store()` with `password: true` in the input box
   - `configuration.ts:31` returns `apiKey: ""` for the sync config getter — never reads from settings
-  - No API keys appear in `console.log/warn/error` calls — the `console.warn` calls in copilotService.ts only log session IDs and error messages
+  - No API keys appear in `console.log/warn/error` calls — the `console.warn` calls in copilotService.ts only log session IDs and error messages, never tokens
   - No secrets in URLs or query parameters
+  - `authStatusProvider.ts:decodeJwtPayload()` only extracts identity claims (upn, name) — never logs the raw token
 - **Impact:** Positive — secrets are properly handled.
 - **Remediation:** No action needed.
 
@@ -121,9 +161,10 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
   - No CDN links in webview HTML (CSP blocks them anyway)
   - No telemetry or analytics code
   - The only network calls go through the Copilot SDK to the user-configured endpoint
-  - esbuild bundles all dependencies — no runtime CDN fetches
+  - esbuild bundles all dependencies (both extension and webview) — no runtime CDN fetches
   - MCP remote servers are gated behind `allowRemoteMcp: false` default
   - The `tools.url` setting defaults to `false` for air-gap safety
+  - Conversation history operations (list/resume/delete) are local SDK file operations, not network calls
 - **Impact:** Positive — fully air-gap compliant.
 - **Remediation:** No action needed.
 
@@ -138,14 +179,15 @@ The Forge codebase demonstrates **solid security fundamentals** — CSP is well-
   - No `eval()` or dynamic code execution on either side
   - `localResourceRoots` restricts webview file access to `_extensionUri` only
   - `enableScripts: true` is necessary and secured by the CSP nonce
+  - New conversation commands (`listConversations`, `resumeConversation`, `deleteConversation`) properly pass through to SDK with error handling
 - **Impact:** Positive — the trust boundary is reasonably well-guarded.
-- **Remediation:** No action needed, but consider adding a `command` allowlist check to `_handleMessage()` to reject unknown commands early.
+- **Remediation:** Consider adding a `command` allowlist check to `_handleMessage()` to reject unknown commands early. See also the `sessionId` validation finding above.
 
-### ℹ️ Info: `error` Message Uses `textContent`
+### ℹ️ Info: Code Action Provider is Safe
 
-- **Location:** media/chat.js:309
-- **Category:** XSS
-- **Description:** Error messages from the extension are rendered via `appendMessage("error", ...)` which uses `contentDiv.textContent = content` for non-assistant roles (line 196). This is safe — error messages cannot inject HTML.
+- **Location:** src/codeActionProvider.ts
+- **Category:** Input Validation
+- **Description:** `ForgeCodeActionProvider` only creates VS Code `CodeAction` objects with hardcoded command IDs and titles. No user input is processed, no DOM manipulation, no network calls. The `sendFromEditor` function (src/extension.ts:175-202) reads selection content from the active editor, which is inherently trusted content.
 - **Impact:** None.
 - **Remediation:** No action needed.
 
@@ -161,21 +203,27 @@ All dependencies are clean. Key security-relevant dependency versions:
 - `@azure/identity@^4.13.0` — current Azure auth SDK
 - `@github/copilot-sdk@0.1.26` — pinned version (Technical Preview)
 
+No `eval`, `Function()`, or `unsafe-inline`/`unsafe-eval` patterns found in source code.
+
 ## Summary Table
 
-| # | Severity | Title | Category |
-|---|----------|-------|----------|
-| 1 | 🟡 Medium | CSS Selector Injection via `message.id` | Input Validation |
-| 2 | 🟡 Medium | Bearer Token Refresh Gap (Entra ID) | Auth |
-| 3 | 🟡 Medium | No Endpoint URL Validation | Input Validation |
-| 4 | 🟡 Medium | MCP Server Command Injection Surface | Input Validation |
-| 5 | 🟢 Low | `innerHTML` with Static Content | XSS |
-| 6 | 🟢 Low | `renderMarkdown()` Properly Sanitized | XSS |
-| 7 | 🟢 Low | Tool Params Uses `textContent` | XSS |
-| 8 | ℹ️ Info | CSP Policy Correctly Configured | CSP |
-| 9 | ℹ️ Info | Secret Management Correct | Secrets |
-| 10 | ℹ️ Info | Air-Gap Compliance Verified | Air-Gap |
-| 11 | ℹ️ Info | Trust Boundary Adequate | Trust Boundary |
-| 12 | ℹ️ Info | Error Messages Use `textContent` | XSS |
+| # | Severity | Title | Category | Status |
+|---|----------|-------|----------|--------|
+| 1 | 🟡 Medium | CSS Selector Injection via `message.id` | Input Validation | Open |
+| 2 | 🟡 Medium | Bearer Token Refresh Gap (Entra ID) | Auth | Open (#27) |
+| 3 | 🟡 Medium | No Endpoint URL Validation | Input Validation | Open |
+| 4 | 🟡 Medium | MCP Server Command Injection Surface | Input Validation | Open |
+| 5 | 🟡 Medium | Conversation `sessionId` Not Validated | Trust Boundary | **New** |
+| 6 | 🟢 Low | `innerHTML` with Static Content | XSS | Pass ✓ |
+| 7 | 🟢 Low | `renderMarkdown()` Properly Sanitized | XSS | Pass ✓ |
+| 8 | 🟢 Low | Tool Display Uses Safe DOM APIs | XSS | Pass ✓ |
+| 9 | 🟢 Low | Conversation List Renders Safely | XSS | Pass ✓ |
+| 10 | 🟢 Low | Auth Banner Renders Safely | XSS | Pass ✓ |
+| 11 | 🟢 Low | Model Selector Renders Safely | XSS | Pass ✓ |
+| 12 | ℹ️ Info | CSP Policy Correctly Configured | CSP | Pass ✓ |
+| 13 | ℹ️ Info | Secret Management Correct | Secrets | Pass ✓ |
+| 14 | ℹ️ Info | Air-Gap Compliance Verified | Air-Gap | Pass ✓ |
+| 15 | ℹ️ Info | Trust Boundary Adequate | Trust Boundary | Pass ✓ |
+| 16 | ℹ️ Info | Code Action Provider Safe | Input Validation | Pass ✓ |
 
-**Overall Assessment:** The codebase has a strong security posture for an air-gapped VS Code extension. No critical or high-severity findings. The four medium-severity items are all defense-in-depth improvements that would harden the extension further.
+**Overall Assessment:** The codebase maintains a strong security posture for an air-gapped VS Code extension. No critical or high-severity findings. Five medium-severity items are defense-in-depth improvements. All new features (conversation history, model selector, tool progress, code actions, auth banner) follow the established safe patterns. The XSS surface is well-controlled via DOMPurify + CSP nonce.
