@@ -2086,3 +2086,4 @@ updateAuthStatus(...).catch((err) => {
 3. Replace all `console.warn/error` with OutputChannel
 4. Add await + try-catch to all async cleanup operations
 5. Update error messages to be actionable (already mostly done, but verify consistency)
+
