@@ -73,7 +73,7 @@ export function validateConfiguration(
         errors.push({ field: "forge.copilot.endpoint", message: "Endpoint must use HTTPS." });
       }
     } catch {
-      errors.push({ field: "forge.copilot.endpoint", message: "Endpoint must be a valid URL (e.g., https://myresource.openai.azure.com/)." });
+      errors.push({ field: "forge.copilot.endpoint", message: "Endpoint must be a valid URL (e.g., https://myresource.services.ai.azure.com/)." });
     }
   }
 
