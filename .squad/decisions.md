@@ -2087,6 +2087,51 @@ updateAuthStatus(...).catch((err) => {
 4. Add await + try-catch to all async cleanup operations
 5. Update error messages to be actionable (already mostly done, but verify consistency)
 
+
+### 2026-03-02: Remove Copilot CLI Installation Guide from Docs
+**By:** Fuchs (Technical Writer)  
+**Status:** Implemented
+
+## Decision
+
+Removed `docs/installation-guide.md` and redirected all documentation references to the upstream [Copilot CLI repository](https://github.com/github/copilot-cli).
+
+## Rationale
+
+- Copilot CLI installation instructions are **out of scope** for Forge documentation — they are maintained upstream by the Copilot CLI team.
+- Duplicating upstream docs creates maintenance burden and risks version drift.
+- Air-gapped deployment philosophy: **minimize duplicated docs, always link to canonical sources.**
+
+## Changes
+
+1. Deleted `docs/installation-guide.md`
+2. Updated `README.md` line 18: Quick Start step 2 now links to [Copilot CLI repo](https://github.com/github/copilot-cli)
+3. Updated `docs/configuration-reference.md`:
+   - Line 187: "cliPath" setting reference updated to link to Copilot CLI repo
+   - Line 556: Summary section updated to link to Copilot CLI repo for CLI installation
+4. Added **Azure CLI (`az`)** as a prerequisite in `README.md` Prerequisites section (required for Entra ID auth)
+
+## Impact
+
+- Users now have a **single canonical source** for Copilot CLI setup (upstream repo)
+- README explicitly lists Azure CLI as a prerequisite, improving setup clarity
+- Reduced doc maintenance surface area
+
+### Default models changed to empty array
+
+**By:** Blair
+**Date:** 2026-03-02
+**What:** Changed `forge.copilot.models` default from `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` to `[]`. Updated setting description to clarify that values must match the Azure AI Foundry **model deployment name** (not the model name, as they can differ).
+**Why:** Hardcoded model names are meaningless in air-gapped BYOK deployments — users must configure their own deployment names. An empty default avoids confusing "model not found" errors and forces explicit setup.
+**Impact:** Users who previously relied on the default models list will now need to add their deployment names in settings before first use. The model selector will show empty until configured.
+
+### README Positioning: Broader Value Prop Over Air-Gapped
+
+**By:** Fuchs
+**Date:** 2026-03-02
+**What:** Repositioned README and package.json description to lead with organizational control over AI inference (private endpoints, data sovereignty, compliance, cost control) rather than "air-gapped" as the headline framing. Air-gapped remains as one mentioned scenario alongside sovereign cloud and compliance-driven environments.
+**Why:** The real value prop is organizations wanting control and visibility over their entire AI invocation flow. Air-gapped networks are one use case, not the defining one.
+**Impact:** All docs referencing Forge's purpose should use the broader framing. "Air-gapped" is fine as a scenario mention but should not be the lead descriptor.
 ---
 
 ### 2026-03-10: Update Endpoint Examples to `.services.ai.azure.com` Format
@@ -2123,3 +2168,27 @@ Added clarifying note in configuration-reference.md explaining both `.services.a
 **Date:** 2025-07-24
 **What:** Updated user-facing example endpoint URL from `https://myresource.openai.azure.com/` to `https://myresource.services.ai.azure.com/` in `package.json` settings description and `src/configuration.ts` validation error message. The `isAzure` regex (`/\.azure\.com/i`) was intentionally left unchanged — it matches both formats, so no logic change was needed. This is a docs-only change to reflect Azure AI Foundry's current generic endpoint format.
 **Why:** Azure AI Foundry now uses `services.ai.azure.com` as the standard endpoint format. The old `openai.azure.com` still works but is no longer the recommended example for new users.
+
+---
+
+### Documentation Audit — Consistency & Accuracy Pass
+
+**By:** MacReady  
+**When:** Post-PR #116 multi-round review  
+**What:**
+
+Audited all documentation files (`README.md`, `docs/configuration-reference.md`, `docs/sideload-test-checklist.md`, `package.json`) for consistency with the actual codebase.
+
+**Key decisions enforced:**
+
+1. **Setting name is `forge.copilot.models` (array), not `forge.copilot.model` (string).** All documentation must use the plural form with array syntax. Default is `[]`.
+
+2. **Endpoint URL must NOT include `/openai/v1/`.** The SDK auto-appends this path for `.azure.com` endpoints. Documentation that tells users to include it causes double-pathing errors.
+
+3. **"Air-gapped" is a scenario, not primary positioning.** Per the earlier positioning decision, "air-gapped" should only appear as one of several environment types (alongside compliance-driven, restricted networks, etc.), never as the headline framing. Package.json setting descriptions updated to use "restricted environments" / "network safety" instead.
+
+4. **Entra ID is the default auth method.** Documentation should not present API key setup as a required step — it's one of two auth options, and Entra ID is the default.
+
+5. **Forge lives in the sidebar (activity bar), not the bottom panel.** UI location references must say "sidebar" or "activity bar", not "bottom panel" or "panel area".
+
+**Why:** After many rounds of PR #116 changes, the docs had drifted significantly from the codebase. The `model` → `models` rename and endpoint URL format issues were actively harmful — they'd cause users to misconfigure the extension.

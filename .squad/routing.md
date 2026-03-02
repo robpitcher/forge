@@ -18,6 +18,7 @@ How to decide who handles what.
 | CI/CD, GitHub Actions, infrastructure | Palmer | Workflows, build pipelines, devcontainer, environment setup |
 | Configuration & settings | Blair | VS Code settings contribution, validation |
 | Documentation, README, guides | Fuchs | User docs, setup guides, API reference, changelogs, inline docs |
+| Mermaid diagrams, visual docs, architecture visuals | Nauls | Flowcharts, sequence diagrams, state diagrams, ER diagrams |
 | Async issue work (bugs, tests, small features) | @copilot 🤖 | Well-defined tasks matching capability profile |
 | Session logging | Scribe | Automatic — never needs routing |
 
@@ -34,6 +35,7 @@ How to decide who handles what.
 | `squad:fuchs` | Documentation task | Fuchs |
 | `squad:norris` | Security review task | Norris |
 | `squad:copper` | Code quality review task | Copper |
+| `squad:nauls` | Diagram / visual documentation task | Nauls |
 | `squad:copilot` | Assign to @copilot for autonomous work (if enabled) | @copilot 🤖 |
 
 ### How Issue Assignment Works

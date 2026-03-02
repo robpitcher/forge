@@ -1,7 +1,7 @@
 {
   "name": "forge",
   "displayName": "Forge",
-  "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
+  "description": "AI chat routed through your own Azure AI Foundry endpoint — private, self-managed, all inference in your tenant",
   "version": "0.1.0",
   "publisher": "robpitcher",
   "repository": {
@@ -102,12 +102,8 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "gpt-4.1",
-            "gpt-4o",
-            "gpt-4o-mini"
-          ],
-          "description": "Available model deployments for the model selector. The first entry is the default active model."
+          "default": [],
+          "description": "Available model deployments for the model selector. Values must match your Azure AI Foundry model deployment name (not the model name, as they can differ). The first entry is the default active model."
         },
         "forge.copilot.wireApi": {
           "type": "string",
@@ -133,7 +129,7 @@
           "description": "Authentication method. 'entraId' uses DefaultAzureCredential (recommended). 'apiKey' uses a static API key.",
           "enumDescriptions": [
             "Use Azure Entra ID (DefaultAzureCredential) for authentication. Recommended for environments with Azure AD.",
-            "Use a static API key stored in VS Code SecretStorage. Use for air-gapped environments without Entra ID."
+            "Use a static API key stored in VS Code SecretStorage. Use for environments without Entra ID."
           ]
         },
         "forge.copilot.autoApproveTools": {
@@ -165,7 +161,7 @@
         "forge.copilot.tools.url": {
           "type": "boolean",
           "default": false,
-          "description": "Enable the URL tool (fetch web content). Disabled by default for air-gapped environments."
+          "description": "Enable the URL tool (fetch web content). Disabled by default for restricted environments."
         },
         "forge.copilot.tools.mcp": {
           "type": "boolean",
@@ -175,7 +171,7 @@
         "forge.copilot.mcpAllowRemote": {
           "type": "boolean",
           "default": false,
-          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for air-gap safety."
+          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for network safety."
         },
         "forge.copilot.mcpServers": {
           "type": "object",

@@ -27,7 +27,7 @@ describe("getConfiguration", () => {
       endpoint: "",
       apiKey: "",
       authMethod: "entraId",
-      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      models: [],
       wireApi: "completions",
       cliPath: "",
       autoApproveTools: false,
