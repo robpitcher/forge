@@ -9,9 +9,9 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring
 ## Prerequisites
 
 - **VS Code** 1.93 or later
-- **[GitHub Copilot CLI](https://github.com/github/copilot-cli)** binary
+- **[GitHub Copilot CLI](https://github.com/github/copilot-cli)**
 - **[Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)** (`az`) — Required for Entra ID authentication (recommended for most environments)
-- **Azure AI Foundry** endpoint
+- **Azure AI Foundry** endpoint and model deployment(s)
 
 ## Quick Start
 
