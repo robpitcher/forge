@@ -66,6 +66,15 @@ export function validateConfiguration(
       message:
         "Please configure the Azure AI Foundry endpoint in Settings (forge.copilot.endpoint)",
     });
+  } else {
+    try {
+      const url = new URL(config.endpoint);
+      if (url.protocol !== "https:") {
+        errors.push({ field: "forge.copilot.endpoint", message: "Endpoint must use HTTPS." });
+      }
+    } catch {
+      errors.push({ field: "forge.copilot.endpoint", message: "Endpoint must be a valid URL (e.g., https://myresource.openai.azure.com/)." });
+    }
   }
 
   if (config.authMethod === "apiKey" && !config.apiKey) {

@@ -25,7 +25,12 @@ import type {
   ContextItem,
 } from "./types.js";
 
+const AUTH_POLL_INTERVAL_MS = 30_000;
+const SIGN_IN_RECHECK_MS = 5000;
+const TOOL_PERMISSION_TIMEOUT_MS = 120_000;
+
 export function activate(context: vscode.ExtensionContext): void {
+  const outputChannel = vscode.window.createOutputChannel("Forge");
   const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState);
   
   // Status bar item for auth status
@@ -34,7 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
   
   // Wire auth refresh callback so provider methods can trigger status updates
   const refreshAuth = () => {
-    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
   };
   provider.setAuthRefreshCallback(refreshAuth);
   
@@ -54,14 +59,14 @@ export function activate(context: vscode.ExtensionContext): void {
   
   // Poll auth status every 30s (catches `az login` completions that don't trigger config changes)
   const authPollInterval = setInterval(() => {
-    updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
-  }, 30_000);
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
+  }, AUTH_POLL_INTERVAL_MS);
   const authPollDisposable = new vscode.Disposable(() => clearInterval(authPollInterval));
   
   // Re-check auth when the window regains focus
   const focusListener = vscode.window.onDidChangeWindowState((e) => {
     if (e.focused) {
-      updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
     }
   });
   
@@ -69,6 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let signInTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
   
   context.subscriptions.push(
+    outputChannel,
     statusBarItem,
     configListener,
     authPollDisposable,
@@ -79,7 +85,9 @@ export function activate(context: vscode.ExtensionContext): void {
         signInTimeoutHandle = undefined;
       }
     }),
-    vscode.window.registerWebviewViewProvider("forge.chatView", provider),
+    vscode.window.registerWebviewViewProvider("forge.chatView", provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
     ),
@@ -98,8 +106,8 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         signInTimeoutHandle = setTimeout(() => {
           signInTimeoutHandle = undefined;
-          updateAuthStatus(statusBarItem, provider, context.secrets).catch(() => {});
-        }, 5000);
+          updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
+        }, SIGN_IN_RECHECK_MS);
       } else {
         await provider.openSettings();
       }
@@ -137,8 +145,8 @@ export function activate(context: vscode.ExtensionContext): void {
       const uri = uris[0];
       const raw = await vscode.workspace.fs.readFile(uri);
       let content = new TextDecoder("utf-8").decode(raw);
-      if (content.length > 8000) {
-        content = content.slice(0, 8000) + "\n...[truncated]";
+      if (content.length > ChatViewProvider.CONTEXT_CHAR_BUDGET) {
+        content = content.slice(0, ChatViewProvider.CONTEXT_CHAR_BUDGET) + "\n...[truncated]";
       }
       const filePath = vscode.workspace.asRelativePath(uri);
       // Derive languageId from file extension — no document open required
@@ -425,8 +433,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
       const selection = editor.selection;
-      const content = editor.document.getText(selection);
+      let content = editor.document.getText(selection);
       if (!content) { return; }
+      if (content.length > ChatViewProvider.CONTEXT_CHAR_BUDGET) {
+        content = content.slice(0, ChatViewProvider.CONTEXT_CHAR_BUDGET) + "\n...[truncated]";
+      }
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
       const startLine = selection.start.line + 1;
       let endLine = selection.end.line + 1;
@@ -567,7 +578,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private static readonly _CONTEXT_CHAR_BUDGET = 8000;
+  public static readonly CONTEXT_CHAR_BUDGET = 8000;
 
   /**
    * Prepend formatted workspace context blocks to the user's prompt.
@@ -581,7 +592,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return prompt;
     }
 
-    const budget = ChatViewProvider._CONTEXT_CHAR_BUDGET;
+    const budget = ChatViewProvider.CONTEXT_CHAR_BUDGET;
     const truncationNote = "\n...[truncated — context exceeds 8000 char limit]";
     const separator = "\n\n";
     let usedChars = 0;
@@ -639,12 +650,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       let accumulatedContent = "";
       const cleanup = () => {
         unsubDelta();
+        unsubMessage();
         unsubIdle();
         unsubError();
         unsubToolProgress();
         unsubToolPartialResult();
         unsubToolComplete();
       };
+
+      const unsubMessage = session.on("assistant.message", (event: any) => {
+        if (event?.data?.content) {
+          accumulatedContent = event.data.content;
+        }
+      });
 
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
         if (event?.data?.deltaContent) {
@@ -738,14 +756,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         params: request,
       });
 
-      // Auto-deny after a short timeout to avoid hanging indefinitely
-      const timeoutMs = 120_000; // 2 minutes
+      const timeoutMs = TOOL_PERMISSION_TIMEOUT_MS;
 
       return new Promise<PermissionRequestResult>((resolve) => {
         const timeoutHandle = setTimeout(() => {
           // If still pending when the timeout fires, deny the request
           const resolver = this._pendingPermissions.get(toolCallId);
           if (resolver) {
+            this._view?.webview.postMessage({ type: "toolTimeout", id: toolCallId });
             resolver(false);
           }
         }, timeoutMs);
@@ -794,6 +812,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleResumeConversation(sessionId: string): Promise<void> {
     if (!sessionId) {
       this._postError("Invalid session ID");
+      return;
+    }
+    if (typeof sessionId !== "string" || sessionId.length > 200) {
+      this._postError("Invalid session ID.");
       return;
     }
 
@@ -855,6 +877,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private async _handleDeleteConversation(sessionId: string): Promise<void> {
     if (!sessionId) {
       this._postError("Invalid session ID");
+      return;
+    }
+    if (typeof sessionId !== "string" || sessionId.length > 200) {
+      this._postError("Invalid session ID.");
       return;
     }
 

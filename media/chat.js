@@ -2,6 +2,9 @@
   const { marked } = require("marked");
   const DOMPurify = require("dompurify");
 
+  const COPY_FEEDBACK_MS = 2000;
+  const AUTH_BANNER_DISMISS_MS = 3000;
+
   // Configure marked for chat rendering
   marked.setOptions({
     breaks: true,
@@ -25,6 +28,7 @@
   let pendingContext = [];
   let lastAutoAttachedContent = null;
   let messages = [];
+  let renderTimeout = null;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -64,6 +68,18 @@
   function setInputEnabled(enabled) {
     sendBtn.disabled = !enabled;
     userInput.disabled = !enabled;
+  }
+
+  function resetUIState() {
+    isStreaming = false;
+    currentAssistantRawText = "";
+    currentAssistantMessage = null;
+    pendingContext = [];
+    contextChipsContainer.innerHTML = "";
+    lastAutoAttachedContent = null;
+    autoAttachedChipElement = null;
+    autoAttachedCtx = null;
+    setInputEnabled(true);
   }
 
   function sendMessage() {
@@ -250,14 +266,18 @@
       btn.type = "button";
       btn.title = "Copy code";
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5z"/></svg>';
+      const copyIcon = btn.innerHTML;
       btn.addEventListener("click", () => {
         const code = pre.querySelector("code");
         const text = code ? code.textContent : pre.textContent;
         navigator.clipboard.writeText(text).then(() => {
           btn.innerHTML = '<span class="code-copy-feedback">Copied!</span>';
           setTimeout(() => {
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5z"/></svg>';
-          }, 2000);
+            btn.innerHTML = copyIcon;
+          }, COPY_FEEDBACK_MS);
+        }).catch(() => {
+          btn.innerHTML = '<span class="code-copy-feedback">Copy failed</span>';
+          setTimeout(() => { btn.innerHTML = copyIcon; }, COPY_FEEDBACK_MS);
         });
       });
       pre.appendChild(btn);
@@ -271,9 +291,13 @@
       currentAssistantRawText = "";
     }
     currentAssistantRawText += content;
-    currentAssistantMessage.innerHTML = renderMarkdown(currentAssistantRawText);
-    addCopyButtons(currentAssistantMessage);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (renderTimeout) clearTimeout(renderTimeout);
+    renderTimeout = setTimeout(() => {
+      currentAssistantMessage.innerHTML = renderMarkdown(currentAssistantRawText);
+      addCopyButtons(currentAssistantMessage);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      renderTimeout = null;
+    }, 50);
   }
 
   window.addEventListener("message", (event) => {
@@ -296,6 +320,15 @@
         break;
 
       case "streamEnd":
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+          renderTimeout = null;
+        }
+        if (currentAssistantMessage) {
+          currentAssistantMessage.innerHTML = renderMarkdown(currentAssistantRawText);
+          addCopyButtons(currentAssistantMessage);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
         if (currentAssistantRawText) {
           messages.push({ role: "assistant", content: currentAssistantRawText });
         }
@@ -308,6 +341,7 @@
       case "error":
         appendMessage("error", `⚠️ ${message.message}`);
         currentAssistantMessage = null;
+        currentAssistantRawText = "";
         isStreaming = false;
         setInputEnabled(true);
         break;
@@ -345,7 +379,7 @@
         break;
 
       case "toolComplete": {
-        const progressEl = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
+        const progressEl = document.querySelector(`.tool-progress[data-tool-id="${CSS.escape(message.id)}"]`);
         if (progressEl) {
           progressEl.remove();
         }
@@ -354,16 +388,8 @@
 
 
       case "conversationReset":
+        resetUIState();
         chatMessages.innerHTML = "";
-        currentAssistantMessage = null;
-        currentAssistantRawText = "";
-        isStreaming = false;
-        setInputEnabled(true);
-        pendingContext = [];
-        contextChipsContainer.innerHTML = "";
-        lastAutoAttachedContent = null;
-        autoAttachedChipElement = null;
-        autoAttachedCtx = null;
         messages = [];
         break;
 
@@ -376,8 +402,8 @@
         break;
 
       case "conversationResumed":
+        resetUIState();
         chatMessages.innerHTML = "";
-        currentAssistantMessage = null;
         messages = message.messages || [];
         // Render restored messages
         messages.forEach((msg) => {
@@ -402,6 +428,23 @@
           modelSelector.value = message.model;
         }
         break;
+
+      case "toolTimeout": {
+        const card = document.querySelector(`.tool-confirmation[data-tool-id="${CSS.escape(message.id)}"]`);
+        if (card) {
+          const actions = card.querySelector(".tool-actions");
+          if (actions) {
+            actions.innerHTML = "";
+            const status = document.createElement("span");
+            status.className = "tool-status-rejected";
+            status.textContent = "Timed out — auto-denied";
+            actions.appendChild(status);
+          }
+          const btns = card.querySelectorAll("button");
+          btns.forEach((b) => { b.disabled = true; });
+        }
+        break;
+      }
     }
   });
 
@@ -517,7 +560,7 @@
   }
 
   function renderToolProgress(message) {
-    let indicator = document.querySelector(`.tool-progress[data-tool-id="${message.id}"]`);
+    let indicator = document.querySelector(`.tool-progress[data-tool-id="${CSS.escape(message.id)}"]`);
     if (!indicator) {
       indicator = document.createElement("div");
       indicator.className = "tool-progress";
@@ -542,7 +585,7 @@
   }
 
   function renderToolPartialResult(message) {
-    let container = document.querySelector(`.tool-partial-result[data-tool-id="${message.id}"]`);
+    let container = document.querySelector(`.tool-partial-result[data-tool-id="${CSS.escape(message.id)}"]`);
     if (!container) {
       container = document.createElement("div");
       container.className = "tool-partial-result";
@@ -599,7 +642,7 @@
         if (banner.parentNode) {
           banner.remove();
         }
-      }, 3000);
+      }, AUTH_BANNER_DISMISS_MS);
     } else if (status.state === "notAuthenticated") {
       banner.className = "auth-banner not-authenticated";
 
