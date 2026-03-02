@@ -339,23 +339,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     // Reset dedup state so initial status always goes through
     this._lastAuthStatus = undefined;
     
-    // Send initial auth status
-    getConfigurationAsync(this._secrets)
-      .then(async (config) => {
-        const status = await checkAuthStatus(config, this._secrets);
-        this.postAuthStatus(status, !!config.endpoint);
-        this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
-        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
-        this._view?.webview.postMessage({
-          type: "configStatus",
-          hasEndpoint: !!config.endpoint,
-          hasAuth: status.state === "authenticated",
-          hasModels: config.models.length > 0,
-        });
-      })
-      .catch(() => {
-        // Silent failure — status bar will show the error
-      });
+    // Send initial config status (also re-sent on webviewReady to handle race condition)
+    this._sendConfigStatus();
   }
 
   public async openSettings(): Promise<void> {
@@ -401,6 +386,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachSelection");
     } else if (message.command === "attachFile") {
       await vscode.commands.executeCommand("forge.attachFile");
+    } else if (message.command === "webviewReady") {
+      this._sendConfigStatus();
     } else if (message.command === "openSettings") {
       await this.openSettings();
     } else if (message.command === "openEndpointSettings") {
@@ -491,6 +478,25 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } else if (message.command === "deleteConversation") {
       await this._handleDeleteConversation(message.sessionId as string);
     }
+  }
+
+  private _sendConfigStatus(): void {
+    getConfigurationAsync(this._secrets)
+      .then(async (config) => {
+        const status = await checkAuthStatus(config, this._secrets);
+        this.postAuthStatus(status, !!config.endpoint);
+        this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
+        this._view?.webview.postMessage({
+          type: "configStatus",
+          hasEndpoint: !!config.endpoint,
+          hasAuth: status.state === "authenticated",
+          hasModels: config.models.length > 0,
+        });
+      })
+      .catch(() => {
+        // Silent failure — status bar will show the error
+      });
   }
 
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {

@@ -840,4 +840,7 @@
       banner.appendChild(troubleshootBtn);
     }
   }
+
+  // Signal readiness so extension can send initial state (avoids race condition)
+  vscode.postMessage({ command: "webviewReady" });
 })();
