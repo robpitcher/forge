@@ -44,3 +44,5 @@
 - Kept example config unchanged — it shows a realistic configured setup
 - Model Selector section updated to mention deployment names and the distinction
 - Key learning: deployment names and model names can differ in Foundry (e.g., deployment `my-gpt4` may host model `gpt-4o`)
+
+📌 Team update (2026-03-02T15:11:14Z): Models config consolidated — changed `forge.copilot.models` default to empty array. README repositioned to lead with organizational control (private endpoints, data sovereignty, compliance) over "air-gapped" framing. Both decisions merged to decisions.md. — decided by Fuchs & Blair

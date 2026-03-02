@@ -2116,3 +2116,19 @@ Removed `docs/installation-guide.md` and redirected all documentation references
 - Users now have a **single canonical source** for Copilot CLI setup (upstream repo)
 - README explicitly lists Azure CLI as a prerequisite, improving setup clarity
 - Reduced doc maintenance surface area
+
+### Default models changed to empty array
+
+**By:** Blair
+**Date:** 2026-03-02
+**What:** Changed `forge.copilot.models` default from `["gpt-4.1", "gpt-4o", "gpt-4o-mini"]` to `[]`. Updated setting description to clarify that values must match the Azure AI Foundry **model deployment name** (not the model name, as they can differ).
+**Why:** Hardcoded model names are meaningless in air-gapped BYOK deployments — users must configure their own deployment names. An empty default avoids confusing "model not found" errors and forces explicit setup.
+**Impact:** Users who previously relied on the default models list will now need to add their deployment names in settings before first use. The model selector will show empty until configured.
+
+### README Positioning: Broader Value Prop Over Air-Gapped
+
+**By:** Fuchs
+**Date:** 2026-03-02
+**What:** Repositioned README and package.json description to lead with organizational control over AI inference (private endpoints, data sovereignty, compliance, cost control) rather than "air-gapped" as the headline framing. Air-gapped remains as one mentioned scenario alongside sovereign cloud and compliance-driven environments.
+**Why:** The real value prop is organizations wanting control and visibility over their entire AI invocation flow. Air-gapped networks are one use case, not the defining one.
+**Impact:** All docs referencing Forge's purpose should use the broader framing. "Air-gapped" is fine as a scenario mention but should not be the lead descriptor.
