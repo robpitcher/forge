@@ -115,3 +115,41 @@
 📌 Team update (2026-03-01T23:45:00Z): Phase 4 feature batch complete — 3 agents shipped markdown rendering (#100, PR #109), model selector (#81, PR #111), and mode selector (#108, PR #110). All PRs targeting dev, 205 tests passing. Phase 4/5 issues triaged: #103→Palmer, #104→Fuchs, #105→Palmer, #69→Fuchs, #78→Blair, #77→Childs. Scoping comments posted. Decisions merged to decisions.md (model selector UI pattern, RemoteMcpSettings rename). Orchestration logs written to .squad/orchestration-log/. — coordinated by Scribe
 
 📌 Completed model config consolidation (#81 simplification) — Removed `forge.copilot.model` (singular) setting, consolidating to single `forge.copilot.models` array. Active model defaults to `models[0]` and is persisted in `workspaceState` (`forge.selectedModel`) when user changes via dropdown. `_getActiveModel()` helper resolves selection: persisted value if still in models array, else `models[0]`. `copilotService.getOrCreateSession()` and `resumeConversation()` now accept `model` as explicit parameter instead of reading `config.model`. Updated 13 test files, added 3 new tests (195 total). Key learnings: (1) Runtime state (selected model) should live in `workspaceState`, not user-facing settings — simpler config surface for users. (2) When moving state from config to runtime, the service layer should accept it as a parameter rather than reading config directly — cleaner separation. (3) `_getActiveModel()` validates persisted selection against current models array — handles case where user removes a model from their config after selecting it. (4) Error-scenario tests' mock `ExtensionContext` needed `workspaceState` mock added since constructor now reads from it.
+
+## Learnings
+
+### 2026-02-27: Extension & Webview Review for Issue #112
+**Context:** Performed domain-specific code review of extension.ts, configuration.ts, media/chat.js, media/chat.css for webview lifecycle, message handling, UI state, DOM manipulation, context attachments, streaming, activation/deactivation, and configuration correctness.
+
+**Key Findings:**
+1. **Webview state is not preserved across hide/show** — when user collapses/expands the Forge panel, the webview is recreated with blank HTML but `this._conversationMessages` persists in provider memory. Critical UX issue.
+2. **No cancellation support during streaming** — once `session.send()` fires, there's no way to abort. Need to expose session.abort() to a webview "Stop" button.
+3. **Event listener leak on code copy buttons** — `addCopyButtons()` is called on every `appendDelta()`, and while it checks for duplicate buttons, it doesn't prevent duplicate listeners if markdown re-parsing replaces the DOM.
+4. **Webview messages posted when hidden accumulate in VS Code's queue** — when user re-shows panel, 100+ queued `streamDelta` messages flush at once, causing jank.
+5. **No default case in message handler** — malformed webview messages silently fall through the if-else chain. Need `else` block with `console.warn()`.
+
+**Patterns Learned:**
+- **VS Code Webview Lifecycle:** `resolveWebviewView()` is called every time the panel is shown, not just on first activation. State must be explicitly restored from `workspaceState` or reconstructed.
+- **Message Queue Behavior:** VS Code queues messages sent to hidden webviews. This is usually good (no lost messages), but can cause UI stutter on rapid-fire updates like streaming. Need to check `this._view?.visible` or buffer deltas client-side.
+- **Event Listener Cleanup:** Incremental DOM updates (e.g., streaming markdown) can orphan event listeners. Use event delegation or explicit cleanup patterns (WeakMap, data attributes).
+- **Permission Request Timeouts:** The SDK permission handler pattern (lines 708-757) is elegant but needs UI feedback when timeouts fire. Auto-deny is correct behavior, but user must be notified.
+
+**Tools Validated:**
+- `this._workspaceState` is already used for model selection (line 266, 416) and message caching (line 542-543) — extend this for full UI state restoration.
+- `this._view?.visible` property exists (part of WebviewView API) — should check before posting non-critical updates.
+- VS Code's message queue is part of the platform — cannot be disabled, must design around it.
+
+**Recommendations for Future Work:**
+1. Add webview state restoration in `resolveWebviewView()` — send cached messages to webview on show.
+2. Implement cancellation: add "Stop" button to webview, store active session in provider, call `session.abort()`.
+3. Replace per-button copy listeners with event delegation on `#chatMessages`.
+4. Add `this._view?.visible` checks before posting authStatus, streamDelta (or buffer deltas).
+5. Add default case in `_handleMessage()` with logging.
+6. Add timeout feedback for tool confirmations.
+
+**Cross-references:**
+- Related to `.squad/decisions.md` lines 61-66 (manual testing todos T-1 through T-5) — several edge cases found here would be caught by those tests.
+- Validates architecture decision from `.squad/decisions.md` lines 16-25 (WebviewViewProvider pattern, streaming via event listeners).
+
+
+📌 Completed #112 (Blair domain review, 2nd pass) — Thorough code review of extension.ts, configuration.ts, media/chat.js, media/chat.css, and package.json for issue #112. Produced 15 findings (0 critical, 2 high, 7 medium, 4 low, 2 info). Key learnings: (1) `sendMessageWithContext` (code action commands) bypasses the webview message flow — the user never sees the prompt that was sent, only the response. Needs a synthetic user message posted to webview. (2) `postContextAttached` and other `_view?.webview.postMessage()` calls silently drop messages when the webview isn't resolved — context attachments made before opening the panel are lost. (3) `conversationResumed` handler in chat.js is missing half the state resets that `conversationReset` has (`isStreaming`, `currentAssistantRawText`, `pendingContext`, etc.) — resuming mid-stream locks the UI. (4) Status bar tooltip for API key auth says "Click to sign in with Azure CLI" — copy-paste bug from the Entra ID branch (line 229). (5) Tool confirmation timeout (2 min) auto-denies but never updates the webview card — user sees stale Approve/Reject buttons. (6) No `retainContextWhenHidden` and no `vscode.getState()`/`vscode.setState()` — webview state is lost on panel hide/show, though the extension-side `_conversationMessages` array survives.
