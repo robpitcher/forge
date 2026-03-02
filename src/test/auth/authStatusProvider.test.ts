@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ExtensionConfig } from "../../configuration.js";
-import type { AuthStatus } from "../../auth/authStatusProvider.js";
 
 // Mock @azure/identity before importing — createCredentialProvider uses dynamic import()
 const mockGetToken = vi.fn();

@@ -11,7 +11,8 @@
       "extensions": [
         "bierner.markdown-mermaid",
         "GitHub.vscode-pull-request-github",
-        "dbaeumer.vscode-eslint"
+        "dbaeumer.vscode-eslint",
+        "vsls-liveshare.codetour"
       ]
     }
   },
