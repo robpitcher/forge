@@ -6,12 +6,12 @@
     {
       "file": "package.json",
       "line": 23,
-      "description": "**Extension Manifest** — `contributes` declares the activitybar view container, chat view, slash commands, configuration settings (endpoint, auth method, models), and keybindings. This is the entry point VS Code reads to register everything Forge provides."
+      "description": "**Extension Manifest** — `contributes` declares the activitybar view container, chat view, commands, configuration settings (endpoint, auth method, models), and menus. This is the entry point VS Code reads to register everything Forge provides."
     },
     {
       "file": "src/extension.ts",
       "line": 33,
-      "description": "**activate()** — Extension entry point. Registers the `ChatViewProvider` as a `WebviewViewProvider`, sets up the status bar item for auth status, registers commands (new conversation, attach selection/file, set API key), and wires up the `ForgeCodeActionProvider`."
+      "description": "**activate()** — Extension entry point. Registers the `ChatViewProvider` as a `WebviewViewProvider`, sets up the status bar item for auth status, registers commands for attaching selection/file and opening settings, and wires up the `ForgeCodeActionProvider`."
     },
     {
       "file": "src/extension.ts",
@@ -66,7 +66,7 @@
     {
       "file": "media/chat.css",
       "line": 1,
-      "description": "**Theme integration** — All colors and fonts use VS Code CSS custom properties (`var(--vscode-*)`) so the chat UI automatically adapts to light, dark, and high-contrast themes. No hardcoded colors — the webview inherits the user's editor theme."
+      "description": "**Theme integration** — Primarily uses VS Code CSS custom properties (`var(--vscode-*)`), with a few fallback values, so the chat UI automatically adapts to light, dark, and high-contrast themes while inheriting the user's editor theme."
     }
   ]
 }
