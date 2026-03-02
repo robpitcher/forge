@@ -112,3 +112,15 @@ export function getPostedMessagesOfType(
     (msg: unknown) => (msg as { type: string }).type === type
   );
 }
+
+/**
+ * Simulates sending an arbitrary command message from the webview.
+ */
+export function simulateWebviewCommand(
+  view: MockWebviewView,
+  message: Record<string, unknown>
+): void {
+  for (const handler of view.webview._messageHandlers) {
+    handler(message);
+  }
+}
