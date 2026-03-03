@@ -164,7 +164,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
         authMethod: "apiKey",
         models: ["gpt-4o", "gpt-4.1", "gpt-4o-mini"],
         wireApi: "responses",
-        cliPath: "/custom/cli",
+        cliPath: process.execPath,
         toolShell: true,
         toolRead: true,
         toolWrite: true,
@@ -311,7 +311,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
     it("respects custom CLI path without requiring GitHub auth", async () => {
       const configWithCli: ExtensionConfig = {
         ...validAzureConfig,
-        cliPath: "/opt/copilot-cli/bin/copilot",
+        cliPath: process.execPath,
         toolShell: true,
         toolRead: true,
         toolWrite: true,
@@ -324,7 +324,7 @@ describe("Air-gap validation (SC2, SC3)", () => {
       const ctorCall = constructorSpy.mock.calls[0][0] as Record<string, unknown>;
       
       expect(ctorCall).toBeDefined();
-      expect(ctorCall.cliPath).toBe("/opt/copilot-cli/bin/copilot");
+      expect(ctorCall.cliPath).toBe(process.execPath);
       
       // Still no GitHub-related config
       expect(ctorCall).not.toHaveProperty("token");

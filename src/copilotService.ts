@@ -1,4 +1,5 @@
 import { execSync, execFileSync } from "child_process";
+import { statSync } from "fs";
 import { ExtensionConfig } from "./configuration.js";
 import type {
   CopilotClient,
@@ -53,6 +54,20 @@ function resolveCopilotCliFromPath(): string | undefined {
 export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidationResult> {
   return new Promise((resolve) => {
     try {
+      try {
+        if (statSync(cliPath).isDirectory()) {
+          resolve({
+            valid: false,
+            reason: "version_check_failed",
+            path: cliPath,
+            details: "Configured cliPath points to a directory. Set forge.copilot.cliPath to the Copilot executable file path.",
+          });
+          return;
+        }
+      } catch {
+        // Ignore stat errors here and defer to execFileSync for final validation.
+      }
+
       const output = execFileSync(cliPath, ["--version"], {
         encoding: "utf8",
         timeout: 5000,
@@ -140,17 +155,37 @@ export async function getOrCreateClient(
     return client;
   }
 
+  const configuredCliPath = config.cliPath.trim() !== "" ? config.cliPath.trim() : undefined;
+  if (configuredCliPath) {
+    const validation = await validateCopilotCli(configuredCliPath);
+    if (!validation.valid) {
+      if (validation.reason === "not_found") {
+        throw new CopilotCliNotFoundError(
+          "Copilot CLI not found. Install @github/copilot globally or set forge.copilot.cliPath in settings."
+        );
+      }
+      if (validation.reason === "version_check_failed" && validation.details?.toLowerCase().includes("directory")) {
+        throw new CopilotCliNotFoundError(
+          "forge.copilot.cliPath points to a directory. Set it to the Copilot executable file path (for example, /usr/local/bin/copilot)."
+        );
+      }
+      throw new CopilotCliNotFoundError(
+        "The configured Copilot CLI path is invalid. Set forge.copilot.cliPath to the GitHub Copilot CLI executable."
+      );
+    }
+  }
+
   const { CopilotClient: SDKCopilotClient } = await import(
     "@github/copilot-sdk"
   );
 
   const clientOptions: Record<string, unknown> = {};
-  if (config.cliPath) {
-    clientOptions.cliPath = config.cliPath;
+  if (configuredCliPath) {
+    clientOptions.cliPath = configuredCliPath;
   } else {
-    const resolved = resolveCopilotCliFromPath();
-    if (resolved) {
-      clientOptions.cliPath = resolved;
+    const discoveredCliPath = resolveCopilotCliFromPath();
+    if (discoveredCliPath) {
+      clientOptions.cliPath = discoveredCliPath;
     }
   }
 
