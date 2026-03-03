@@ -10,6 +10,8 @@ import {
   listConversations,
   resumeConversation,
   deleteConversation,
+  discoverAndValidateCli,
+  type CopilotCliValidationResult,
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import { ForgeCodeActionProvider } from "./codeActionProvider.js";
@@ -52,12 +54,22 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel.appendLine(`Initial auth status check failed: ${err}`);
   });
   
+  // Preflight CLI validation
+  performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+    outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+  });
+  
   // Listen for config changes
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("forge.copilot")) {
       updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
         outputChannel.appendLine(`Auth status update on config change failed: ${err}`);
       });
+      if (e.affectsConfiguration("forge.copilot.cliPath")) {
+        performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+          outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+        });
+      }
     }
   });
   
@@ -274,6 +286,66 @@ async function updateAuthStatus(
 }
 
 /**
+ * Perform CLI preflight check: discover and validate the Copilot CLI.
+ * Shows actionable notifications and webview banner when validation fails.
+ * Never throws — fire-and-forget.
+ */
+async function performCliPreflight(
+  config: ExtensionConfig,
+  outputChannel: vscode.OutputChannel,
+  provider: ChatViewProvider
+): Promise<void> {
+  try {
+    const result = await discoverAndValidateCli(config.cliPath);
+    
+    if (result.valid) {
+      outputChannel.appendLine(`[forge] Copilot CLI validated: v${result.version} at ${result.path}`);
+      provider.postCliStatus(result);
+      return;
+    }
+    
+    // CLI validation failed — show actionable notifications
+    provider.postCliStatus(result);
+    
+    if (result.reason === "not_found") {
+      vscode.window.showWarningMessage(
+        "Forge: Copilot CLI not found. Install it with `npm install -g @github/copilot` or set the path in settings.",
+        "Open Settings",
+        "Open Terminal"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        } else if (choice === "Open Terminal") {
+          const term = vscode.window.createTerminal("Install Copilot CLI");
+          term.sendText("npm install -g @github/copilot");
+          term.show();
+        }
+      });
+    } else if (result.reason === "wrong_binary") {
+      vscode.window.showWarningMessage(
+        "Forge: The 'copilot' binary on your PATH is not the GitHub Copilot CLI. Set the correct path in settings.",
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    } else if (result.reason === "version_check_failed") {
+      vscode.window.showWarningMessage(
+        "Forge: Could not verify the Copilot CLI. It may need to be updated. Details: " + (result.details ?? "Unknown error"),
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    }
+  } catch (err) {
+    outputChannel.appendLine(`CLI preflight check error: ${err}`);
+  }
+}
+
+/**
  * Wraps a promise with a timeout. If the promise doesn't resolve within the
  * specified time, rejects with a timeout error.
  */
@@ -349,6 +421,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     this._lastAuthStatus = statusKey;
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
+  }
+
+  public postCliStatus(result: CopilotCliValidationResult): void {
+    this._view?.webview.postMessage({ type: "cliStatus", result });
   }
 
   /** Re-sends all webview state (auth, models, config status). Accepts pre-fetched data to avoid redundant calls. */

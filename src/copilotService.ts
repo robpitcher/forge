@@ -18,6 +18,13 @@ const sessions = new Map<string, ICopilotSession>();
 const sessionConfigHashes = new Map<string, string>();
 
 /**
+ * Result of validating the copilot CLI binary.
+ */
+export type CopilotCliValidationResult =
+  | { valid: true; version: string; path: string }
+  | { valid: false; reason: "not_found" | "wrong_binary" | "version_check_failed"; path?: string; details?: string };
+
+/**
  * Attempts to find the `copilot` CLI binary on PATH.
  * Returns the resolved path or undefined if not found.
  */
@@ -31,6 +38,92 @@ function resolveCopilotCliFromPath(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Validates that a CLI binary is actually the @github/copilot CLI.
+ * 
+ * Runs `<cliPath> --version` and checks that it returns a version number without error.
+ * The @github/copilot CLI supports `--version` and returns version output; other `copilot`
+ * binaries may not support this flag or may fail.
+ * 
+ * @param cliPath - Path to the CLI binary to validate
+ * @returns Validation result with version string if valid, or error details if invalid
+ */
+export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidationResult> {
+  return new Promise((resolve) => {
+    try {
+      const output = execSync(`"${cliPath}" --version`, {
+        encoding: "utf8",
+        timeout: 5000,
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
+
+      // If we got output without error, check if it looks like a version
+      // The @github/copilot CLI returns version info. We just need to verify
+      // it didn't error out (wrong binary might not support --version)
+      if (output && output.length > 0) {
+        resolve({ valid: true, version: output, path: cliPath });
+      } else {
+        resolve({
+          valid: false,
+          reason: "version_check_failed",
+          path: cliPath,
+          details: "No version output returned",
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const lower = message.toLowerCase();
+
+      // Check if binary wasn't found
+      if (lower.includes("enoent") || lower.includes("not found") || lower.includes("cannot find")) {
+        resolve({
+          valid: false,
+          reason: "not_found",
+          path: cliPath,
+          details: message,
+        });
+      } else {
+        // Binary exists but returned error — likely wrong binary
+        resolve({
+          valid: false,
+          reason: "wrong_binary",
+          path: cliPath,
+          details: message,
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Discovers and validates the Copilot CLI binary.
+ * 
+ * If a configuredPath is provided, validates it directly. Otherwise, searches PATH
+ * using resolveCopilotCliFromPath() and validates the result.
+ * 
+ * @param configuredPath - Optional explicit CLI path from user configuration
+ * @returns Validation result with discovered/configured CLI path
+ */
+export async function discoverAndValidateCli(configuredPath?: string): Promise<CopilotCliValidationResult> {
+  // If configured path is provided, validate it directly
+  if (configuredPath && configuredPath.trim() !== "") {
+    return validateCopilotCli(configuredPath);
+  }
+
+  // Otherwise, discover from PATH
+  const discoveredPath = resolveCopilotCliFromPath();
+  if (!discoveredPath) {
+    return {
+      valid: false,
+      reason: "not_found",
+      details: "No copilot binary found on PATH and no cliPath configured",
+    };
+  }
+
+  // Validate the discovered binary
+  return validateCopilotCli(discoveredPath);
 }
 
 export class CopilotCliNotFoundError extends Error {

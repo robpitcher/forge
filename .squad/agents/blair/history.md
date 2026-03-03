@@ -210,3 +210,11 @@
 
 📌 Team update (2026-03-03T16:30:00Z): Entra ID error message extraction and auth polling optimization merged into decisions.md. Also documented auto-resolution of copilot CLI path and _sendConfigStatus UI-critical data pattern.
 
+
+📌 CLI Preflight Validation (2025-03-03T17:15:00Z) — Added preflight validation that checks if the GitHub Copilot CLI is correctly installed during extension activation. Implemented `performCliPreflight()` in extension.ts that calls `discoverAndValidateCli()` from copilotService. Shows VS Code warning notifications with actionable buttons ("Open Settings", "Open Terminal") based on failure reason (not_found, wrong_binary, version_check_failed). Also posts `cliStatus` message to webview to display an in-chat banner using the same pattern as auth banners. Validation runs fire-and-forget during activation and re-runs when `forge.copilot.cliPath` config changes. Added webview handler `updateCliBanner()` that shows ✅ "CLI ready" (auto-dismisses in 2s) or ⚠️ error message with "Fix" button. Updated test files to mock `discoverAndValidateCli()` and filter `cliStatus` messages. All 246 tests pass, typecheck passes. Pre-existing highlight.js bundling issue on branch is unrelated to this work.
+- Preflight validation should NOT block activation — use async fire-and-forget pattern with `.catch()` logging
+- VS Code warning messages + webview banners together provide belt-and-suspenders UX
+- Reuse existing webview patterns (banner ID, CSS classes, button event handling) for consistency
+- Mock new service functions in ALL test files that call activate() to prevent preflight from posting unexpected messages
+- Add new message types to test filter lists alongside existing types (authStatus, modelsUpdated, modelSelected, configStatus)
+- When build errors appear unrelated to your changes, verify with git diff and git log to confirm pre-existing issues

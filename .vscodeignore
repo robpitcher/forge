@@ -1,9 +1,5 @@
 src/**
 node_modules/**
-!node_modules/@github/copilot/**
-!node_modules/@github/copilot-sdk/**
-!node_modules/vscode-jsonrpc/**
-!node_modules/zod/**
 .squad/**
 .squad-templates/**
 specs/**

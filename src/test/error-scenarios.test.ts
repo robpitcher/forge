@@ -30,6 +30,14 @@ vi.mock("../auth/authStatusProvider.js", () => ({
   checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
 }));
 
+vi.mock("../copilotService.js", async () => {
+  const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
+  return {
+    ...actual,
+    discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
+  };
+});
+
 const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
