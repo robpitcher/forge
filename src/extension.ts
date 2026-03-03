@@ -269,7 +269,7 @@ async function updateAuthStatus(
   }
   
   provider.postAuthStatus(status, !!config.endpoint);
-  provider.postConfigStatus(!!config.endpoint, status.state === "authenticated", config.models.length > 0);
+  provider.refreshWebviewState();
 }
 
 export async function deactivate(): Promise<void> {
@@ -343,6 +343,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       hasAuth,
       hasModels,
     });
+  }
+
+  /** Re-sends all webview state (auth, models, config status) from fresh config. */
+  public refreshWebviewState(): void {
+    this._sendConfigStatus();
   }
 
   public resolveWebviewView(

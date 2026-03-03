@@ -1,12 +1,25 @@
 (function () {
   const { marked } = require("marked");
   const DOMPurify = require("dompurify");
+  const hljs = require("highlight.js");
+  const { markedHighlight } = require("marked-highlight");
 
   const COPY_FEEDBACK_MS = 2000;
   const AUTH_BANNER_DISMISS_MS = 3000;
   const RENDER_THROTTLE_MS = 50;
 
-  // Configure marked for chat rendering
+  // Configure marked with syntax highlighting
+  marked.use(
+    markedHighlight({
+      langPrefix: "hljs language-",
+      highlight(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    })
+  );
   marked.setOptions({
     breaks: true,
     gfm: true,
