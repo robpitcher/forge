@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import { ExtensionConfig } from "./configuration.js";
 import type {
   CopilotClient,
@@ -15,6 +16,22 @@ import type {
 let client: CopilotClient | undefined;
 const sessions = new Map<string, ICopilotSession>();
 const sessionConfigHashes = new Map<string, string>();
+
+/**
+ * Attempts to find the `copilot` CLI binary on PATH.
+ * Returns the resolved path or undefined if not found.
+ */
+function resolveCopilotCliFromPath(): string | undefined {
+  try {
+    const cmd = process.platform === "win32" ? "where copilot" : "which copilot";
+    const result = execSync(cmd, { encoding: "utf8", timeout: 5000 })
+      .trim()
+      .split("\n")[0];
+    return result || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export class CopilotCliNotFoundError extends Error {
   constructor(message: string) {
@@ -37,6 +54,11 @@ export async function getOrCreateClient(
   const clientOptions: Record<string, unknown> = {};
   if (config.cliPath) {
     clientOptions.cliPath = config.cliPath;
+  } else {
+    const resolved = resolveCopilotCliFromPath();
+    if (resolved) {
+      clientOptions.cliPath = resolved;
+    }
   }
 
   try {
@@ -48,10 +70,11 @@ export async function getOrCreateClient(
     if (
       message.toLowerCase().includes("not found") ||
       message.toLowerCase().includes("enoent") ||
-      message.toLowerCase().includes("cannot find")
+      message.toLowerCase().includes("cannot find") ||
+      message.toLowerCase().includes("cannot resolve")
     ) {
       throw new CopilotCliNotFoundError(
-        "Copilot CLI not found. Please install it or set the path in forge.copilot.cliPath"
+        "Copilot CLI not found. Install @github/copilot globally or set forge.copilot.cliPath in settings."
       );
     }
     throw err;
