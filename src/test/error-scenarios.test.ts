@@ -112,7 +112,7 @@ describe("Error: WebviewView error paths", () => {
   };
   let mockView: MockWebviewView;
 
-  function setupProvider(settings: Record<string, string>, secretApiKey?: string) {
+  function setupProvider(settings: Record<string, unknown>, secretApiKey?: string) {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn(
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
@@ -216,6 +216,7 @@ describe("Error: WebviewView error paths", () => {
       apiKey: "",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("spawn copilot ENOENT"));
@@ -244,6 +245,7 @@ describe("Error: WebviewView error paths", () => {
       apiKey: "",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("Permission denied"));
@@ -275,6 +277,7 @@ describe("Error: WebviewView error paths", () => {
       apiKey: "",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockSession.send.mockRejectedValueOnce(
@@ -318,6 +321,7 @@ describe("Error: WebviewView error paths", () => {
       apiKey: "",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockSession.send.mockImplementation(async () => {
@@ -371,7 +375,7 @@ describe("Error: auth error rewriting (_rewriteAuthError)", () => {
   };
   let mockView: MockWebviewView;
 
-  function setupRewriteProvider(settings: Record<string, string>, secretApiKey?: string) {
+  function setupRewriteProvider(settings: Record<string, unknown>, secretApiKey?: string) {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn(
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
@@ -414,6 +418,7 @@ describe("Error: auth error rewriting (_rewriteAuthError)", () => {
     apiKey: "",
     wireApi: "completions",
     cliPath: "",
+    models: ["gpt-4"],
   };
 
   beforeEach(() => {

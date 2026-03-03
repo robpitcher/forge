@@ -1,12 +1,44 @@
 (function () {
   const { marked } = require("marked");
   const DOMPurify = require("dompurify");
+  const hljs = require("highlight.js/lib/core");
+
+  // Register only languages commonly used in developer chat
+  hljs.registerLanguage("javascript", require("highlight.js/lib/languages/javascript"));
+  hljs.registerLanguage("typescript", require("highlight.js/lib/languages/typescript"));
+  hljs.registerLanguage("python", require("highlight.js/lib/languages/python"));
+  hljs.registerLanguage("java", require("highlight.js/lib/languages/java"));
+  hljs.registerLanguage("csharp", require("highlight.js/lib/languages/csharp"));
+  hljs.registerLanguage("go", require("highlight.js/lib/languages/go"));
+  hljs.registerLanguage("rust", require("highlight.js/lib/languages/rust"));
+  hljs.registerLanguage("ruby", require("highlight.js/lib/languages/ruby"));
+  hljs.registerLanguage("php", require("highlight.js/lib/languages/php"));
+  hljs.registerLanguage("sql", require("highlight.js/lib/languages/sql"));
+  hljs.registerLanguage("bash", require("highlight.js/lib/languages/bash"));
+  hljs.registerLanguage("json", require("highlight.js/lib/languages/json"));
+  hljs.registerLanguage("yaml", require("highlight.js/lib/languages/yaml"));
+  hljs.registerLanguage("xml", require("highlight.js/lib/languages/xml"));
+  hljs.registerLanguage("css", require("highlight.js/lib/languages/css"));
+  hljs.registerLanguage("markdown", require("highlight.js/lib/languages/markdown"));
+  hljs.registerLanguage("diff", require("highlight.js/lib/languages/diff"));
+  const { markedHighlight } = require("marked-highlight");
 
   const COPY_FEEDBACK_MS = 2000;
   const AUTH_BANNER_DISMISS_MS = 3000;
   const RENDER_THROTTLE_MS = 50;
 
-  // Configure marked for chat rendering
+  // Configure marked with syntax highlighting
+  marked.use(
+    markedHighlight({
+      langPrefix: "hljs language-",
+      highlight(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    })
+  );
   marked.setOptions({
     breaks: true,
     gfm: true,
@@ -30,6 +62,8 @@
   let lastAutoAttachedContent = null;
   let messages = [];
   let renderTimeout = null;
+  let configIsComplete = false;
+  let _lastWelcomeFlags = null;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -103,6 +137,171 @@
     autoAttachedChipElement = null;
     autoAttachedCtx = null;
     vscode.postMessage(msg);
+  }
+
+  function applyConfigStatus(hasEndpoint, hasAuth, hasModels) {
+    const welcomeScreen = document.getElementById("welcomeScreen");
+    const inputArea = document.querySelector(".input-area");
+    configIsComplete = hasEndpoint && hasAuth && hasModels;
+
+    if (!configIsComplete) {
+      const flagsKey = `${hasEndpoint}:${hasAuth}:${hasModels}`;
+      if (_lastWelcomeFlags === flagsKey) { return; }
+      _lastWelcomeFlags = flagsKey;
+
+      welcomeScreen.classList.remove("hidden");
+      chatMessages.classList.add("hidden");
+      inputArea.classList.add("hidden");
+      renderWelcomeScreen(welcomeScreen, hasEndpoint, hasAuth, hasModels);
+    } else {
+      _lastWelcomeFlags = null;
+      welcomeScreen.classList.add("hidden");
+      chatMessages.classList.remove("hidden");
+      inputArea.classList.remove("hidden");
+    }
+  }
+
+  function showConfigCheckFeedback(missing, allGood) {
+    const feedbackEl = document.getElementById("configCheckFeedback");
+    if (!feedbackEl) { return; }
+
+    if (allGood) {
+      feedbackEl.innerHTML = '<span class="config-feedback-ok">✅ All set!</span>';
+    } else {
+      const items = missing.map((m) => `<div class="config-feedback-item">❌ Missing: ${m}</div>`).join("");
+      feedbackEl.innerHTML = items;
+    }
+
+    feedbackEl.classList.remove("hidden");
+    // Re-trigger animation on repeat clicks
+    feedbackEl.classList.remove("config-feedback-flash");
+    void feedbackEl.offsetWidth;
+    feedbackEl.classList.add("config-feedback-flash");
+  }
+
+  function renderWelcomeScreen(container, hasEndpoint, hasAuth, hasModels) {
+    container.innerHTML = "";
+
+    const icon = document.createElement("img");
+    icon.className = "welcome-icon";
+    icon.src = container.dataset.iconUri;
+    icon.alt = "Forge";
+    container.appendChild(icon);
+
+    const title = document.createElement("h1");
+    title.textContent = "Welcome to Forge";
+    container.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "subtitle";
+    subtitle.textContent = "AI chat powered by your Azure AI Foundry endpoint — private, secure, yours.";
+    container.appendChild(subtitle);
+
+    const steps = document.createElement("div");
+    steps.className = "setup-steps";
+
+    // Step 1: Endpoint
+    const step1 = createSetupStep(
+      1, hasEndpoint,
+      "Connect your endpoint",
+      "Point Forge to your Azure AI Foundry resource",
+      [{ label: "Open Endpoint Settings", command: "openEndpointSettings" }]
+    );
+    steps.appendChild(step1);
+
+    // Step 2: Model
+    const step2 = createSetupStep(
+      2, hasModels,
+      "Add a model",
+      "Configure your model deployment name(s)",
+      [{ label: "Open Model Settings", command: "openModelSettings" }]
+    );
+    steps.appendChild(step2);
+
+    // Step 3: Auth
+    const step3 = createSetupStep(
+      3, hasAuth,
+      "Authenticate",
+      "Sign in with Entra ID or provide an API key",
+      [
+        { label: "Sign in with Entra ID", command: "signIn" },
+        { label: "Set API Key", command: "setApiKey" },
+      ]
+    );
+    steps.appendChild(step3);
+
+    container.appendChild(steps);
+
+    // "Check Configuration" button
+    const checkDiv = document.createElement("div");
+    checkDiv.className = "check-config";
+    const checkBtn = document.createElement("button");
+    checkBtn.className = "check-config-btn";
+    checkBtn.textContent = "🔄 Check Configuration";
+    checkBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "checkConfig" });
+    });
+    checkDiv.appendChild(checkBtn);
+
+    const feedbackDiv = document.createElement("div");
+    feedbackDiv.id = "configCheckFeedback";
+    feedbackDiv.className = "config-check-feedback hidden";
+    checkDiv.appendChild(feedbackDiv);
+
+    container.appendChild(checkDiv);
+
+    const helpDiv = document.createElement("div");
+    helpDiv.className = "help-link";
+    helpDiv.appendChild(document.createTextNode("Need help? "));
+    const helpBtn = document.createElement("button");
+    helpBtn.textContent = "View documentation";
+    helpBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "openDocs" });
+    });
+    helpDiv.appendChild(helpBtn);
+    container.appendChild(helpDiv);
+  }
+
+  function createSetupStep(number, completed, title, description, actions) {
+    const step = document.createElement("div");
+    step.className = "setup-step" + (completed ? " completed" : "");
+
+    const indicator = document.createElement("div");
+    indicator.className = "step-indicator";
+    if (completed) {
+      indicator.textContent = "✅";
+    } else {
+      const circle = document.createElement("div");
+      circle.className = "step-number";
+      circle.textContent = String(number);
+      indicator.appendChild(circle);
+    }
+    step.appendChild(indicator);
+
+    const content = document.createElement("div");
+    content.className = "step-content";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = title;
+    content.appendChild(h3);
+
+    const p = document.createElement("p");
+    p.textContent = description;
+    content.appendChild(p);
+
+    if (!completed) {
+      actions.forEach(({ label, command }) => {
+        const btn = document.createElement("button");
+        btn.textContent = label;
+        btn.addEventListener("click", () => {
+          vscode.postMessage({ command });
+        });
+        content.appendChild(btn);
+      });
+    }
+
+    step.appendChild(content);
+    return step;
   }
 
   function newConversation() {
@@ -391,7 +590,9 @@
 
       case "conversationReset":
         resetUIState();
-        chatMessages.innerHTML = "";
+        if (configIsComplete) {
+          chatMessages.innerHTML = "";
+        }
         messages = [];
         break;
 
@@ -416,12 +617,23 @@
       case "modelsUpdated": {
         modelSelector.innerHTML = "";
         const models = message.models || [];
-        models.forEach((m) => {
+        if (models.length === 0) {
           const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
+          opt.value = "";
+          opt.textContent = "No models configured";
+          opt.disabled = true;
+          opt.selected = true;
           modelSelector.appendChild(opt);
-        });
+          modelSelector.disabled = true;
+        } else {
+          modelSelector.disabled = false;
+          models.forEach((m) => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            modelSelector.appendChild(opt);
+          });
+        }
         break;
       }
 
@@ -430,6 +642,16 @@
           modelSelector.value = message.model;
         }
         break;
+
+      case "configStatus": {
+        applyConfigStatus(message.hasEndpoint, message.hasAuth, message.hasModels);
+        break;
+      }
+
+      case "configCheckResult": {
+        showConfigCheckFeedback(message.missing, message.allGood);
+        break;
+      }
 
       case "toolTimeout": {
         const card = document.querySelector(`.tool-confirmation[data-tool-id="${CSS.escape(message.id)}"]`);
@@ -698,4 +920,7 @@
       banner.appendChild(troubleshootBtn);
     }
   }
+
+  // Signal readiness so extension can send initial state (avoids race condition)
+  vscode.postMessage({ command: "webviewReady" });
 })();

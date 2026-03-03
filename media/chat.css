@@ -154,6 +154,67 @@ body {
   white-space: pre;
 }
 
+/* highlight.js syntax highlighting — mapped to VS Code theme tokens */
+.hljs {
+  color: var(--vscode-editor-foreground, inherit);
+  background: transparent;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-title.function_.invoke__ {
+  color: var(--vscode-symbolIcon-keywordForeground, #569cd6);
+}
+.hljs-built_in {
+  color: var(--vscode-symbolIcon-functionForeground, #dcdcaa);
+}
+.hljs-type,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ {
+  color: var(--vscode-symbolIcon-classForeground, #4ec9b0);
+}
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: var(--vscode-symbolIcon-stringForeground, #ce9178);
+}
+.hljs-number,
+.hljs-literal {
+  color: var(--vscode-symbolIcon-numberForeground, #b5cea8);
+}
+.hljs-comment,
+.hljs-doctag {
+  color: var(--vscode-symbolIcon-commentForeground, #6a9955);
+  font-style: italic;
+}
+.hljs-variable,
+.hljs-params {
+  color: var(--vscode-symbolIcon-variableForeground, #9cdcfe);
+}
+.hljs-title.function_ {
+  color: var(--vscode-symbolIcon-functionForeground, #dcdcaa);
+}
+.hljs-regexp {
+  color: var(--vscode-symbolIcon-stringForeground, #d16969);
+}
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta .hljs-string {
+  color: var(--vscode-symbolIcon-keywordForeground, #c586c0);
+}
+.hljs-deletion {
+  color: var(--vscode-diffEditor-removedTextForeground, #f44747);
+}
+.hljs-addition {
+  color: var(--vscode-diffEditor-insertedTextForeground, #73c991);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
+
 .markdown-body blockquote {
   margin: 8px 0;
   padding: 4px 12px;
@@ -635,4 +696,190 @@ button:active {
 .conversation-delete-btn:hover {
   opacity: 1;
   color: var(--vscode-errorForeground);
+}
+
+/* ── Global utility ── */
+.hidden {
+  display: none !important;
+}
+
+/* ── Welcome / setup wizard screen ── */
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 24px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.welcome-screen.hidden {
+  display: none;
+}
+
+.welcome-screen .welcome-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+}
+
+.welcome-screen h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.welcome-screen .subtitle {
+  font-size: 13px;
+  opacity: 0.8;
+  margin: 0 0 24px 0;
+  max-width: 300px;
+}
+
+.welcome-screen .setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+}
+
+.welcome-screen .setup-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.welcome-screen .setup-step.completed {
+  opacity: 0.6;
+}
+
+.welcome-screen .step-indicator {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.welcome-screen .step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.welcome-screen .step-content {
+  flex: 1;
+}
+
+.welcome-screen .step-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.welcome-screen .step-content p {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.welcome-screen .step-content button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.welcome-screen .step-content button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.welcome-screen .help-link {
+  margin-top: 24px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.welcome-screen .check-config {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.welcome-screen .check-config-btn {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 8px 20px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.welcome-screen .check-config-btn:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+/* Config check feedback */
+.config-check-feedback {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  font-size: 12px;
+  text-align: left;
+}
+
+.config-check-feedback.hidden {
+  display: none;
+}
+
+.config-feedback-item {
+  padding: 2px 0;
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+.config-feedback-ok {
+  color: var(--vscode-testing-iconPassed, #73c991);
+  font-weight: 600;
+}
+
+@keyframes configFeedbackFlash {
+  0% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.config-feedback-flash {
+  animation: configFeedbackFlash 0.25s ease-out;
+}
+
+.welcome-screen .help-link button {
+  background: none;
+  border: none;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 12px;
+  padding: 0;
 }

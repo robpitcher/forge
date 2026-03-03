@@ -2192,3 +2192,139 @@ Audited all documentation files (`README.md`, `docs/configuration-reference.md`,
 5. **Forge lives in the sidebar (activity bar), not the bottom panel.** UI location references must say "sidebar" or "activity bar", not "bottom panel" or "panel area".
 
 **Why:** After many rounds of PR #116 changes, the docs had drifted significantly from the codebase. The `model` → `models` rename and endpoint URL format issues were actively harmful — they'd cause users to misconfigure the extension.
+# Decision: configStatus message ordering in resolveWebviewView
+
+**Branch:** squad/120-welcome-inline  
+**Date:** 2026-03-02  
+**Author:** Blair (Extension Dev)
+
+## Context
+
+Issue #120 adds a first-run welcome card. The welcome card needs to know whether endpoint, auth, and models are configured. This requires a new `configStatus` message from the extension to the webview.
+
+## Decision
+
+`configStatus` is sent as the **fourth** lifecycle message in `resolveWebviewView`, after `authStatus`, `modelsUpdated`, and `modelSelected`. The message carries `hasEndpoint`, `hasAuth`, and `hasModels` booleans.
+
+```typescript
+this._view?.webview.postMessage({
+  type: "configStatus",
+  hasEndpoint: !!config.endpoint,
+  hasAuth: status.state === "authenticated",
+  hasModels: config.models.length > 0,
+});
+```
+
+## Rationale
+
+- **Auth status first** — the auth banner must render before the welcome card to preserve visual hierarchy (auth banner appears above welcome card in DOM insertion order)
+- **After modelsUpdated** — `hasModels` mirrors the same config data already sent in `modelsUpdated`, so no extra async work needed
+- **Booleans, not raw config** — the webview doesn't need the full config, just three presence flags; keeps the message surface minimal
+
+## Impact on Tests
+
+Tests that filter lifecycle messages by type and count total messages for `vi.waitFor()` timing must filter before counting. Adding `configStatus` to the filter-by-type list is not enough if the raw message count is used as the timing condition — it will pass before stream messages arrive. See `extension.test.ts` for the correct pattern:
+
+```typescript
+await vi.waitFor(() => {
+  const filtered = getPostedMessages(mockView).filter((m) => {
+    const t = m.type;
+    return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus";
+  });
+  expect(filtered.length).toBeGreaterThanOrEqual(4);
+});
+```
+
+Any future lifecycle messages added to `resolveWebviewView` must follow this same pattern.
+# Decision: Option B welcome screen uses `.hidden` utility class for toggle
+
+**Date:** 2025-01-01  
+**Author:** Blair  
+**Branch:** squad/120-welcome-replace
+
+## Context
+
+Option B (replace-area welcome screen) needs to show/hide three DOM elements:
+`#welcomeScreen`, `#chatMessages`, and `.input-area`. Two approaches were considered:
+(a) toggle element-specific CSS classes, (b) add a global `.hidden` utility.
+
+## Decision
+
+Added a global `.hidden { display: none !important }` utility class to `chat.css`. 
+The `!important` ensures it overrides any `display` rule from other classes (e.g., 
+`.welcome-screen { display: flex }` must be overridden when hidden).
+
+## Rationale
+
+- `#chatMessages` and `.input-area` had no existing hide/show mechanism.
+- A utility class is reusable and explicit — easier to trace in DevTools.
+- Option A (inline card) didn't need to hide the input area, so it didn't add `.hidden`. 
+  If Option A is merged first, Option B needs to add the utility class.
+
+## Impact
+
+- `.conversation-list.hidden` already existed as a compound selector. The new global 
+  `.hidden` class is compatible — both approaches work on different elements.
+- Tests updated to filter `configStatus` from message-type assertions.
+
+
+
+# Welcome Screen State Management Pattern
+
+**Decided:** 2026-03-02
+
+## Context
+
+The welcome screen UI state machine relies on `configStatus` messages to track completion of setup steps and trigger auto-transitions (e.g., step 3 ✅ when user authenticates). Initially, `configStatus` was only sent during webview initialization (`resolveWebviewView`, `webviewReady`). Auth/config mutations went through `updateAuthStatus()` which only sent `authStatus` messages.
+
+## Decision
+
+**All auth/config state changes must send BOTH `authStatus` AND `configStatus` messages.**
+
+The standalone `updateAuthStatus()` function now calls:
+1. `provider.postAuthStatus(status, !!config.endpoint)` (existing)
+2. `provider.postConfigStatus(!!config.endpoint, status.state === "authenticated", config.models.length > 0)` (new)
+
+This covers all mutation paths automatically:
+- 30s auth poll
+- Config change listener
+- Webview focus listener
+- Sign-in timeout handler
+- API key storage via `_refreshAuthStatus`
+
+## Rationale
+
+Centralizing the fix in `updateAuthStatus()` ensures all code paths send both messages without requiring 5 separate patches. The `postConfigStatus` method does NOT deduplicate — the welcome screen logic needs to re-evaluate state on every update, even if values haven't changed.
+
+## Alternatives Rejected
+
+- ❌ **Send configStatus only in auth poll** — doesn't cover config changes (endpoint, models), sign-in timeout, or API key storage
+- ❌ **Deduplicate configStatus like authStatus** — welcome screen logic needs fresh state on every change for correct transitions
+
+## Impact
+
+- Welcome screen now auto-transitions when users complete setup steps
+- Auth banner and welcome screen state stay synchronized
+- No race conditions between welcome screen and status bar
+
+## Affected Files
+
+- `src/extension.ts` — `updateAuthStatus()`, `postConfigStatus()` method
+
+## Related
+
+- Issue #123 (welcome screen auto-detect bugs)
+- `.squad/decisions.md` lines 126-147 (welcome UI options)
+### 2026-03-02T18:06Z: Design decision — welcome screen style
+**By:** Rob Pitcher (via Copilot)
+**What:** For issue #120 first-run experience, use the "replace chat area" approach (Option B) — full-screen welcome/setup wizard that replaces the chat area when config is incomplete. The inline message approach (Option A) is rejected.
+**Why:** User tested both mockup branches and preferred the replace-area UX.
+
+### API Key Storage Must Sync authMethod Setting
+
+**By:** Blair  
+**Date:** 2026-03-02  
+**What:** When storing an API key via `_promptAndStoreApiKey()`, the extension now also updates `forge.copilot.authMethod` to `"apiKey"` (Global scope). When clearing via `_clearApiKey()`, it reverts to `"entraId"`. This ensures `checkAuthStatus` evaluates the correct credential type. Any future code path that programmatically sets/clears an API key must maintain this invariant.  
+**Why:** Without this sync, `checkAuthStatus` always evaluated Entra ID auth (the default), making the welcome screen stuck after API key entry.  
+**Impact:** Auth method now correctly follows API key storage state. Sign-in flow and welcome screen state are synchronized.  
+**Related:** Issue #81 (auth UX), `.squad/log/2026-03-02T23-30-apikey-authmethod-fix.md`

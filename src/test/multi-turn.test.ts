@@ -187,12 +187,13 @@ describe("multi-turn conversation context (SC4)", () => {
     let mockView: MockWebviewView;
 
     function setupValidSettings() {
-      const settings: Record<string, string> = {
+      const settings: Record<string, unknown> = {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",
         apiKey: "test-key-123",
         authMethod: "apiKey",
         wireApi: "completions",
         cliPath: "",
+        models: ["gpt-4"],
       };
       vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
         get: vi.fn(
