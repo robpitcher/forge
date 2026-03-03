@@ -196,3 +196,7 @@
 - `getConfiguration()` is synchronous and reads only VS Code settings (no SecretStorage). Use it for non-blocking UI updates.
 - Always add timeout wrappers (`Promise.race`) to credential checks to prevent indefinite hangs.
 - Replace silent `.catch(() => {})` with proper output channel logging for diagnostic visibility.
+- `getOrCreateClient()` in copilotService.ts now auto-resolves the copilot CLI binary via `which`/`where` before constructing `SDKCopilotClient`, preventing the `import.meta.resolve` failure in bundled .vsix environments.
+- The esbuild shim's error message is "Cannot resolve module: ..." — added "cannot resolve" to the error detection patterns alongside "not found", "enoent", and "cannot find".
+- `child_process.execSync` is used (not `execFileSync`) because `which`/`where` are shell builtins on some platforms. Wrapped with `{ encoding: 'utf8', timeout: 5000 }` for safety.
+- Air-gap test updated to accept auto-resolved cliPath while still asserting no GitHub credentials leak into the constructor.
