@@ -186,3 +186,13 @@
 - Separate message types for "state update" vs "user-triggered action result" is cleaner than trying to correlate a state message with a button click via flags or timeouts.
 
 📌 Fixed and renamed CI workflow files — Renamed `squad-preview.yml` → `preview-release.yml` and `squad-insider-release.yml` → `insider-release.yml`. Both had a broken `node --test test/*.test.js` step (project uses vitest). Replaced with the full CI pipeline: `npm ci`, lint, typecheck, build, `npm test` — matching `ci.yml` exactly. Preview workflow kept its validation steps (CHANGELOG, .squad/ file check, version check) but moved them after `npm ci` so node_modules exist. Added `cache: npm` to setup-node for consistency.
+
+## Learnings
+
+📌 Fixed extension freeze on Windows due to slow DefaultAzureCredential — The extension appeared completely frozen on Windows (no models, no responses, no errors) because `_sendConfigStatus()` at line 542 gated ALL webview messages behind `checkAuthStatus()`, which calls `DefaultAzureCredential.getToken()`. On Windows, this can hang for 15-60 seconds trying IMDS (managed identity endpoint 169.254.169.254) before falling through to Azure CLI. During this time, the webview received ZERO messages. Fixed by restructuring `_sendConfigStatus()`: (1) Send models and preliminary configStatus immediately using sync `getConfiguration()` (no await). (2) Then do async auth check with 15-second timeout via new `withTimeout()` helper. (3) After auth resolves, send updated configStatus and authStatus. (4) Added proper logging to Forge output channel (replaced silent `.catch(() => {})`). (5) Pass `outputChannel` to ChatViewProvider constructor. This way the webview gets models/endpoint info within milliseconds even if auth takes 30 seconds. The webview's `applyConfigStatus()` dedup logic (keyed on `${hasEndpoint}:${hasAuth}:${hasModels}`) handles receiving preliminary status (hasAuth=false) followed by updated status (hasAuth=true).
+- `DefaultAzureCredential` on Windows can hang for 15-60 seconds trying IMDS before falling through to Azure CLI.
+- Critical UI updates (models list, endpoint status) must not be gated behind slow async operations like credential checks.
+- Send preliminary state immediately, then update after async operations complete — webview dedup logic handles multiple status messages.
+- `getConfiguration()` is synchronous and reads only VS Code settings (no SecretStorage). Use it for non-blocking UI updates.
+- Always add timeout wrappers (`Promise.race`) to credential checks to prevent indefinite hangs.
+- Replace silent `.catch(() => {})` with proper output channel logging for diagnostic visibility.
