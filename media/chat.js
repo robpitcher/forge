@@ -953,7 +953,7 @@
       
       let message = "";
       if (result.reason === "not_found") {
-        message = "⚠️ Copilot CLI not found. Install with npm or configure path.";
+        message = "⚠️ Copilot CLI not found. Install GitHub Copilot CLI or configure path.";
       } else if (result.reason === "wrong_binary") {
         message = "⚠️ Wrong 'copilot' binary detected. Please configure the correct path.";
       } else if (result.reason === "version_check_failed") {

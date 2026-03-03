@@ -148,6 +148,11 @@ export class CopilotCliNotFoundError extends Error {
   }
 }
 
+function formatCliStartupDiagnostics(cliPath: string | undefined, details: string): string {
+  const attemptedPath = cliPath ?? "(none)";
+  return `Attempted CLI path: ${attemptedPath}\nStartup error: ${details}`;
+}
+
 export async function getOrCreateClient(
   config: ExtensionConfig
 ): Promise<CopilotClient> {
@@ -161,7 +166,9 @@ export async function getOrCreateClient(
     if (!validation.valid) {
       if (validation.reason === "not_found") {
         throw new CopilotCliNotFoundError(
-          "Copilot CLI not found. Install @github/copilot globally or set forge.copilot.cliPath in settings."
+          "Copilot CLI not found at configured forge.copilot.cliPath.\n" +
+          `Attempted CLI path: ${configuredCliPath}\n` +
+          `Validation error: ${validation.details ?? "Unknown error"}`
         );
       }
       if (validation.reason === "version_check_failed" && validation.details?.toLowerCase().includes("directory")) {
@@ -170,7 +177,9 @@ export async function getOrCreateClient(
         );
       }
       throw new CopilotCliNotFoundError(
-        "The configured Copilot CLI path is invalid. Set forge.copilot.cliPath to the GitHub Copilot CLI executable."
+        "The configured Copilot CLI path is invalid. Set forge.copilot.cliPath to the GitHub Copilot CLI executable.\n" +
+        `Attempted CLI path: ${configuredCliPath}\n` +
+        `Validation error: ${validation.details ?? "Unknown error"}`
       );
     }
   }
@@ -180,13 +189,9 @@ export async function getOrCreateClient(
   );
 
   const clientOptions: Record<string, unknown> = {};
-  if (configuredCliPath) {
-    clientOptions.cliPath = configuredCliPath;
-  } else {
-    const discoveredCliPath = resolveCopilotCliFromPath();
-    if (discoveredCliPath) {
-      clientOptions.cliPath = discoveredCliPath;
-    }
+  const resolvedCliPath = configuredCliPath ?? resolveCopilotCliFromPath();
+  if (resolvedCliPath) {
+    clientOptions.cliPath = resolvedCliPath;
   }
 
   try {
@@ -202,9 +207,8 @@ export async function getOrCreateClient(
       (lower.includes("exited with code") && lower.includes("stderr"))
     ) {
       throw new CopilotCliNotFoundError(
-        "The 'copilot' binary found on your PATH does not appear to be the GitHub Copilot CLI (@github/copilot). " +
-        "Install it with: npm install -g @github/copilot — then restart VS Code. " +
-        "Or set forge.copilot.cliPath to the correct binary location."
+        "Copilot CLI failed to start. Verify forge.copilot.cliPath points to the GitHub Copilot CLI executable.\n" +
+        formatCliStartupDiagnostics(resolvedCliPath, message)
       );
     }
     if (
@@ -214,7 +218,8 @@ export async function getOrCreateClient(
       lower.includes("cannot resolve")
     ) {
       throw new CopilotCliNotFoundError(
-        "Copilot CLI not found. Install @github/copilot globally or set forge.copilot.cliPath in settings."
+        "Copilot CLI not found from the extension host environment. Install GitHub Copilot CLI (npm, winget, Homebrew, or install script) or set forge.copilot.cliPath.\n" +
+        formatCliStartupDiagnostics(resolvedCliPath, message)
       );
     }
     throw err;

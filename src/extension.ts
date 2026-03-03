@@ -309,16 +309,11 @@ async function performCliPreflight(
     
     if (result.reason === "not_found") {
       vscode.window.showWarningMessage(
-        "Forge: Copilot CLI not found. Install it with `npm install -g @github/copilot` or set the path in settings.",
-        "Open Settings",
-        "Open Terminal"
+        "Forge: Copilot CLI not found. Install GitHub Copilot CLI (npm, winget, Homebrew, or install script) or set the path in settings.",
+        "Open Settings"
       ).then(choice => {
         if (choice === "Open Settings") {
           vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
-        } else if (choice === "Open Terminal") {
-          const term = vscode.window.createTerminal("Install Copilot CLI");
-          term.sendText("npm install -g @github/copilot");
-          term.show();
         }
       });
     } else if (result.reason === "wrong_binary") {

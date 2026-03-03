@@ -126,6 +126,25 @@ describe("copilotService", () => {
       expect(constructorSpy).not.toHaveBeenCalled();
       expect(mockClient.start).not.toHaveBeenCalled();
     });
+
+    it("includes attempted cli path and startup error details when startup fails", async () => {
+      const configWithCli = { ...validConfig, cliPath: "/custom/path/copilot" };
+      mockExecFileSync.mockReturnValueOnce("GitHub Copilot CLI 0.0.421-1\n");
+      mockClient.start.mockRejectedValueOnce(new Error("unknown option: --headless"));
+
+      let thrown: unknown;
+      try {
+        await getOrCreateClient(configWithCli);
+      } catch (err) {
+        thrown = err;
+      }
+
+      expect(thrown).toBeInstanceOf(Error);
+      const message = (thrown as Error).message;
+      expect(message).toContain("Attempted CLI path: /custom/path/copilot");
+      expect(message).toContain("Startup error: unknown option: --headless");
+      expect(message).not.toContain("npm install -g @github/copilot");
+    });
   });
 
   describe("getOrCreateSession", () => {
