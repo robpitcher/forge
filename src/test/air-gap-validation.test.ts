@@ -344,11 +344,17 @@ describe("Air-gap validation (SC2, SC3)", () => {
 
       await getOrCreateClient(configNoCli);
 
-      // Should either pass empty object or undefined options
+      // Auto-resolve may find copilot on PATH and pass cliPath,
+      // or pass empty object if not found. Either way, no GitHub credentials.
       const ctorCall = constructorSpy.mock.calls[0][0] as Record<string, unknown> | undefined;
       
       if (ctorCall) {
-        expect(Object.keys(ctorCall)).toHaveLength(0);
+        for (const key of Object.keys(ctorCall)) {
+          expect(key).toBe("cliPath");
+          expect(typeof ctorCall[key]).toBe("string");
+        }
+        expect(ctorCall).not.toHaveProperty("token");
+        expect(ctorCall).not.toHaveProperty("github");
       }
     });
   });
