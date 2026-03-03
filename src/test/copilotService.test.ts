@@ -15,15 +15,21 @@ import {
   validateCopilotCli,
   discoverAndValidateCli,
 } from "../copilotService.js";
-import { execSync, execFileSync } from "child_process";
+import { execSync, execFileSync, execFile } from "child_process";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
-  execFileSync: vi.fn(),
+  execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
+  execFileSync: vi.fn().mockReturnValue("0.1.26"),
+  execFile: vi.fn(
+    (_cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
+      if (callback) callback(null, "", "");
+      return { kill: vi.fn(), pid: 12345 };
+    },
+  ),
 }));
 
 const validConfig: ExtensionConfig = {
@@ -72,8 +78,10 @@ describe("copilotService", () => {
     const mockExecFileSync = vi.mocked(execFileSync);
 
     beforeEach(() => {
-      mockExecSync.mockReset();
-      mockExecFileSync.mockReset();
+      mockExecSync.mockClear();
+      mockExecSync.mockReturnValue("/usr/local/bin/copilot\n");
+      mockExecFileSync.mockClear();
+      mockExecFileSync.mockReturnValue("0.1.26");
     });
 
     it("creates a client and starts it", async () => {

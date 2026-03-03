@@ -7,6 +7,7 @@ import {
   destroySession,
   stopClient,
   CopilotCliNotFoundError,
+  CopilotCliNeedsInstallError,
   listConversations,
   resumeConversation,
   deleteConversation,
@@ -15,6 +16,7 @@ import {
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import { ForgeCodeActionProvider } from "./codeActionProvider.js";
+import { installCopilotCli, type CliInstallResult } from "./cliInstaller.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
@@ -37,7 +39,13 @@ type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Forge");
-  const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState, outputChannel);
+  const provider = new ChatViewProvider(
+    context.extensionUri, 
+    context.secrets, 
+    context.workspaceState, 
+    outputChannel,
+    context.globalStorageUri.fsPath
+  );
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
@@ -55,7 +63,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   
   // Preflight CLI validation
-  performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+  performCliPreflight(getConfiguration(), outputChannel, provider, context.globalStorageUri.fsPath).catch((err) => {
     outputChannel.appendLine(`CLI preflight check failed: ${err}`);
   });
   
@@ -66,7 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
         outputChannel.appendLine(`Auth status update on config change failed: ${err}`);
       });
       if (e.affectsConfiguration("forge.copilot.cliPath")) {
-        performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+        performCliPreflight(getConfiguration(), outputChannel, provider, context.globalStorageUri.fsPath).catch((err) => {
           outputChannel.appendLine(`CLI preflight check failed: ${err}`);
         });
       }
@@ -293,7 +301,8 @@ async function updateAuthStatus(
 async function performCliPreflight(
   config: ExtensionConfig,
   outputChannel: vscode.OutputChannel,
-  provider: ChatViewProvider
+  provider: ChatViewProvider,
+  globalStoragePath?: string
 ): Promise<void> {
   try {
     const result = await discoverAndValidateCli(config.cliPath);
@@ -374,7 +383,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage,
     private readonly _workspaceState: vscode.Memento,
-    private readonly _outputChannel: vscode.OutputChannel
+    private readonly _outputChannel: vscode.OutputChannel,
+    private readonly _globalStoragePath: string
   ) {
     // Restore persisted model selection
     this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
@@ -769,10 +779,16 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         config,
         authToken,
         activeModel,
+        this._globalStoragePath,
         this._createPermissionHandler(),
       );
     } catch (err: unknown) {
-      if (err instanceof CopilotCliNotFoundError) {
+      if (err instanceof CopilotCliNeedsInstallError) {
+        // Copilot CLI not found — offer to install it automatically
+        this._isProcessing = false;
+        await this._handleCliAutoInstall(err.message);
+        return;
+      } else if (err instanceof CopilotCliNotFoundError) {
         this._postError(err.message);
       } else {
         const message = err instanceof Error ? err.message : String(err);
@@ -1053,10 +1069,71 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "error", message });
   }
 
+  private async _handleCliAutoInstall(errorMessage: string): Promise<void> {
+    // Show ask-first dialog
+    const choice = await vscode.window.showInformationMessage(
+      "Forge needs the GitHub Copilot CLI to work. Install it now?",
+      "Install",
+      "Cancel"
+    );
+
+    if (choice === "Install") {
+      // Show progress notification during install
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Installing Copilot CLI...",
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const result: CliInstallResult = await installCopilotCli({
+              globalStoragePath: this._globalStoragePath,
+            });
+
+            if (result.success) {
+              await vscode.window.showInformationMessage(
+                "Copilot CLI installed successfully. Try sending a message again."
+              );
+            } else {
+              const errorDetail = result.error ?? "Unknown error";
+              const choice = await vscode.window.showErrorMessage(
+                `Failed to install Copilot CLI: ${errorDetail}`,
+                "Open Settings"
+              );
+              if (choice === "Open Settings") {
+                await this.openSettings();
+              }
+            }
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            const choice = await vscode.window.showErrorMessage(
+              `Failed to install Copilot CLI: ${message}`,
+              "Open Settings"
+            );
+            if (choice === "Open Settings") {
+              await this.openSettings();
+            }
+          }
+        }
+      );
+    } else {
+      // User cancelled — show manual install instructions
+      const choice = await vscode.window.showInformationMessage(
+        "To use Forge, install the GitHub Copilot CLI manually (npm, winget, Homebrew, or install script), or configure forge.copilot.cliPath to point to an existing installation.",
+        "Open Settings",
+        "Dismiss"
+      );
+      if (choice === "Open Settings") {
+        await this.openSettings();
+      }
+    }
+  }
+
   private async _handleListConversations(): Promise<void> {
     try {
       const config = await getConfigurationAsync(this._secrets);
-      const conversations = await listConversations(config);
+      const conversations = await listConversations(config, this._globalStoragePath);
       this._view?.webview.postMessage({ type: "conversationList", conversations });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1107,7 +1184,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._createPermissionHandler());
+      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._globalStoragePath, this._createPermissionHandler());
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState
