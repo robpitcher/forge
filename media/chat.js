@@ -161,6 +161,24 @@
     }
   }
 
+  function showConfigCheckFeedback(missing, allGood) {
+    const feedbackEl = document.getElementById("configCheckFeedback");
+    if (!feedbackEl) { return; }
+
+    if (allGood) {
+      feedbackEl.innerHTML = '<span class="config-feedback-ok">✅ All set!</span>';
+    } else {
+      const items = missing.map((m) => `<div class="config-feedback-item">❌ Missing: ${m}</div>`).join("");
+      feedbackEl.innerHTML = items;
+    }
+
+    feedbackEl.classList.remove("hidden");
+    // Re-trigger animation on repeat clicks
+    feedbackEl.classList.remove("config-feedback-flash");
+    void feedbackEl.offsetWidth;
+    feedbackEl.classList.add("config-feedback-flash");
+  }
+
   function renderWelcomeScreen(container, hasEndpoint, hasAuth, hasModels) {
     container.innerHTML = "";
 
@@ -224,6 +242,12 @@
       vscode.postMessage({ command: "checkConfig" });
     });
     checkDiv.appendChild(checkBtn);
+
+    const feedbackDiv = document.createElement("div");
+    feedbackDiv.id = "configCheckFeedback";
+    feedbackDiv.className = "config-check-feedback hidden";
+    checkDiv.appendChild(feedbackDiv);
+
     container.appendChild(checkDiv);
 
     const helpDiv = document.createElement("div");
@@ -621,6 +645,11 @@
 
       case "configStatus": {
         applyConfigStatus(message.hasEndpoint, message.hasAuth, message.hasModels);
+        break;
+      }
+
+      case "configCheckResult": {
+        showConfigCheckFeedback(message.missing, message.allGood);
         break;
       }
 

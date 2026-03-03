@@ -519,25 +519,39 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } else if (message.command === "deleteConversation") {
       await this._handleDeleteConversation(message.sessionId as string);
     } else if (message.command === "checkConfig") {
-      this._sendConfigStatus();
+      this._sendConfigStatus(undefined, true);
     } else if (message.command === "openDocs") {
       await vscode.env.openExternal(vscode.Uri.parse("https://github.com/robpitcher/forge?tab=readme-ov-file#forge"));
     }
   }
 
-  private _sendConfigStatus(prefetched?: PrefetchedState): void {
+  private _sendConfigStatus(prefetched?: PrefetchedState, isCheckRequest = false): void {
     const doWork = async () => {
       const config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
       const status = prefetched?.authStatus ?? await checkAuthStatus(config, this._secrets);
       this.postAuthStatus(status, !!config.endpoint);
       this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
       this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
+      const hasEndpoint = !!config.endpoint;
+      const hasAuth = status.state === "authenticated";
+      const hasModels = config.models.length > 0;
       this._view?.webview.postMessage({
         type: "configStatus",
-        hasEndpoint: !!config.endpoint,
-        hasAuth: status.state === "authenticated",
-        hasModels: config.models.length > 0,
+        hasEndpoint,
+        hasAuth,
+        hasModels,
       });
+      if (isCheckRequest) {
+        const missing: string[] = [];
+        if (!hasEndpoint) { missing.push("Azure endpoint URL"); }
+        if (!hasModels) { missing.push("Model configuration"); }
+        if (!hasAuth) { missing.push("Authentication"); }
+        this._view?.webview.postMessage({
+          type: "configCheckResult",
+          missing,
+          allGood: missing.length === 0,
+        });
+      }
     };
     doWork().catch(() => {
       // Silent failure — status bar will show the error
