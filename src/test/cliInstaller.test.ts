@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EventEmitter } from "events";
 
 // Hoisted mocks
 const mockExecFile = vi.fn();
+const mockSpawn = vi.fn();
 const mockExistsSync = vi.fn();
 const mockStatSync = vi.fn();
 const mockMkdirSync = vi.fn();
@@ -12,6 +14,7 @@ const mockHttpsGet = vi.fn();
 
 vi.mock("child_process", () => ({
   execFile: mockExecFile,
+  spawn: mockSpawn,
   execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
   execFileSync: vi.fn().mockReturnValue("0.1.26"),
 }));
@@ -48,6 +51,24 @@ let installCopilotCli: typeof import("../cliInstaller.js")["installCopilotCli"];
 let getManagedCliPath: typeof import("../cliInstaller.js")["getManagedCliPath"];
 let isManagedCliInstalled: typeof import("../cliInstaller.js")["isManagedCliInstalled"];
 
+function createMockSpawnedProcess() {
+  const child = new EventEmitter() as EventEmitter & {
+    pid: number;
+    kill: ReturnType<typeof vi.fn>;
+    exitCode: null;
+    signalCode: null;
+    stderr: EventEmitter;
+    stdout: EventEmitter;
+  };
+  child.pid = 12345;
+  child.kill = vi.fn();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.stderr = new EventEmitter();
+  child.stdout = new EventEmitter();
+  return child;
+}
+
 describe("cliInstaller", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -59,8 +80,10 @@ describe("cliInstaller", () => {
     mockWriteFileSync.mockReset();
     mockReadFileSync.mockReset();
     mockExecFile.mockReset();
+    mockSpawn.mockReset();
     mockCreateWriteStream.mockReset();
     mockHttpsGet.mockReset();
+    mockSpawn.mockImplementation(() => createMockSpawnedProcess());
 
     const module = await import("../cliInstaller.js");
     installCopilotCli = module.installCopilotCli;
@@ -360,22 +383,36 @@ describe("cliInstaller", () => {
 
       const { probeCliCompatibility } = await import("../copilotService.js");
 
-      mockExecFile.mockImplementation(
-        (_cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
-          if (callback) {
-            callback(
-              new Error("error: unknown option '--headless'"),
-              "",
-              "unknown option '--headless'",
-            );
-          }
-          return { kill: vi.fn(), pid: 12345 };
-        },
-      );
+      mockSpawn.mockImplementation(() => {
+        const child = createMockSpawnedProcess();
+        process.nextTick(() => {
+          child.stderr.emit("data", "unknown option '--headless'");
+          child.emit("exit", 1, null);
+        });
+        return child;
+      });
 
       const result = await probeCliCompatibility("/test/copilot");
       expect(result.compatible).toBe(false);
       expect(result.error).toContain("required flags");
+    });
+
+    it("rejects binaries that exit immediately", async () => {
+      vi.resetModules();
+
+      const { probeCliCompatibility } = await import("../copilotService.js");
+
+      mockSpawn.mockImplementation(() => {
+        const child = createMockSpawnedProcess();
+        process.nextTick(() => {
+          child.emit("exit", 0, null);
+        });
+        return child;
+      });
+
+      const result = await probeCliCompatibility("/test/copilot");
+      expect(result.compatible).toBe(false);
+      expect(result.error).toContain("exited before startup probe completed");
     });
 
     it("accepts compatible binary", async () => {
@@ -383,12 +420,7 @@ describe("cliInstaller", () => {
 
       const { probeCliCompatibility } = await import("../copilotService.js");
 
-      mockExecFile.mockImplementation(
-        (_cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
-          if (callback) callback(null, "", "");
-          return { kill: vi.fn(), pid: 12345 };
-        },
-      );
+      mockSpawn.mockImplementation(() => createMockSpawnedProcess());
 
       const result = await probeCliCompatibility("/test/copilot");
       expect(result.compatible).toBe(true);

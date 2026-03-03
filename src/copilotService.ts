@@ -1,4 +1,4 @@
-import { execSync, execFileSync, execFile } from "child_process";
+import { execSync, execFileSync, spawn } from "child_process";
 import { statSync } from "fs";
 import { ExtensionConfig } from "./configuration.js";
 import { getManagedCliPath } from "./cliInstaller.js";
@@ -116,68 +116,110 @@ export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidatio
 /**
  * Probes CLI compatibility by attempting to start it in headless mode.
  * 
- * Spawns the CLI with --headless --no-auto-update --stdio and checks if it starts
- * without error. This validates that the CLI supports the flags required by the SDK.
+ * Spawns the CLI with --headless --no-auto-update --stdio and treats it as
+ * compatible only if it stays alive for a short grace period.
  * 
  * @param cliPath - Path to the CLI binary to probe
  * @returns Compatibility result with error details if incompatible
  */
+const PROBE_REQUIRED_FLAGS = ["--headless", "--no-auto-update", "--stdio"] as const;
+const PROBE_GRACE_PERIOD_MS = 100;
+const PROBE_TIMEOUT_MS = 5000;
+
+function hasUnsupportedFlagError(text: string): boolean {
+  const lower = text.toLowerCase();
+  return lower.includes("unknown option") || lower.includes("unrecognized");
+}
+
 export async function probeCliCompatibility(
   cliPath: string
 ): Promise<{ compatible: boolean; error?: string }> {
   return new Promise((resolve) => {
-    const child = execFile(
-      cliPath,
-      ["--headless", "--no-auto-update", "--stdio"],
-      { timeout: 5000 },
-      (error, stdout, stderr) => {
-        if (error) {
-          // If we killed the process ourselves (SIGTERM from our setTimeout),
-          // that means the CLI started successfully — it accepted the flags.
-          const execError = error as NodeJS.ErrnoException & { killed?: boolean; signal?: string };
-          if (execError.killed || execError.signal === "SIGTERM") {
-            resolve({ compatible: true });
-            return;
-          }
+    let settled = false;
+    let stderrText = "";
+    let graceTimer: NodeJS.Timeout | undefined;
+    let timeoutTimer: NodeJS.Timeout | undefined;
+    let child: ReturnType<typeof spawn> | undefined;
 
-          const message = error.message.toLowerCase();
-          const stderrLower = stderr.toLowerCase();
+    const resolveCompatible = (): void => {
+      finalize({ compatible: true });
+    };
 
-          // Check for incompatible CLI (doesn't support required flags)
-          if (
-            message.includes("unknown option") ||
-            stderrLower.includes("unknown option") ||
-            message.includes("unrecognized") ||
-            stderrLower.includes("unrecognized")
-          ) {
-            resolve({
-              compatible: false,
-              error: `CLI does not support required flags (--headless, --no-auto-update, --stdio). Ensure you have GitHub Copilot CLI installed, not a different 'copilot' binary.`,
-            });
-            return;
-          }
+    const resolveIncompatible = (error: string): void => {
+      finalize({ compatible: false, error });
+    };
 
-          // Other errors during startup
-          resolve({
-            compatible: false,
-            error: `CLI startup probe failed: ${error.message}`,
-          });
-          return;
+    const finalize = (result: { compatible: boolean; error?: string }): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (graceTimer) {
+        clearTimeout(graceTimer);
+      }
+      if (timeoutTimer) {
+        clearTimeout(timeoutTimer);
+      }
+      if (child && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // Process may have already exited.
         }
-
-        // CLI started successfully (or at least accepted the flags)
-        resolve({ compatible: true });
       }
-    );
+      resolve(result);
+    };
 
-    // Kill the process after a brief check — we just want to know it started
-    setTimeout(() => {
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        // Process may have already exited
+    try {
+      child = spawn(cliPath, [...PROBE_REQUIRED_FLAGS], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      resolveIncompatible(`CLI startup probe failed: ${message}`);
+      return;
+    }
+
+    child.stderr?.on("data", (chunk: Buffer | string) => {
+      stderrText += chunk.toString();
+    });
+
+    child.on("error", (err: Error) => {
+      if (hasUnsupportedFlagError(err.message) || hasUnsupportedFlagError(stderrText)) {
+        resolveIncompatible(
+          "CLI does not support required flags (--headless, --no-auto-update, --stdio). Ensure you have GitHub Copilot CLI installed, not a different 'copilot' binary."
+        );
+        return;
       }
-    }, 1000);
+      resolveIncompatible(`CLI startup probe failed: ${err.message}`);
+    });
+
+    child.on("exit", (code, signal) => {
+      if (settled) {
+        return;
+      }
+
+      const trimmedStderr = stderrText.trim();
+      if (hasUnsupportedFlagError(trimmedStderr)) {
+        resolveIncompatible(
+          "CLI does not support required flags (--headless, --no-auto-update, --stdio). Ensure you have GitHub Copilot CLI installed, not a different 'copilot' binary."
+        );
+        return;
+      }
+
+      const exitReason = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
+      resolveIncompatible(
+        `CLI exited before startup probe completed (${exitReason})${trimmedStderr ? `: ${trimmedStderr}` : ""}`
+      );
+    });
+
+    graceTimer = setTimeout(() => {
+      resolveCompatible();
+    }, PROBE_GRACE_PERIOD_MS);
+
+    timeoutTimer = setTimeout(() => {
+      resolveIncompatible(`CLI startup probe timed out after ${PROBE_TIMEOUT_MS}ms`);
+    }, PROBE_TIMEOUT_MS);
   });
 }
 

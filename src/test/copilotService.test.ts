@@ -15,7 +15,7 @@ import {
   validateCopilotCli,
   discoverAndValidateCli,
 } from "../copilotService.js";
-import { execSync, execFileSync, execFile } from "child_process";
+import { execSync, execFileSync } from "child_process";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
@@ -24,12 +24,16 @@ vi.mock("@github/copilot-sdk", () =>
 vi.mock("child_process", () => ({
   execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
   execFileSync: vi.fn().mockReturnValue("0.1.26"),
-  execFile: vi.fn(
-    (_cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
-      if (callback) callback(null, "", "");
-      return { kill: vi.fn(), pid: 12345 };
+  spawn: vi.fn(() => ({
+    pid: 12345,
+    exitCode: null,
+    signalCode: null,
+    kill: vi.fn(),
+    on: vi.fn().mockReturnThis(),
+    stderr: {
+      on: vi.fn().mockReturnThis(),
     },
-  ),
+  })),
 }));
 
 const validConfig: ExtensionConfig = {

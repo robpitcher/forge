@@ -25,13 +25,25 @@ vi.mock("child_process", () => {
       return { kill: vi.fn(), pid: 12345 };
     },
   );
+  const spawnMock = vi.fn(() => ({
+    pid: 12345,
+    exitCode: null,
+    signalCode: null,
+    kill: vi.fn(),
+    on: vi.fn().mockReturnThis(),
+    stderr: {
+      on: vi.fn().mockReturnThis(),
+    },
+  }));
 
   return {
     // resolveCopilotCliFromPath() calls execSync("which copilot" / "where copilot")
     execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
     // validateCopilotCli() calls execFileSync(path, ["--version"])
     execFileSync: vi.fn().mockReturnValue("0.1.26"),
-    // probeCliCompatibility() calls execFile(path, ["--headless", ...])
+    // cliInstaller uses execFile for npm/tar flows
     execFile: execFileMock,
+    // probeCliCompatibility() calls spawn(path, ["--headless", ...])
+    spawn: spawnMock,
   };
 });
