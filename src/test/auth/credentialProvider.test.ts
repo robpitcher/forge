@@ -13,10 +13,10 @@ vi.mock("@azure/identity", () => {
   };
 });
 
-// Mock child_process for execSync used in auto-recovery
+// Mock child_process for execFileSync used in auto-recovery
 vi.mock("child_process", () => {
   return {
-    execSync: vi.fn(),
+    execFileSync: vi.fn(),
   };
 });
 
@@ -137,17 +137,17 @@ describe("EntraIdCredentialProvider", () => {
       .mockRejectedValueOnce(new Error("No subscription found. Run 'az account set'"))
       .mockResolvedValueOnce({ token: "recovered-token", expiresOnTimestamp: Date.now() + 3600000 });
 
-    // Mock execSync to simulate az cli commands
-    const { execSync } = await import("child_process");
-    const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (cmd === "az account list --output json") {
+    // Mock execFileSync to simulate az cli commands
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((cmd: string, args?: string[]) => {
+      if (cmd === "az" && args?.[0] === "account" && args?.[1] === "list") {
         return JSON.stringify([
           { id: "sub-123", name: "My Subscription", state: "Enabled", isDefault: false },
         ]);
       }
       return "";
-    });
+    }) as typeof execFileSync);
 
     const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
     const token = await provider.getToken();
@@ -161,12 +161,12 @@ describe("EntraIdCredentialProvider", () => {
     mockGetToken
       .mockRejectedValue(new Error("No subscription found. Run 'az account set'"));
 
-    // Mock execSync to fail (no subscriptions)
-    const { execSync } = await import("child_process");
-    const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
-    mockExecSync.mockImplementation(() => {
+    // Mock execFileSync to fail (no subscriptions)
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((() => {
       return JSON.stringify([]);
-    });
+    }) as unknown) as typeof execFileSync);
 
     const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
     
@@ -185,17 +185,17 @@ describe("EntraIdCredentialProvider", () => {
       .mockRejectedValueOnce(new Error("No subscription found"))
       .mockRejectedValueOnce(new Error("Still no subscription"));
 
-    // Mock execSync to return disabled subscription
-    const { execSync } = await import("child_process");
-    const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (cmd === "az account list --output json") {
+    // Mock execFileSync to return disabled subscription
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((cmd: string) => {
+      if (cmd === "az") {
         return JSON.stringify([
           { id: "sub-999", name: "Disabled Sub", state: "Disabled", isDefault: false },
         ]);
       }
       return "";
-    });
+    }) as typeof execFileSync);
 
     const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
     

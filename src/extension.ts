@@ -299,7 +299,7 @@ async function performCliPreflight(
     const result = await discoverAndValidateCli(config.cliPath);
     
     if (result.valid) {
-      outputChannel.appendLine(`[forge] Copilot CLI validated: v${result.version} at ${result.path}`);
+      outputChannel.appendLine(`[forge] Copilot CLI validated: ${result.version} at ${result.path}`);
       provider.postCliStatus(result);
       return;
     }
@@ -373,6 +373,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
   private _selectedModel?: string;
+  private _lastCliValidation?: CopilotCliValidationResult;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -424,6 +425,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   public postCliStatus(result: CopilotCliValidationResult): void {
+    this._lastCliValidation = result;
     this._view?.webview.postMessage({ type: "cliStatus", result });
   }
 
@@ -517,6 +519,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachFile");
     } else if (message.command === "webviewReady") {
       this._sendConfigStatus();
+      if (this._lastCliValidation) {
+        this._view?.webview.postMessage({ type: "cliStatus", result: this._lastCliValidation });
+      }
     } else if (message.command === "openSettings") {
       await this.openSettings();
     } else if (message.command === "openEndpointSettings") {

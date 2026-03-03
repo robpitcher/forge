@@ -218,3 +218,11 @@
 - Mock new service functions in ALL test files that call activate() to prevent preflight from posting unexpected messages
 - Add new message types to test filter lists alongside existing types (authStatus, modelsUpdated, modelSelected, configStatus)
 - When build errors appear unrelated to your changes, verify with git diff and git log to confirm pre-existing issues
+
+📌 PR Review Fixes — credentialProvider.ts and extension.ts (2025) — Addressed 5 PR review comments:
+1. **Multi-subscription guardrail**: `autoSelectSubscription()` now only auto-selects when exactly ONE enabled subscription exists. Zero or multiple subscriptions return false, and the caller surfaces "Multiple Azure subscriptions found. Run `az account set --subscription <id>` to select one."
+2. **Timeout on az commands**: Both `execFileSync` calls in `autoSelectSubscription()` now have `timeout: 10000` (10s) to prevent blocking the extension host.
+3. **execFileSync for injection safety**: Replaced `execSync` shell-string construction with `execFileSync("az", [...args])` to prevent command injection via subscription IDs. Updated import from `child_process`.
+4. **Double "v" in CLI log**: Removed extra `v` prefix from CLI version log line — `result.version` already includes the full version string.
+5. **CLI status caching**: Added `_lastCliValidation` field to `ChatViewProvider`. `postCliStatus()` caches the result. `webviewReady` handler re-sends cached CLI status alongside config status, preventing dropped `cliStatus` messages when preflight completes before webview is ready.
+- Updated test mocks from `execSync` → `execFileSync` with proper arg-based matching. All 246 tests pass.

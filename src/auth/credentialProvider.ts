@@ -1,6 +1,6 @@
 import type * as vscode from "vscode";
 import type { ExtensionConfig } from "../configuration.js";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 const AZURE_COGNITIVE_SERVICES_SCOPE =
   "https://cognitiveservices.azure.com/.default";
@@ -43,14 +43,24 @@ export class EntraIdCredentialProvider implements CredentialProvider {
         this.hasAttemptedRecovery = true;
         
         try {
-          this.autoSelectSubscription();
+          const recovered = this.autoSelectSubscription();
+          
+          if (!recovered) {
+            throw new Error(
+              `Azure authentication failed. Multiple Azure subscriptions found. Run 'az account set --subscription <id>' to select one.`,
+            );
+          }
           
           // Retry getToken after setting subscription
           const result = await this.credential.getToken(
             AZURE_COGNITIVE_SERVICES_SCOPE,
           );
           return result.token;
-        } catch {
+        } catch (retryError) {
+          // If autoSelectSubscription returned false (thrown above) or retry fails
+          if (retryError instanceof Error && retryError.message.includes("Multiple Azure subscriptions")) {
+            throw retryError;
+          }
           // If retry fails, throw the original error with better message
           throw new Error(
             `Azure authentication failed. Run 'az account set --subscription <id>' to select a subscription.`,
@@ -71,12 +81,13 @@ export class EntraIdCredentialProvider implements CredentialProvider {
     );
   }
 
-  private autoSelectSubscription(): void {
+  private autoSelectSubscription(): boolean {
     try {
       // Get list of subscriptions
-      const output = execSync("az account list --output json", {
+      const output = execFileSync("az", ["account", "list", "--output", "json"], {
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
+        timeout: 10000,
       });
       
       const subscriptions = JSON.parse(output) as Array<{
@@ -86,22 +97,29 @@ export class EntraIdCredentialProvider implements CredentialProvider {
         isDefault: boolean;
       }>;
       
-      // Find first enabled subscription
-      const enabledSub = subscriptions.find((sub) => sub.state === "Enabled");
+      const enabledSubs = subscriptions.filter((sub) => sub.state === "Enabled");
       
-      if (!enabledSub) {
-        throw new Error("No enabled Azure subscriptions found");
+      if (enabledSubs.length === 0) {
+        return false;
       }
       
-      // Set the subscription
-      execSync(`az account set --subscription "${enabledSub.id}"`, {
+      if (enabledSubs.length > 1) {
+        // Multiple subscriptions — do not auto-select to avoid mutating global CLI state
+        return false;
+      }
+      
+      // Exactly one enabled subscription — safe to auto-select
+      const enabledSub = enabledSubs[0];
+      execFileSync("az", ["account", "set", "--subscription", enabledSub.id], {
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
+        timeout: 10000,
       });
       
       console.warn(
         `[forge] No Azure subscription set. Auto-selecting: ${enabledSub.name} (${enabledSub.id})`,
       );
+      return true;
     } catch (execError) {
       // If az cli commands fail, we'll let the retry fail naturally
       console.warn("[forge] Failed to auto-select Azure subscription:", execError);
