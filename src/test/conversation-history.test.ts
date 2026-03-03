@@ -339,6 +339,7 @@ describe("conversation history persistence", () => {
         validConfig,
         "test-key-123",
         "gpt-4.1",
+        undefined,
         mockPermissionHandler
       );
 
@@ -590,6 +591,7 @@ describe("conversation history webview handlers", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)

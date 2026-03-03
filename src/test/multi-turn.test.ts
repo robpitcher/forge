@@ -209,6 +209,7 @@ describe("multi-turn conversation context (SC4)", () => {
       const mockExtCtx = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
         secrets: {
           get: vi.fn().mockImplementation((key: string) =>
             key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)

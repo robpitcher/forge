@@ -1,6 +1,7 @@
-import { execSync, execFileSync } from "child_process";
+import { execSync, execFileSync, spawn } from "child_process";
 import { statSync } from "fs";
 import { ExtensionConfig } from "./configuration.js";
+import { getManagedCliPath } from "./cliInstaller.js";
 import type {
   CopilotClient,
   ICopilotSession,
@@ -113,6 +114,116 @@ export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidatio
 }
 
 /**
+ * Probes CLI compatibility by attempting to start it in headless mode.
+ * 
+ * Spawns the CLI with --headless --no-auto-update --stdio and treats it as
+ * compatible only if it stays alive for a short grace period.
+ * 
+ * @param cliPath - Path to the CLI binary to probe
+ * @returns Compatibility result with error details if incompatible
+ */
+const PROBE_REQUIRED_FLAGS = ["--headless", "--no-auto-update", "--stdio"] as const;
+const PROBE_GRACE_PERIOD_MS = 100;
+const PROBE_TIMEOUT_MS = 5000;
+
+function hasUnsupportedFlagError(text: string): boolean {
+  const lower = text.toLowerCase();
+  return lower.includes("unknown option") || lower.includes("unrecognized");
+}
+
+export async function probeCliCompatibility(
+  cliPath: string
+): Promise<{ compatible: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let stderrText = "";
+    let graceTimer: NodeJS.Timeout | undefined;
+    let timeoutTimer: NodeJS.Timeout | undefined;
+    let child: ReturnType<typeof spawn> | undefined;
+
+    const resolveCompatible = (): void => {
+      finalize({ compatible: true });
+    };
+
+    const resolveIncompatible = (error: string): void => {
+      finalize({ compatible: false, error });
+    };
+
+    const finalize = (result: { compatible: boolean; error?: string }): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (graceTimer) {
+        clearTimeout(graceTimer);
+      }
+      if (timeoutTimer) {
+        clearTimeout(timeoutTimer);
+      }
+      if (child && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // Process may have already exited.
+        }
+      }
+      resolve(result);
+    };
+
+    try {
+      child = spawn(cliPath, [...PROBE_REQUIRED_FLAGS], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      resolveIncompatible(`CLI startup probe failed: ${message}`);
+      return;
+    }
+
+    child.stderr?.on("data", (chunk: Buffer | string) => {
+      stderrText += chunk.toString();
+    });
+
+    child.on("error", (err: Error) => {
+      if (hasUnsupportedFlagError(err.message) || hasUnsupportedFlagError(stderrText)) {
+        resolveIncompatible(
+          "CLI does not support required flags (--headless, --no-auto-update, --stdio). Ensure you have GitHub Copilot CLI installed, not a different 'copilot' binary."
+        );
+        return;
+      }
+      resolveIncompatible(`CLI startup probe failed: ${err.message}`);
+    });
+
+    child.on("exit", (code, signal) => {
+      if (settled) {
+        return;
+      }
+
+      const trimmedStderr = stderrText.trim();
+      if (hasUnsupportedFlagError(trimmedStderr)) {
+        resolveIncompatible(
+          "CLI does not support required flags (--headless, --no-auto-update, --stdio). Ensure you have GitHub Copilot CLI installed, not a different 'copilot' binary."
+        );
+        return;
+      }
+
+      const exitReason = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
+      resolveIncompatible(
+        `CLI exited before startup probe completed (${exitReason})${trimmedStderr ? `: ${trimmedStderr}` : ""}`
+      );
+    });
+
+    graceTimer = setTimeout(() => {
+      resolveCompatible();
+    }, PROBE_GRACE_PERIOD_MS);
+
+    timeoutTimer = setTimeout(() => {
+      resolveIncompatible(`CLI startup probe timed out after ${PROBE_TIMEOUT_MS}ms`);
+    }, PROBE_TIMEOUT_MS);
+  });
+}
+
+/**
  * Discovers and validates the Copilot CLI binary.
  * 
  * If a configuredPath is provided, validates it directly. Otherwise, searches PATH
@@ -148,18 +259,35 @@ export class CopilotCliNotFoundError extends Error {
   }
 }
 
+export class CopilotCliNeedsInstallError extends Error {
+  constructor() {
+    super("No compatible Copilot CLI found. Installation required.");
+    this.name = "CopilotCliNeedsInstallError";
+  }
+}
+
 function formatCliStartupDiagnostics(cliPath: string | undefined, details: string): string {
   const attemptedPath = cliPath ?? "(none)";
   return `Attempted CLI path: ${attemptedPath}\nStartup error: ${details}`;
 }
 
 export async function getOrCreateClient(
-  config: ExtensionConfig
+  config: ExtensionConfig,
+  globalStoragePath?: string
 ): Promise<CopilotClient> {
   if (client) {
     return client;
   }
 
+  // Resolution chain:
+  // 1. Configured path (forge.copilot.cliPath) — explicit user override
+  // 2. Managed copy — check globalStoragePath
+  // 3. PATH discovery — existing resolveCopilotCliFromPath()
+  // 4. If none found, throw CopilotCliNeedsInstallError
+
+  let resolvedCliPath: string | undefined;
+
+  // Step 1: Check configured path
   const configuredCliPath = config.cliPath.trim() !== "" ? config.cliPath.trim() : undefined;
   if (configuredCliPath) {
     const validation = await validateCopilotCli(configuredCliPath);
@@ -182,17 +310,50 @@ export async function getOrCreateClient(
         `Validation error: ${validation.details ?? "Unknown error"}`
       );
     }
+    resolvedCliPath = configuredCliPath;
+  }
+
+  // Step 2: Check managed copy if no configured path
+  if (!resolvedCliPath && globalStoragePath) {
+    const managedPath = await getManagedCliPath(globalStoragePath);
+    if (managedPath) {
+      resolvedCliPath = managedPath;
+    }
+  }
+
+  // Step 3: Check PATH if still not found
+  if (!resolvedCliPath) {
+    const pathDiscovery = resolveCopilotCliFromPath();
+    if (pathDiscovery) {
+      const validation = await validateCopilotCli(pathDiscovery);
+      if (validation.valid) {
+        resolvedCliPath = pathDiscovery;
+      }
+    }
+  }
+
+  // Step 4: If still not found, throw CopilotCliNeedsInstallError
+  if (!resolvedCliPath) {
+    throw new CopilotCliNeedsInstallError();
+  }
+
+  // Probe CLI compatibility before using it
+  const probeResult = await probeCliCompatibility(resolvedCliPath);
+  if (!probeResult.compatible) {
+    throw new CopilotCliNotFoundError(
+      `Copilot CLI failed compatibility check.\n` +
+      `Attempted CLI path: ${resolvedCliPath}\n` +
+      `Error: ${probeResult.error ?? "Unknown error"}`
+    );
   }
 
   const { CopilotClient: SDKCopilotClient } = await import(
     "@github/copilot-sdk"
   );
 
-  const clientOptions: Record<string, unknown> = {};
-  const resolvedCliPath = configuredCliPath ?? resolveCopilotCliFromPath();
-  if (resolvedCliPath) {
-    clientOptions.cliPath = resolvedCliPath;
-  }
+  const clientOptions: Record<string, unknown> = {
+    cliPath: resolvedCliPath,
+  };
 
   try {
     client = new SDKCopilotClient(clientOptions);
@@ -316,6 +477,7 @@ export async function getOrCreateSession(
   config: ExtensionConfig,
   authToken: string,
   model: string,
+  globalStoragePath?: string,
   onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
   const configHash = config.endpoint + "|" + config.authMethod + "|" + model + "|" + config.wireApi + "|" + authToken;
@@ -327,7 +489,7 @@ export async function getOrCreateSession(
     await destroySession(conversationId);
   }
 
-  const copilotClient = await getOrCreateClient(config);
+  const copilotClient = await getOrCreateClient(config, globalStoragePath);
   const provider = buildProviderConfig(config, authToken);
   const toolConfig = buildToolConfig(config);
   const mcpServers = buildMcpServersConfig(config);
@@ -410,9 +572,9 @@ export async function destroyAllSessions(): Promise<void> {
  * 
  * Wraps the SDK's `client.listSessions()` and maps SessionMetadata to ConversationMetadata.
  */
-export async function listConversations(config: ExtensionConfig): Promise<ConversationMetadata[]> {
+export async function listConversations(config: ExtensionConfig, globalStoragePath?: string): Promise<ConversationMetadata[]> {
   try {
-    const copilotClient = await getOrCreateClient(config);
+    const copilotClient = await getOrCreateClient(config, globalStoragePath);
     const sessionList: SessionMetadata[] = await copilotClient.listSessions();
     
     return sessionList.map((s) => ({
@@ -438,10 +600,11 @@ export async function resumeConversation(
   config: ExtensionConfig,
   authToken: string,
   model: string,
+  globalStoragePath?: string,
   onPermissionRequest?: PermissionHandler,
 ): Promise<ICopilotSession> {
   try {
-    const copilotClient = await getOrCreateClient(config);
+    const copilotClient = await getOrCreateClient(config, globalStoragePath);
     const provider = buildProviderConfig(config, authToken);
     const toolConfig = buildToolConfig(config);
     const mcpServers = buildMcpServersConfig(config);
@@ -481,9 +644,9 @@ export async function resumeConversation(
  * 
  * Wraps the SDK's `client.getLastSessionId()`.
  */
-export async function getLastConversationId(config: ExtensionConfig): Promise<string | undefined> {
+export async function getLastConversationId(config: ExtensionConfig, globalStoragePath?: string): Promise<string | undefined> {
   try {
-    const copilotClient = await getOrCreateClient(config);
+    const copilotClient = await getOrCreateClient(config, globalStoragePath);
     return await copilotClient.getLastSessionId();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -497,9 +660,9 @@ export async function getLastConversationId(config: ExtensionConfig): Promise<st
  * Wraps the SDK's `client.deleteSession()` and also removes the session
  * from the local sessions map if present.
  */
-export async function deleteConversation(sessionId: string, config: ExtensionConfig): Promise<void> {
+export async function deleteConversation(sessionId: string, config: ExtensionConfig, globalStoragePath?: string): Promise<void> {
   try {
-    const copilotClient = await getOrCreateClient(config);
+    const copilotClient = await getOrCreateClient(config, globalStoragePath);
     await copilotClient.deleteSession(sessionId);
     
     // Remove from local map if present

@@ -85,6 +85,7 @@ describe("WebviewView chat panel", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
@@ -325,6 +326,7 @@ describe("WebviewView chat panel", () => {
     let mockExtContext: {
       subscriptions: { dispose: () => void }[];
       extensionUri: { toString: () => string };
+      globalStorageUri: { fsPath: string };
       secrets: {
         get: ReturnType<typeof vi.fn>;
         store: ReturnType<typeof vi.fn>;
@@ -343,6 +345,7 @@ describe("WebviewView chat panel", () => {
       mockExtContext = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
         secrets: {
           get: vi.fn().mockImplementation((key: string) =>
             key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)

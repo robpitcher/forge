@@ -130,6 +130,7 @@ describe("Error: WebviewView error paths", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
@@ -393,6 +394,7 @@ describe("Error: auth error rewriting (_rewriteAuthError)", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)

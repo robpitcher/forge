@@ -22,8 +22,18 @@ vi.mock("@github/copilot-sdk", () =>
 );
 
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
-  execFileSync: vi.fn(),
+  execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
+  execFileSync: vi.fn().mockReturnValue("0.1.26"),
+  spawn: vi.fn(() => ({
+    pid: 12345,
+    exitCode: null,
+    signalCode: null,
+    kill: vi.fn(),
+    on: vi.fn().mockReturnThis(),
+    stderr: {
+      on: vi.fn().mockReturnThis(),
+    },
+  })),
 }));
 
 const validConfig: ExtensionConfig = {
@@ -72,8 +82,10 @@ describe("copilotService", () => {
     const mockExecFileSync = vi.mocked(execFileSync);
 
     beforeEach(() => {
-      mockExecSync.mockReset();
-      mockExecFileSync.mockReset();
+      mockExecSync.mockClear();
+      mockExecSync.mockReturnValue("/usr/local/bin/copilot\n");
+      mockExecFileSync.mockClear();
+      mockExecFileSync.mockReturnValue("0.1.26");
     });
 
     it("creates a client and starts it", async () => {
