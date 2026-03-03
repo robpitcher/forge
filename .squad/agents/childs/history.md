@@ -79,3 +79,5 @@
 
 📌 Team update (2026-03-03T16:30:00Z): Wrong Copilot Binary Detection decision merged into decisions.md — established pattern for detecting --headless errors and providing actionable guidance for Windows .vsix sideload scenarios.
 
+📌 Azure CLI auth auto-recovery (2026-03-03): Implemented auto-recovery in `EntraIdCredentialProvider` to handle "No subscription found" errors from `DefaultAzureCredential` → `AzureCliCredential` chain. When user has run `az login` but not `az account set`, provider now auto-detects error, runs `az account list`, selects first enabled subscription, and retries `getToken()`. Recovery only attempts once per provider instance (tracked via `hasAttemptedRecovery` boolean). Uses `execSync` from `child_process` to call `az` CLI commands. Added 4 new tests (happy path recovery, single-attempt guarantee, no-enabled-subscriptions edge case, non-subscription error passthrough). Decision: users only need `az login`, not `az account set` — reduces setup friction while remaining air-gap safe (only calls local CLI). All 236 tests pass. Issue requested by Rob Pitcher.
+
