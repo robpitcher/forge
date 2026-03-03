@@ -12,11 +12,19 @@ import {
   getOrCreateSession,
   removeSession,
   stopClient,
+  validateCopilotCli,
+  discoverAndValidateCli,
 } from "../copilotService.js";
+import { execSync, execFileSync } from "child_process";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
+
+vi.mock("child_process", () => ({
+  execSync: vi.fn(),
+  execFileSync: vi.fn(),
+}));
 
 const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/",
@@ -240,6 +248,161 @@ describe("copilotService", () => {
 
       await getOrCreateSession("conv-1", validConfig, "test-key-123", "gpt-4.1");
       expect(newMockClient.createSession).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("validateCopilotCli", () => {
+    const mockExecFileSync = vi.mocked(execFileSync);
+
+    beforeEach(() => {
+      mockExecFileSync.mockReset();
+    });
+
+    it("returns valid result when CLI returns version", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await validateCopilotCli("/usr/local/bin/copilot");
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.version).toBe("@github/copilot v1.2.3");
+        expect(result.path).toBe("/usr/local/bin/copilot");
+      }
+    });
+
+    it("returns wrong_binary when CLI returns error", async () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error("unknown option: --version");
+      });
+
+      const result = await validateCopilotCli("/usr/bin/copilot");
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("wrong_binary");
+        expect(result.path).toBe("/usr/bin/copilot");
+        expect(result.details).toContain("unknown option");
+      }
+    });
+
+    it("returns not_found when CLI binary does not exist", async () => {
+      mockExecFileSync.mockImplementation(() => {
+        const err: Error & { code?: string } = new Error("Command failed: copilot --version");
+        err.message = "ENOENT: no such file or directory";
+        throw err;
+      });
+
+      const result = await validateCopilotCli("/nonexistent/copilot");
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("not_found");
+        expect(result.path).toBe("/nonexistent/copilot");
+      }
+    });
+
+    it("returns version_check_failed when CLI returns empty output", async () => {
+      mockExecFileSync.mockReturnValue("");
+
+      const result = await validateCopilotCli("/usr/local/bin/copilot");
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("version_check_failed");
+        expect(result.details).toBe("No version output returned");
+      }
+    });
+
+    it("handles timeout error as wrong_binary", async () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error("Command timed out");
+      });
+
+      const result = await validateCopilotCli("/usr/bin/copilot");
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("wrong_binary");
+      }
+    });
+  });
+
+  describe("discoverAndValidateCli", () => {
+    const mockExecSync = vi.mocked(execSync);
+    const mockExecFileSync = vi.mocked(execFileSync);
+
+    beforeEach(() => {
+      mockExecSync.mockReset();
+      mockExecFileSync.mockReset();
+    });
+
+    it("validates configured path when provided", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await discoverAndValidateCli("/custom/path/copilot");
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.path).toBe("/custom/path/copilot");
+      }
+    });
+
+    it("discovers and validates CLI from PATH when no config", async () => {
+      // First call (execSync): which/where copilot
+      mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");
+      // Second call (execFileSync): copilot --version
+      mockExecFileSync.mockReturnValueOnce("@github/copilot v1.2.3\n");
+
+      const result = await discoverAndValidateCli();
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.path).toBe("/usr/local/bin/copilot");
+      }
+    });
+
+    it("returns not_found when no CLI on PATH and no config", async () => {
+      // which/where fails
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Command failed");
+      });
+
+      const result = await discoverAndValidateCli();
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("not_found");
+        expect(result.details).toContain("No copilot binary found on PATH");
+      }
+    });
+
+    it("validates discovered CLI and reports wrong_binary", async () => {
+      // First call (execSync): which/where finds a copilot
+      mockExecSync.mockReturnValueOnce("/usr/bin/copilot\n");
+      // Second call (execFileSync): copilot --version fails
+      mockExecFileSync.mockImplementationOnce(() => {
+        throw new Error("unknown option: --version");
+      });
+
+      const result = await discoverAndValidateCli();
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("wrong_binary");
+        expect(result.path).toBe("/usr/bin/copilot");
+      }
+    });
+
+    it("ignores empty configured path and discovers from PATH", async () => {
+      mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");
+      mockExecFileSync.mockReturnValueOnce("@github/copilot v1.2.3\n");
+
+      const result = await discoverAndValidateCli("   ");
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.path).toBe("/usr/local/bin/copilot");
+      }
     });
   });
 });

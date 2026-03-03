@@ -13,6 +13,13 @@ vi.mock("@azure/identity", () => {
   };
 });
 
+// Mock child_process for execFileSync used in auto-recovery
+vi.mock("child_process", () => {
+  return {
+    execFileSync: vi.fn(),
+  };
+});
+
 // Mock vscode SecretStorage for the factory function
 function createMockSecrets(apiKey?: string) {
   return {
@@ -122,6 +129,89 @@ describe("EntraIdCredentialProvider", () => {
     expect(first).toBe("token-1");
     expect(second).toBe("token-2");
     expect(mockGetToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-recovers when 'No subscription found' error occurs", async () => {
+    // First call fails with subscription error, second succeeds
+    mockGetToken
+      .mockRejectedValueOnce(new Error("No subscription found. Run 'az account set'"))
+      .mockResolvedValueOnce({ token: "recovered-token", expiresOnTimestamp: Date.now() + 3600000 });
+
+    // Mock execFileSync to simulate az cli commands
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((cmd: string, args?: string[]) => {
+      if (cmd === "az" && args?.[0] === "account" && args?.[1] === "list") {
+        return JSON.stringify([
+          { id: "sub-123", name: "My Subscription", state: "Enabled", isDefault: false },
+        ]);
+      }
+      return "";
+    }) as typeof execFileSync);
+
+    const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
+    const token = await provider.getToken();
+
+    expect(token).toBe("recovered-token");
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-recovery only attempts once per provider instance", async () => {
+    // Both calls fail with subscription error
+    mockGetToken
+      .mockRejectedValue(new Error("No subscription found. Run 'az account set'"));
+
+    // Mock execFileSync to fail (no subscriptions)
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((() => {
+      return JSON.stringify([]);
+    }) as unknown) as typeof execFileSync);
+
+    const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
+    
+    // First call attempts recovery and fails (autoSelectSubscription throws, so no retry getToken)
+    await expect(provider.getToken()).rejects.toThrow("Azure authentication failed");
+    
+    // Second call should NOT attempt recovery again — just throw the original error
+    await expect(provider.getToken()).rejects.toThrow("No subscription found");
+    
+    // getToken should be called 2 times: initial (first call), then second call (no retry)
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-recovery fails gracefully when no enabled subscriptions exist", async () => {
+    mockGetToken
+      .mockRejectedValueOnce(new Error("No subscription found"))
+      .mockRejectedValueOnce(new Error("Still no subscription"));
+
+    // Mock execFileSync to return disabled subscription
+    const { execFileSync } = await import("child_process");
+    const mockExecFileSync = vi.mocked(execFileSync);
+    mockExecFileSync.mockImplementation(((cmd: string) => {
+      if (cmd === "az") {
+        return JSON.stringify([
+          { id: "sub-999", name: "Disabled Sub", state: "Disabled", isDefault: false },
+        ]);
+      }
+      return "";
+    }) as typeof execFileSync);
+
+    const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
+    
+    await expect(provider.getToken()).rejects.toThrow("Azure authentication failed");
+  });
+
+  it("does not attempt recovery for non-subscription errors", async () => {
+    mockGetToken.mockRejectedValue(new Error("Network error"));
+
+    const provider = new EntraIdCredentialProvider({ getToken: mockGetToken });
+    
+    // Should throw immediately without attempting recovery
+    await expect(provider.getToken()).rejects.toThrow("Network error");
+    
+    // Only called once (no retry)
+    expect(mockGetToken).toHaveBeenCalledTimes(1);
   });
 });
 
