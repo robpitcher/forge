@@ -226,3 +226,18 @@
 4. **Double "v" in CLI log**: Removed extra `v` prefix from CLI version log line — `result.version` already includes the full version string.
 5. **CLI status caching**: Added `_lastCliValidation` field to `ChatViewProvider`. `postCliStatus()` caches the result. `webviewReady` handler re-sends cached CLI status alongside config status, preventing dropped `cliStatus` messages when preflight completes before webview is ready.
 - Updated test mocks from `execSync` → `execFileSync` with proper arg-based matching. All 246 tests pass.
+
+📌 CLI Auto-Install Integration (2025-03-03T20:00:00Z) — Wired CLI auto-install flow into extension activation to catch `CopilotCliNeedsInstallError` and offer automatic installation via `installCopilotCli()`. Changes in `extension.ts`:
+1. **Import additions**: Added `CopilotCliNeedsInstallError` to copilotService imports, added `installCopilotCli` and `CliInstallResult` from cliInstaller.ts
+2. **ChatViewProvider constructor**: Added `_globalStoragePath: string` parameter (from `context.globalStorageUri.fsPath`) to enable managed CLI installation path
+3. **Error handling in `_handleChatMessage`**: Added catch block for `CopilotCliNeedsInstallError` before the existing `CopilotCliNotFoundError` catch — calls `_handleCliAutoInstall()` to show ask-first dialog
+4. **New method `_handleCliAutoInstall()`**: Shows info message "Forge needs the GitHub Copilot CLI to work. Install it now?" with Install/Cancel buttons. On Install: shows progress notification, calls `installCopilotCli({ globalStoragePath })`, on success shows "Copilot CLI installed successfully" message, on failure shows error with "Open Settings" button. On Cancel: shows manual install instructions with "Open Settings" option.
+5. **Updated function signatures**: Pass `_globalStoragePath` to `getOrCreateSession()`, `resumeConversation()`, `listConversations()`, and `performCliPreflight()` — Childs added these parameters to copilotService functions
+6. **Test fixes**: Updated `conversation-history.test.ts` to pass `undefined` for globalStoragePath in `resumeConversation()` call (new optional parameter)
+- Key learnings: (1) Auto-install is ask-first, not automatic — user must approve to prevent surprise installs. (2) Progress notifications use `vscode.window.withProgress` with `ProgressLocation.Notification` for non-blocking feedback. (3) globalStoragePath must flow through from `activate()` context all the way to copilotService functions — store in provider instance. (4) Error handling order matters: catch `CopilotCliNeedsInstallError` (no CLI at all) before `CopilotCliNotFoundError` (CLI configured but invalid). (5) Signature changes in copilotService.ts (globalStoragePath as optional param) require test updates across multiple files. (6) Install flow does NOT retry the user's message automatically — instructs user to "try sending a message again" to avoid double-send.
+
+## 2026-03-03T20-55-00Z: CLI Auto-Installer UX Integration
+
+Wired CLI auto-install into extension.ts with ask-first dialog, progress notification, and globalStoragePath threading. Show "Forge needs the GitHub Copilot CLI to work. Install it now?" dialog on `CopilotCliNeedsInstallError`. Success shows confirmation, errors point to Settings. Respects user consent (no surprise installs).
+
+**Outcome:** ✅ SUCCESS — Extension ready for CLI auto-install UX.

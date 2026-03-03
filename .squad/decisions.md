@@ -2838,3 +2838,169 @@ PR review identified that `autoSelectSubscription()` in credentialProvider.ts ha
 - `src/auth/credentialProvider.ts` — `autoSelectSubscription()` return type changed from `void` to `boolean`
 - Test mocks updated from `execSync` → `execFileSync`
 - Any future `child_process` usage in auth code should follow the same pattern: `execFileSync` + args array + timeout
+
+---
+
+# Decision: CLI Auto-Installer Architecture
+
+**Status:** Implemented  
+**Date:** 2026-03-03  
+**Decider:** Childs (SDK Dev)  
+**Context:** Issue for CLI auto-installation
+
+## Decision
+
+Implemented a CLI auto-installer module (`src/cliInstaller.ts`) that manages downloading and installing the `@github/copilot` npm package into the extension's globalStoragePath.
+
+### Key Architectural Decisions
+
+1. **Install location:** `{globalStoragePath}/copilot-cli/` — a mini npm project within VS Code's per-extension global storage
+   - Rationale: Per-extension isolation, survives extension updates, no system-wide PATH pollution
+   - CLI binary location: `node_modules/@github/copilot/npm-loader.js` (npm loader that delegates to platform-specific binary)
+
+2. **Version pinning:** CLI version pinned to match `@github/copilot-sdk` version from Forge's package.json (currently 0.1.26)
+   - Rationale: SDK and CLI versions must match to avoid compatibility issues
+   - Implementation: Reads package.json at runtime, strips `^` or `~` prefix
+
+3. **Install method:** npm first, HTTP tarball fallback
+   - Primary: `npm install @github/copilot@{version} --prefix {installDir}`
+   - Fallback: Download tarball from npm registry, extract with system `tar` command, manually install platform-specific binary
+   - Rationale: npm is more reliable, but HTTP fallback works even without npm on PATH (air-gapped environments may not have npm)
+
+4. **Platform-specific binary handling:** The `@github/copilot` package has `optionalDependencies` for platform binaries (`@github/copilot-{platform}-{arch}`)
+   - npm handles this automatically
+   - HTTP fallback must manually download and extract the platform-specific package
+
+5. **Resolution chain in copilotService.ts:**
+   1. Configured path (`forge.copilot.cliPath`) — explicit user override, always wins
+   2. Managed copy — check globalStoragePath via `getManagedCliPath()`
+   3. PATH discovery — existing `resolveCopilotCliFromPath()`
+   4. If none found, throw `CopilotCliNeedsInstallError` — Blair's extension.ts catches this and triggers the install dialog
+
+6. **Startup probe:** New `probeCliCompatibility()` function validates CLI beyond `--version` check
+   - Spawns CLI with `--headless --no-auto-update --stdio` and checks it starts without error
+   - Detects wrong binaries (e.g., Kubernetes `copilot` tool) that might pass version check but don't support required flags
+   - Returns `{compatible: boolean, error?: string}`
+
+### Public API
+
+```typescript
+export interface CliInstallResult {
+  success: boolean;
+  cliPath?: string;
+  version?: string;
+  error?: string;
+  method?: "npm" | "http-tarball";
+}
+
+export interface CliInstallOptions {
+  globalStoragePath: string;
+  targetVersion?: string;
+}
+
+export async function installCopilotCli(options: CliInstallOptions): Promise<CliInstallResult>;
+export async function getManagedCliPath(globalStoragePath: string): Promise<string | undefined>;
+export async function isManagedCliInstalled(globalStoragePath: string): Promise<boolean>;
+export const CLI_INSTALL_DIR: string; // "copilot-cli"
+```
+
+### Breaking Changes to copilotService.ts
+
+- `getOrCreateClient(config, globalStoragePath?)` — new optional parameter
+- `getOrCreateSession(conversationId, config, authToken, model, globalStoragePath?, onPermissionRequest?)` — new optional parameter
+- `resumeConversation(sessionId, config, authToken, model, globalStoragePath?, onPermissionRequest?)` — new optional parameter
+- `listConversations(config, globalStoragePath?)` — new optional parameter
+- `getLastConversationId(config, globalStoragePath?)` — new optional parameter
+- `deleteConversation(sessionId, config, globalStoragePath?)` — new optional parameter
+
+All changes are backward-compatible (optional parameters).
+
+### Integration Notes for Blair
+
+- Catch `CopilotCliNeedsInstallError` in extension.ts and show install dialog
+- Pass `context.globalStorageUri.fsPath` to all copilotService functions
+- After install succeeds, call `resetClient()` to clear the cached client, then retry the operation
+
+### Why Not Use the SDK's Built-in CLI Resolution?
+
+The SDK can auto-discover the CLI from PATH or `node_modules` when `cliPath` is not provided. However:
+- We need a managed install location that persists across extension updates
+- We need to provide a UI-driven install flow (not silent failure)
+- We need to support environments where the CLI is not on PATH and npm is not available
+
+The SDK's built-in resolution is still used as fallback step 3 in the resolution chain.
+
+## Alternatives Considered
+
+1. **System-wide CLI installation** (e.g., via npm global) — rejected for isolation and permission reasons
+2. **Bundle CLI binary in extension VSIX** — rejected due to 140MB binary size and platform-specific builds
+3. **Use SDK's built-in resolution only** — rejected because it doesn't provide install affordances
+
+## Dependencies
+
+- Node.js built-in modules: `child_process`, `fs`, `https`, `path`, `stream/promises`, `zlib`
+- System `tar` command (available on all platforms including Windows 10+)
+
+## Testing Strategy
+
+- Unit tests for install logic (npm success, npm fallback to HTTP, error cases)
+- Integration tests for resolution chain (configured → managed → PATH → error)
+- Probe tests for CLI compatibility detection
+
+Blair owns the extension.ts integration and E2E flow.
+
+---
+
+# Decision: CLI Auto-Install UX Pattern
+
+**Date:** 2026-03-03  
+**Decider:** Blair (Extension Dev)  
+**Context:** CLI auto-installer integration into extension.ts
+
+## Decision
+
+When the Copilot CLI is not found and a user attempts to send a chat message, Forge uses an **ask-first dialog** pattern rather than automatic installation.
+
+### Flow
+
+1. User sends message → `getOrCreateSession` throws `CopilotCliNeedsInstallError`
+2. Extension shows info message: "Forge needs the GitHub Copilot CLI to work. Install it now?"
+   - Buttons: "Install", "Cancel"
+3. If Install → progress notification "Installing Copilot CLI..." → `installCopilotCli()`
+   - Success: "Copilot CLI installed successfully. Try sending a message again."
+   - Failure: Error message with "Open Settings" button
+4. If Cancel → info message with manual install instructions + "Open Settings" option
+
+### Key Decisions
+
+- **No automatic retry** — after successful install, user must re-send the message. This avoids double-send edge cases and makes the flow predictable.
+- **Ask-first, not automatic** — prevents surprise installations that could trigger corporate policy violations in air-gapped environments.
+- **Progress notification** — non-blocking `vscode.window.withProgress` with `ProgressLocation.Notification` so user can continue working during install.
+- **Graceful failure path** — installation errors point user to Settings as fallback (manual install or cliPath configuration).
+
+### Integration Points
+
+- `extension.ts` catches `CopilotCliNeedsInstallError` in `_handleChatMessage` error handler
+- `_globalStoragePath` passed through from `ExtensionContext.globalStorageUri.fsPath` to enable managed CLI install location
+- Reuses existing `openSettings()` command for fallback path
+
+## Rationale
+
+Air-gapped environments often have strict policies about software installation. An automatic install could:
+- Violate corporate security policies
+- Trigger network calls (npm registry, GitHub releases) that fail or leak data
+- Surprise users who expect fully manual control
+
+The ask-first pattern respects user agency while still making installation convenient for most users.
+
+## Alternatives Considered
+
+1. **Automatic install on first message** — rejected: violates user consent, could break air-gap policies
+2. **Preflight auto-install during activation** — rejected: blocks extension startup, no user context for approval
+3. **Silent fallback to manual-only** — rejected: poor UX, hides the problem until user investigates settings
+
+## Impact
+
+- **User-facing:** Clear, predictable installation flow with escape hatches (cancel, settings, manual)
+- **Code:** Minimal — single error catch block + dialog method, no retry logic complexity
+- **Testing:** Covered by existing error handling tests; install dialog is standard VS Code API (no custom mocking needed)
