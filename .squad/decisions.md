@@ -2670,3 +2670,171 @@ Palmer (DevOps Specialist)
 ## Date
 2026-03-03
 
+# 2026-03-03T17:03Z: User directive — CLI distribution strategy
+**By:** Rob Pitcher (via Copilot)
+**What:** Do NOT bundle @github/copilot CLI in the vsix. Instead: (1) Require user-installed CLI, (2) Provide forge.copilot.cliPath setting, (3) Auto-discover via PATH as fallback, (4) Run preflight validation at activation and give fix-it UX when CLI is missing or wrong.
+**Why:** Bundling 103MB of multi-platform native binaries is not best practice. The CLI should be a prerequisite, not embedded.
+
+---
+
+# CLI Validation Functions
+
+**Date:** 2026-03-03  
+**Author:** Childs (SDK Dev)  
+**Context:** Issue — CLI validation requirement after reverting bundled CLI  
+**Status:** Implemented
+
+## Decision
+
+Added two exported functions to `src/copilotService.ts` for validating that a discovered or configured CLI binary is actually the `@github/copilot` CLI:
+
+1. **`validateCopilotCli(cliPath: string): Promise<CopilotCliValidationResult>`**
+   - Runs `<cliPath> --version` with 5-second timeout
+   - Returns `{ valid: true, version, path }` if version output received
+   - Returns `{ valid: false, reason: "not_found" | "wrong_binary" | "version_check_failed", ... }` on error
+   - Validation logic: The @github/copilot CLI supports `--version` and returns version output without error. Other `copilot` binaries (e.g., HashiCorp Terraform Copilot, Microsoft 365 Copilot CLI) may not support this flag or may fail.
+
+2. **`discoverAndValidateCli(configuredPath?: string): Promise<CopilotCliValidationResult>`**
+   - If `configuredPath` is non-empty, validates it directly
+   - Otherwise, calls `resolveCopilotCliFromPath()` to discover from PATH
+   - Returns validation result or `{ valid: false, reason: "not_found" }` if no binary found
+
+## Type Definition
+
+```typescript
+export type CopilotCliValidationResult =
+  | { valid: true; version: string; path: string }
+  | { valid: false; reason: "not_found" | "wrong_binary" | "version_check_failed"; path?: string; details?: string };
+```
+
+## Rationale
+
+- **Separation of concerns:** Validation is a separate function that the extension layer (Blair's domain) will call at activation time. `getOrCreateClient()` remains unchanged.
+- **Async design:** Returns `Promise` for consistency with SDK patterns, even though `execSync` is used internally (wrapped in Promise for future flexibility).
+- **Error classification:** Three failure reasons allow UI layer to show specific messages: install CLI vs. configure correct path vs. network/permission issues.
+- **Air-gap safe:** Only runs `--version` command locally, no network calls.
+
+## Testing
+
+Added 11 tests to `src/test/copilotService.test.ts`:
+- `validateCopilotCli`: 5 tests (valid CLI, wrong binary, not found, empty output, timeout)
+- `discoverAndValidateCli`: 6 tests (configured path, discover from PATH, not found, wrong binary discovered, empty config)
+
+All tests pass. TypeScript compilation clean.
+
+## Future Work
+
+Extension layer (Blair) will call `discoverAndValidateCli()` at activation and show fix-it UX when validation fails.
+
+---
+
+# Decision: Use execFileSync for user-configurable paths
+
+**By:** Childs
+**Date:** 2026-03-03
+**Context:** PR review found command injection vulnerability in `validateCopilotCli()`
+
+## Decision
+
+When executing external binaries where the **path comes from user configuration** (e.g., `forge.copilot.cliPath`), always use `execFileSync` / `execFile` with an argv array — never `execSync` with string interpolation.
+
+`execSync` runs through a shell, making it vulnerable to command injection and quoting breakage (especially on Windows). `execFileSync` bypasses the shell entirely.
+
+## Scope
+
+- `validateCopilotCli()` — now uses `execFileSync(cliPath, ["--version"], ...)`
+- `resolveCopilotCliFromPath()` — still uses `execSync` for `which`/`where` (hardcoded, no user input — acceptable)
+- `credentialProvider.ts` — uses `execSync` for `az` CLI commands (hardcoded commands — acceptable)
+
+## Rule
+
+**Any future code that executes a binary path from user config MUST use `execFileSync`/`execFile` with argv, not `execSync` with template strings.**
+
+---
+
+# CLI Preflight Validation
+
+**Date:** 2025-03-03  
+**Author:** Blair (Extension Dev)  
+**Status:** Implemented
+
+## Decision
+
+Added preflight CLI validation during extension activation that checks if the GitHub Copilot CLI is correctly installed and accessible.
+
+## Context
+
+Per Rob's directive, the extension no longer bundles the @github/copilot CLI. Instead, it requires the user to install it globally and configure it via `forge.copilot.cliPath` setting. We needed a way to validate CLI availability at startup and provide actionable fix-it UX.
+
+## Implementation
+
+1. **Extension Activation (`src/extension.ts`)**
+   - Added `performCliPreflight()` function that calls `discoverAndValidateCli()` from copilotService
+   - Runs async during activation (fire-and-forget, doesn't block)
+   - Re-runs when `forge.copilot.cliPath` config changes
+
+2. **Fix-it UX**
+   - Shows VS Code warning message with buttons based on failure reason:
+     - `not_found`: "Open Settings" or "Open Terminal" (to run npm install)
+     - `wrong_binary`: "Open Settings"
+     - `version_check_failed`: "Open Settings" with details
+   - Simultaneously posts `cliStatus` message to webview for in-chat banner
+
+3. **Webview Banner (`media/chat.js`)**
+   - Added `updateCliBanner()` function similar to `updateAuthBanner()`
+   - Shows ✅ "CLI ready" on success (auto-dismisses in 2s)
+   - Shows ⚠️ error message with "Fix" button on failure
+   - Styled using existing `.auth-banner` CSS classes
+
+4. **Test Updates**
+   - Added mock for `discoverAndValidateCli()` in test files
+   - Added `cliStatus` to message type filters (similar to `authStatus`, `modelsUpdated`, etc.)
+
+## Rationale
+
+- **Proactive validation** catches CLI issues before the user tries to chat
+- **Actionable messages** tell users exactly what to do (install, configure, etc.)
+- **Consistent UX** uses existing banner pattern from auth status
+- **Non-blocking** doesn't slow down activation
+- **Testable** properly mocked in tests
+
+## Verification
+
+- ✅ `npx tsc --noEmit` — passes
+- ✅ `npm test` — all 246 tests pass
+- ⚠️ `npm run build` — pre-existing highlight.js bundling issue on branch (not related to CLI preflight changes)
+
+## Notes
+
+The build error with highlight.js is from commit 3cc82b6 on the current branch and is unrelated to CLI preflight validation. The CLI preflight code is ready and tested.
+
+---
+
+**Dependencies:** Relies on `discoverAndValidateCli()` and `CopilotCliValidationResult` type added by Childs in parallel.
+
+---
+
+# Decision: Multi-subscription guardrail and execFileSync for Azure CLI calls
+
+**Author:** Blair (Extension Dev)
+**Date:** 2025-07-15
+**Status:** Implemented
+
+## Context
+
+PR review identified that `autoSelectSubscription()` in credentialProvider.ts had three issues:
+1. It blindly picked the first enabled subscription on multi-subscription machines, mutating global Azure CLI state.
+2. It used `execSync` with shell string interpolation, opening a (low-risk) command injection vector.
+3. No timeout on `execSync` calls — a hung `az` CLI could block the extension host indefinitely.
+
+## Decision
+
+- **Only auto-select when exactly one** enabled subscription exists. Zero or multiple → return false with actionable error guidance.
+- **Use `execFileSync`** with argument arrays instead of `execSync` with shell strings for all `az` CLI calls.
+- **Add 10-second timeout** to all `execFileSync` calls.
+
+## Impact
+
+- `src/auth/credentialProvider.ts` — `autoSelectSubscription()` return type changed from `void` to `boolean`
+- Test mocks updated from `execSync` → `execFileSync`
+- Any future `child_process` usage in auth code should follow the same pattern: `execFileSync` + args array + timeout
