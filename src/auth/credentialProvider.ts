@@ -50,7 +50,7 @@ export class EntraIdCredentialProvider implements CredentialProvider {
             AZURE_COGNITIVE_SERVICES_SCOPE,
           );
           return result.token;
-        } catch (retryError) {
+        } catch {
           // If retry fails, throw the original error with better message
           throw new Error(
             `Azure authentication failed. Run 'az account set --subscription <id>' to select a subscription.`,
