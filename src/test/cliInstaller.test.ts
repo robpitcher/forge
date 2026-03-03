@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 
+type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+type MockEventHandler = (...args: unknown[]) => void;
+type HttpsResponseCallback = (response: unknown) => void;
+
 // Hoisted mocks
 const mockExecFile = vi.fn();
 const mockSpawn = vi.fn();
@@ -148,7 +152,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(null, "installed", "");
           }
@@ -173,7 +177,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(new Error("ENOENT: npm not found"), "", "");
           } else if (cmd === "tar" && callback) {
@@ -186,7 +190,7 @@ describe("cliInstaller", () => {
       // Mock HTTP download
       const mockFileStream = {
         close: vi.fn(),
-        on: vi.fn((event: string, handler: Function) => {
+        on: vi.fn((event: string, handler: MockEventHandler) => {
           if (event === "finish") handler();
           return mockFileStream;
         }),
@@ -199,7 +203,7 @@ describe("cliInstaller", () => {
         pipe: vi.fn().mockReturnValue(mockFileStream),
         on: vi.fn().mockReturnThis(),
       };
-      mockHttpsGet.mockImplementation((_url: string, callback: Function) => {
+      mockHttpsGet.mockImplementation((_url: string, callback: HttpsResponseCallback) => {
         callback(mockResponse);
         return { on: vi.fn().mockReturnThis() };
       });
@@ -220,7 +224,7 @@ describe("cliInstaller", () => {
         dependencies: { "@github/copilot-sdk": "0.1.26" },
       }));
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) callback(null, "installed", "");
           return { kill: vi.fn(), pid: 12345 };
         },
@@ -245,7 +249,7 @@ describe("cliInstaller", () => {
 
       let capturedArgs: string[] = [];
       mockExecFile.mockImplementation(
-        (cmd: string, args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm") {
             capturedArgs = args;
             if (callback) callback(null, "installed", "");
@@ -268,7 +272,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(new Error("ENOENT: npm not found"), "", "");
           }
@@ -276,9 +280,9 @@ describe("cliInstaller", () => {
         },
       );
 
-      mockHttpsGet.mockImplementation((_url: string, _callback: Function) => {
+      mockHttpsGet.mockImplementation((_url: string, _callback: HttpsResponseCallback) => {
         return {
-          on: vi.fn((_event: string, handler: Function) => {
+          on: vi.fn((_event: string, handler: MockEventHandler) => {
             handler(new Error("Network error"));
             return { on: vi.fn() };
           }),
@@ -300,7 +304,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(new Error("Command timed out"), "", "");
           }
@@ -434,7 +438,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(new Error("ENOENT: npm not found"), "", "");
           }
@@ -442,9 +446,9 @@ describe("cliInstaller", () => {
         },
       );
 
-      mockHttpsGet.mockImplementation((_url: string, _callback: Function) => {
+      mockHttpsGet.mockImplementation((_url: string, _callback: HttpsResponseCallback) => {
         return {
-          on: vi.fn((_event: string, handler: Function) => {
+          on: vi.fn((_event: string, handler: MockEventHandler) => {
             handler(new Error("Network error"));
             return { on: vi.fn() };
           }),
@@ -467,7 +471,7 @@ describe("cliInstaller", () => {
       }));
 
       mockExecFile.mockImplementation(
-        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: Function) => {
+        (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
           if (cmd === "npm" && callback) {
             callback(new Error("ENOENT: npm not found"), "", "");
           } else if (cmd === "tar" && callback) {
@@ -484,7 +488,7 @@ describe("cliInstaller", () => {
         pipe: vi.fn(),
         on: vi.fn(),
       };
-      mockHttpsGet.mockImplementation((_url: string, callback: Function) => {
+      mockHttpsGet.mockImplementation((_url: string, callback: HttpsResponseCallback) => {
         callback(mockResponse);
         return { on: vi.fn().mockReturnThis() };
       });

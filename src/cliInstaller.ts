@@ -1,9 +1,7 @@
 import { execFile } from "child_process";
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { get as httpsGet } from "https";
 import { join } from "path";
-import { pipeline } from "stream/promises";
-import { createGunzip } from "zlib";
 
 /**
  * Subdirectory name within globalStoragePath for managed CLI installation.
