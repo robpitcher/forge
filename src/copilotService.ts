@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { ExtensionConfig } from "./configuration.js";
 import type {
   CopilotClient,
@@ -53,7 +53,7 @@ function resolveCopilotCliFromPath(): string | undefined {
 export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidationResult> {
   return new Promise((resolve) => {
     try {
-      const output = execSync(`"${cliPath}" --version`, {
+      const output = execFileSync(cliPath, ["--version"], {
         encoding: "utf8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "pipe"],

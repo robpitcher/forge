@@ -15,7 +15,7 @@ import {
   validateCopilotCli,
   discoverAndValidateCli,
 } from "../copilotService.js";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
@@ -23,6 +23,7 @@ vi.mock("@github/copilot-sdk", () =>
 
 vi.mock("child_process", () => ({
   execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
 const validConfig: ExtensionConfig = {
@@ -251,14 +252,14 @@ describe("copilotService", () => {
   });
 
   describe("validateCopilotCli", () => {
-    const mockExecSync = vi.mocked(execSync);
+    const mockExecFileSync = vi.mocked(execFileSync);
 
     beforeEach(() => {
-      mockExecSync.mockReset();
+      mockExecFileSync.mockReset();
     });
 
     it("returns valid result when CLI returns version", async () => {
-      mockExecSync.mockReturnValue("@github/copilot v1.2.3\n");
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
 
       const result = await validateCopilotCli("/usr/local/bin/copilot");
 
@@ -270,7 +271,7 @@ describe("copilotService", () => {
     });
 
     it("returns wrong_binary when CLI returns error", async () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("unknown option: --version");
       });
 
@@ -285,7 +286,7 @@ describe("copilotService", () => {
     });
 
     it("returns not_found when CLI binary does not exist", async () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         const err: Error & { code?: string } = new Error("Command failed: copilot --version");
         err.message = "ENOENT: no such file or directory";
         throw err;
@@ -301,7 +302,7 @@ describe("copilotService", () => {
     });
 
     it("returns version_check_failed when CLI returns empty output", async () => {
-      mockExecSync.mockReturnValue("");
+      mockExecFileSync.mockReturnValue("");
 
       const result = await validateCopilotCli("/usr/local/bin/copilot");
 
@@ -313,7 +314,7 @@ describe("copilotService", () => {
     });
 
     it("handles timeout error as wrong_binary", async () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Command timed out");
       });
 
@@ -328,13 +329,15 @@ describe("copilotService", () => {
 
   describe("discoverAndValidateCli", () => {
     const mockExecSync = vi.mocked(execSync);
+    const mockExecFileSync = vi.mocked(execFileSync);
 
     beforeEach(() => {
       mockExecSync.mockReset();
+      mockExecFileSync.mockReset();
     });
 
     it("validates configured path when provided", async () => {
-      mockExecSync.mockReturnValue("@github/copilot v1.2.3\n");
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
 
       const result = await discoverAndValidateCli("/custom/path/copilot");
 
@@ -345,11 +348,10 @@ describe("copilotService", () => {
     });
 
     it("discovers and validates CLI from PATH when no config", async () => {
-      // First call: which/where copilot
-      // Second call: copilot --version
-      mockExecSync
-        .mockReturnValueOnce("/usr/local/bin/copilot\n")
-        .mockReturnValueOnce("@github/copilot v1.2.3\n");
+      // First call (execSync): which/where copilot
+      mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");
+      // Second call (execFileSync): copilot --version
+      mockExecFileSync.mockReturnValueOnce("@github/copilot v1.2.3\n");
 
       const result = await discoverAndValidateCli();
 
@@ -375,13 +377,12 @@ describe("copilotService", () => {
     });
 
     it("validates discovered CLI and reports wrong_binary", async () => {
-      // First call: which/where finds a copilot
-      // Second call: copilot --version fails
-      mockExecSync
-        .mockReturnValueOnce("/usr/bin/copilot\n")
-        .mockImplementationOnce(() => {
-          throw new Error("unknown option: --version");
-        });
+      // First call (execSync): which/where finds a copilot
+      mockExecSync.mockReturnValueOnce("/usr/bin/copilot\n");
+      // Second call (execFileSync): copilot --version fails
+      mockExecFileSync.mockImplementationOnce(() => {
+        throw new Error("unknown option: --version");
+      });
 
       const result = await discoverAndValidateCli();
 
@@ -393,9 +394,8 @@ describe("copilotService", () => {
     });
 
     it("ignores empty configured path and discovers from PATH", async () => {
-      mockExecSync
-        .mockReturnValueOnce("/usr/local/bin/copilot\n")
-        .mockReturnValueOnce("@github/copilot v1.2.3\n");
+      mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");
+      mockExecFileSync.mockReturnValueOnce("@github/copilot v1.2.3\n");
 
       const result = await discoverAndValidateCli("   ");
 
