@@ -68,6 +68,14 @@ describe("copilotService", () => {
   });
 
   describe("getOrCreateClient", () => {
+    const mockExecSync = vi.mocked(execSync);
+    const mockExecFileSync = vi.mocked(execFileSync);
+
+    beforeEach(() => {
+      mockExecSync.mockReset();
+      mockExecFileSync.mockReset();
+    });
+
     it("creates a client and starts it", async () => {
       const client = await getOrCreateClient(validConfig);
 
@@ -85,12 +93,38 @@ describe("copilotService", () => {
 
     it("passes cliPath when configured", async () => {
       const configWithCli = { ...validConfig, cliPath: "/custom/path/copilot" };
+      mockExecFileSync.mockReturnValueOnce("@github/copilot v1.2.3\n");
 
       await getOrCreateClient(configWithCli);
 
       expect(constructorSpy).toHaveBeenCalledWith({
         cliPath: "/custom/path/copilot",
       });
+    });
+
+    it("fails early with actionable error for invalid configured cliPath", async () => {
+      const configWithCli = { ...validConfig, cliPath: "/custom/path/copilot" };
+      mockExecFileSync.mockImplementationOnce(() => {
+        throw new Error("unknown option: --version");
+      });
+
+      await expect(getOrCreateClient(configWithCli)).rejects.toMatchObject({
+        name: "CopilotCliNotFoundError",
+        message: expect.stringContaining("The configured Copilot CLI path is invalid"),
+      });
+      expect(constructorSpy).not.toHaveBeenCalled();
+      expect(mockClient.start).not.toHaveBeenCalled();
+    });
+
+    it("fails early with directory-path guidance when cliPath points to directory", async () => {
+      const configWithCli = { ...validConfig, cliPath: process.cwd() };
+
+      await expect(getOrCreateClient(configWithCli)).rejects.toMatchObject({
+        name: "CopilotCliNotFoundError",
+        message: expect.stringContaining("forge.copilot.cliPath points to a directory"),
+      });
+      expect(constructorSpy).not.toHaveBeenCalled();
+      expect(mockClient.start).not.toHaveBeenCalled();
     });
   });
 
@@ -270,6 +304,17 @@ describe("copilotService", () => {
       }
     });
 
+    it("accepts standard GitHub Copilot CLI version output", async () => {
+      mockExecFileSync.mockReturnValue("GitHub Copilot CLI 0.0.421-1\n");
+
+      const result = await validateCopilotCli("/usr/local/bin/copilot");
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.version).toBe("GitHub Copilot CLI 0.0.421-1");
+      }
+    });
+
     it("returns wrong_binary when CLI returns error", async () => {
       mockExecFileSync.mockImplementation(() => {
         throw new Error("unknown option: --version");
@@ -323,6 +368,20 @@ describe("copilotService", () => {
       expect(result.valid).toBe(false);
       if (!result.valid) {
         expect(result.reason).toBe("wrong_binary");
+      }
+    });
+
+    it("returns version_check_failed for directory path with actionable details", async () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error("EISDIR: illegal operation on a directory");
+      });
+
+      const result = await validateCopilotCli(process.cwd());
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toBe("version_check_failed");
+        expect(result.details).toContain("points to a directory");
       }
     });
   });

@@ -23,6 +23,7 @@
 After every substantial work session:
 
 1. **Log the session** to `.squad/log/{timestamp}-{topic}.md`:
+   - Use Windows-safe ISO 8601 timestamp (colons replaced with hyphens): `2026-02-27T14-39-00Z`
    - Who worked
    - What was done
    - Decisions made

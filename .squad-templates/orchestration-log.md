@@ -1,6 +1,8 @@
 # Orchestration Log Entry
 
 > One file per agent spawn. Saved to `.squad/orchestration-log/{timestamp}-{agent-name}.md`
+> 
+> **Timestamp format:** Windows-safe ISO 8601 (colons replaced with hyphens): `2026-02-27T14-39-00Z` (not `2026-02-27T14:39:00Z`)
 
 ---
 
@@ -20,7 +22,7 @@
 
 ## Rules
 
-1. **One file per agent spawn.** Named `{timestamp}-{agent-name}.md`.
+1. **One file per agent spawn.** Named `{timestamp}-{agent-name}.md`. Use Windows-safe timestamp: replace colons with hyphens (e.g., `2026-02-27T14-39-00Z`).
 2. **Log BEFORE spawning.** The entry must exist before the agent runs.
 3. **Update outcome AFTER the agent completes.** Fill in the Outcome field.
 4. **Never delete or edit past entries.** Append-only.
