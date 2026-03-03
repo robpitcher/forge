@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
+import { getConfiguration, getConfigurationAsync, validateConfiguration, type ExtensionConfig } from "./configuration.js";
 import { createCredentialProvider } from "./auth/credentialProvider.js";
 import {
   getOrCreateSession,
@@ -35,7 +35,7 @@ type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Forge");
-  const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState);
+  const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState, outputChannel);
   
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
@@ -273,6 +273,19 @@ async function updateAuthStatus(
   return status;
 }
 
+/**
+ * Wraps a promise with a timeout. If the promise doesn't resolve within the
+ * specified time, rejects with a timeout error.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+    ),
+  ]);
+}
+
 export async function deactivate(): Promise<void> {
   await stopClient();
 }
@@ -292,7 +305,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _secrets: vscode.SecretStorage,
-    private readonly _workspaceState: vscode.Memento
+    private readonly _workspaceState: vscode.Memento,
+    private readonly _outputChannel: vscode.OutputChannel
   ) {
     // Restore persisted model selection
     this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
@@ -526,25 +540,79 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _sendConfigStatus(prefetched?: PrefetchedState, isCheckRequest = false): void {
+    this._outputChannel.appendLine(`[_sendConfigStatus] Starting config status update (isCheckRequest: ${isCheckRequest})`);
+    
     const doWork = async () => {
-      const config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
-      const status = prefetched?.authStatus ?? await checkAuthStatus(config, this._secrets);
-      this.postAuthStatus(status, !!config.endpoint);
-      this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
-      this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
-      const hasEndpoint = !!config.endpoint;
-      const hasAuth = status.state === "authenticated";
-      const hasModels = config.models.length > 0;
+      // Step 1: Get config synchronously (or use prefetched) and send models/endpoint info IMMEDIATELY
+      const syncConfig = prefetched?.config ?? getConfiguration();
+      const hasModels = syncConfig.models.length > 0;
+      const hasEndpoint = !!syncConfig.endpoint;
+      
+      this._outputChannel.appendLine(`[_sendConfigStatus] Config read: endpoint=${hasEndpoint ? 'present' : 'missing'}, models=${hasModels ? syncConfig.models.length : 0}`);
+      
+      // Send models and model selection immediately
+      this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
+      this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(syncConfig.models) });
+      
+      // Send preliminary configStatus with hasAuth=false (will update after auth check)
       this._view?.webview.postMessage({
         type: "configStatus",
         hasEndpoint,
-        hasAuth,
+        hasAuth: false,
         hasModels,
       });
+      
+      // Step 2: Now do the async auth check with timeout
+      let config: ExtensionConfig;
+      let status: AuthStatus;
+      
+      try {
+        // Get full config with API key
+        config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
+        
+        // Check auth with 15-second timeout
+        if (prefetched?.authStatus) {
+          status = prefetched.authStatus;
+          this._outputChannel.appendLine(`[_sendConfigStatus] Using prefetched auth status: ${status.state}`);
+        } else {
+          this._outputChannel.appendLine(`[_sendConfigStatus] Starting auth check...`);
+          status = await withTimeout(
+            checkAuthStatus(config, this._secrets),
+            15000,
+            "Authentication check timed out"
+          );
+          this._outputChannel.appendLine(`[_sendConfigStatus] Auth check complete: ${status.state}`);
+        }
+      } catch (error) {
+        // Timeout or other error — treat as not authenticated
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this._outputChannel.appendLine(`[_sendConfigStatus] Auth check failed: ${errorMsg}`);
+        
+        config = prefetched?.config ?? getConfiguration();
+        status = {
+          state: "notAuthenticated",
+          reason: errorMsg.includes("timed out") 
+            ? "Authentication check timed out — try running 'az login' again"
+            : "Authentication check failed",
+        };
+      }
+      
+      // Step 3: Send the updated auth status to webview
+      this.postAuthStatus(status, !!config.endpoint);
+      
+      const hasAuth = status.state === "authenticated";
+      this._view?.webview.postMessage({
+        type: "configStatus",
+        hasEndpoint: !!config.endpoint,
+        hasAuth,
+        hasModels: config.models.length > 0,
+      });
+      
+      // Step 4: Handle checkConfig request
       if (isCheckRequest) {
         const missing: string[] = [];
-        if (!hasEndpoint) { missing.push("Azure endpoint URL"); }
-        if (!hasModels) { missing.push("Model configuration"); }
+        if (!config.endpoint) { missing.push("Azure endpoint URL"); }
+        if (!config.models || config.models.length === 0) { missing.push("Model configuration"); }
         if (!hasAuth) { missing.push("Authentication"); }
         this._view?.webview.postMessage({
           type: "configCheckResult",
@@ -552,9 +620,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           allGood: missing.length === 0,
         });
       }
+      
+      this._outputChannel.appendLine(`[_sendConfigStatus] Status update complete`);
     };
-    doWork().catch(() => {
-      // Silent failure — status bar will show the error
+    
+    doWork().catch((error) => {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this._outputChannel.appendLine(`[_sendConfigStatus] Unhandled error: ${errorMsg}`);
     });
   }
 
