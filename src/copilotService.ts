@@ -132,6 +132,14 @@ export async function probeCliCompatibility(
       { timeout: 5000 },
       (error, stdout, stderr) => {
         if (error) {
+          // If we killed the process ourselves (SIGTERM from our setTimeout),
+          // that means the CLI started successfully — it accepted the flags.
+          const execError = error as NodeJS.ErrnoException & { killed?: boolean; signal?: string };
+          if (execError.killed || execError.signal === "SIGTERM") {
+            resolve({ compatible: true });
+            return;
+          }
+
           const message = error.message.toLowerCase();
           const stderrLower = stderr.toLowerCase();
 
