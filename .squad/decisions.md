@@ -2539,3 +2539,134 @@ When detected, throw `CopilotCliNotFoundError` with actionable message:
 
 The build failure suggests missing dependencies in the webview layer — that's Blair's domain (webview owner). This fix is SDK error handling only.
 
+### 2026-03-03T16:51Z: User directive
+**By:** Rob Pitcher (via Copilot)
+**What:** Users should NOT have to run `npm install -g @github/copilot` to use Forge. The extension must ship with the CLI binary — no external install steps.
+**Why:** User request — captured for team memory
+
+### 2026-03-03T16:51Z: User directive  
+**By:** Rob Pitcher (via Copilot)
+**What:** Entra ID auth should work with just `az login` — no subscription setup (`az account set`) should be required. The extension should auto-recover if no subscription is set.
+**Why:** User request — captured for team memory
+
+# Decision: Auto-Recovery for Azure CLI "No Subscription" Errors
+
+**Date:** 2026-03-03  
+**Decider:** Childs  
+**Status:** Implemented
+
+## Context
+
+When users run `az login` but haven't run `az account set`, the `DefaultAzureCredential` → `AzureCliCredential` chain fails with "No subscription found" even though the user IS authenticated. The underlying issue is that `@azure/identity` v4.13.0's `AzureCliCredential` internally calls `az account get-access-token --resource https://cognitiveservices.azure.com`, which requires a subscription context.
+
+Rob Pitcher's requirement: **"With the az cli we shouldn't have to setup an azure subscription. Just authenticating should be sufficient."**
+
+## Decision
+
+Implemented auto-recovery logic in `EntraIdCredentialProvider.getToken()` that:
+
+1. First attempts `DefaultAzureCredential.getToken()` as normal
+2. If it fails with "No subscription found" or "az account set" in the error message:
+   - Runs `az account list --output json` to fetch available subscriptions
+   - Selects the first subscription with `state === "Enabled"`
+   - Runs `az account set --subscription <id>` to set the default
+   - Logs a console.warn message: `[forge] No Azure subscription set. Auto-selecting: <name> (<id>)`
+   - Retries `DefaultAzureCredential.getToken()`
+3. If retry succeeds, returns the token
+4. If retry fails or no enabled subscriptions exist, throws: `"Azure authentication failed. Run 'az account set --subscription <id>' to select a subscription."`
+5. Auto-recovery only attempts ONCE per provider instance (tracked via `hasAttemptedRecovery` boolean)
+
+## Implementation Details
+
+- Import `execSync` from `child_process` for subprocess calls
+- Recovery logic wraps the existing `getToken()` logic in try-catch
+- Uses defensive JSON parsing of `az account list` output
+- Ignores disabled subscriptions (`state !== "Enabled"`)
+- Does NOT replace `DefaultAzureCredential` — just adds recovery logic around it
+- Keeps existing `DefaultAzureCredential` chain intact (tries Environment → ManagedIdentity → VSCode → AzureCLI → etc)
+
+## Test Coverage
+
+Added 4 new tests to `src/test/auth/credentialProvider.test.ts`:
+
+1. **auto-recovers when 'No subscription found' error occurs** — verifies happy path recovery
+2. **auto-recovery only attempts once per provider instance** — ensures no infinite retry loops
+3. **auto-recovery fails gracefully when no enabled subscriptions exist** — handles edge case with only disabled subscriptions
+4. **does not attempt recovery for non-subscription errors** — ensures we don't trigger recovery for network errors, invalid credentials, etc.
+
+All 17 existing credential tests still pass. Full suite: 236 tests passing.
+
+## Alternatives Considered
+
+1. **Replace DefaultAzureCredential with AzureCliCredential directly** — rejected because it breaks the credential chain (would skip VSCode auth, Managed Identity, etc.)
+2. **Pass `tenantId` to AzureCliCredential** — rejected because the problem is missing subscription, not tenant
+3. **Document "run az account set first"** — rejected because it creates unnecessary friction for users who are already logged in
+
+## Impact
+
+- Reduces setup friction for Entra ID auth — users only need `az login`, not `az account set`
+- Transparent to users when recovery succeeds (just a console.warn in output channel)
+- Provides actionable error message if recovery fails
+- No breaking changes — existing behavior unchanged when subscription is already set
+- Air-gap safe — only calls local `az` CLI commands, no network requests
+
+## Files Changed
+
+- `src/auth/credentialProvider.ts` — added `hasAttemptedRecovery` field, `isNoSubscriptionError()` helper, `autoSelectSubscription()` method, try-catch wrapper in `getToken()`
+- `src/test/auth/credentialProvider.test.ts` — added 4 new tests, mocked `child_process.execSync`
+
+# CLI Binary Bundling in .vsix Package
+
+## Context
+The Forge extension uses `@github/copilot-sdk` which depends on the `@github/copilot` CLI binary (103MB). Previously, `node_modules/**` was excluded from the .vsix, causing runtime failures when the SDK tried to resolve the CLI path.
+
+## Decision
+Include `@github/copilot` and its SDK dependencies in the .vsix package by negating the `node_modules/**` exclusion in `.vscodeignore`:
+
+```
+!node_modules/@github/copilot/**
+!node_modules/@github/copilot-sdk/**
+!node_modules/vscode-jsonrpc/**
+!node_modules/zod/**
+```
+
+## Rationale
+1. **Just works UX:** Users should NOT need to run `npm install -g @github/copilot` to use the extension
+2. **SDK resolution path:** The SDK uses `import.meta.resolve("@github/copilot/sdk")` which the esbuild shim resolves by walking up from `dist/` (where `__dirname` is set) to find `node_modules/@github/copilot/sdk/index.js`
+3. **Vsix structure:** In a packaged .vsix, the structure is:
+   ```
+   extension/
+   ├── dist/
+   │   ├── extension.js  ← __dirname here
+   │   └── chat.js
+   ├── node_modules/
+   │   ├── @github/copilot/
+   │   ├── @github/copilot-sdk/
+   │   ├── vscode-jsonrpc/
+   │   └── zod/
+   └── media/
+   ```
+   The shim walks UP from `dist/` → `extension/` → finds `node_modules/` as a sibling, so resolution works correctly.
+
+## Impact
+- **.vsix size:** Increases from ~1.5MB to ~105MB. Acceptable — GitHub Copilot's own extension is hundreds of MB.
+- **Runtime dependencies:** `vscode-jsonrpc` and `zod` are runtime deps of `@github/copilot-sdk` (not bundled by esbuild), so they must also be included.
+- **Air-gap compliance:** All inference still goes to Azure AI Foundry — the CLI binary is purely for SDK internal logic, not telemetry.
+
+## Verification
+✅ `node_modules/@github/copilot/sdk/index.js` exists (12MB)  
+✅ `node_modules/@github/copilot/index.js` exists (16MB)  
+✅ SDK dependencies identified: `vscode-jsonrpc`, `zod`  
+✅ Shim logic validated: walks UP from `dist/__dirname` to find `node_modules/` sibling  
+
+## Alternatives Considered
+1. **Extract only the CLI binary:** Too fragile — the SDK expects the full package structure (sdk/, prebuilds/, etc.)
+2. **Use `which copilot` fallback:** Unreliable — might pick up wrong version, breaks air-gap UX promise
+3. **Bundle CLI as extension resource:** Would require patching SDK resolution logic
+
+## Owner
+Palmer (DevOps Specialist)
+
+## Date
+2026-03-03
+
