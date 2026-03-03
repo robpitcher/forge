@@ -67,11 +67,23 @@ export async function getOrCreateClient(
   } catch (err: unknown) {
     client = undefined;
     const message = err instanceof Error ? err.message : String(err);
+    const lower = message.toLowerCase();
     if (
-      message.toLowerCase().includes("not found") ||
-      message.toLowerCase().includes("enoent") ||
-      message.toLowerCase().includes("cannot find") ||
-      message.toLowerCase().includes("cannot resolve")
+      lower.includes("--headless") ||
+      lower.includes("unknown option") ||
+      (lower.includes("exited with code") && lower.includes("stderr"))
+    ) {
+      throw new CopilotCliNotFoundError(
+        "The 'copilot' binary found on your PATH does not appear to be the GitHub Copilot CLI (@github/copilot). " +
+        "Install it with: npm install -g @github/copilot — then restart VS Code. " +
+        "Or set forge.copilot.cliPath to the correct binary location."
+      );
+    }
+    if (
+      lower.includes("not found") ||
+      lower.includes("enoent") ||
+      lower.includes("cannot find") ||
+      lower.includes("cannot resolve")
     ) {
       throw new CopilotCliNotFoundError(
         "Copilot CLI not found. Install @github/copilot globally or set forge.copilot.cliPath in settings."

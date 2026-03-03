@@ -674,11 +674,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (config.authMethod === "entraId") {
+        const summary = this._extractEntraIdErrorSummary(message);
         this._postError(
-          "Entra ID authentication failed. Ensure you're signed in via Azure CLI, " +
-          "VS Code Azure Account extension, or running on a VM with Managed Identity. " +
-          "Alternatively, switch to API key auth in Settings (forge.copilot.authMethod). " +
-          `Details: ${message}`
+          `Entra ID authentication failed. ${summary} ` +
+          "Or switch to API key auth in Settings (forge.copilot.authMethod)."
         );
       } else {
         this._postError(`Authentication failed: ${message}`);
@@ -793,6 +792,33 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
     }
     return message;
+  }
+
+  private _extractEntraIdErrorSummary(rawMessage: string): string {
+    const lower = rawMessage.toLowerCase();
+
+    // Azure CLI: No subscription found
+    if (lower.includes("no subscription found") || lower.includes("az account set")) {
+      return "Azure CLI: No subscription found. Run 'az account set' to select a subscription, then try again.";
+    }
+
+    // Azure CLI: Not logged in
+    if (lower.includes("az login") || lower.includes("please run 'az login'")) {
+      return "Azure CLI: Not logged in. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Azure AD errors (AADSTS codes)
+    if (lower.includes("aadsts")) {
+      return "Azure CLI: Authentication issue. Run 'az login' and 'az account set', then try again.";
+    }
+
+    // MFA or interactive login required
+    if (lower.includes("multi-factor") || lower.includes("mfa") || lower.includes("interactive")) {
+      return "Azure CLI: Interactive login required. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Generic fallback
+    return "Check your Azure CLI setup. Run 'az login' and 'az account set', then try again.";
   }
 
   private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
@@ -989,9 +1015,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         if (config.authMethod === "entraId") {
+          const summary = this._extractEntraIdErrorSummary(message);
           this._postError(
-            "Entra ID authentication failed. Ensure you're signed in via Azure CLI. " +
-            `Details: ${message}`
+            `Entra ID authentication failed. ${summary} ` +
+            "Or switch to API key auth in Settings (forge.copilot.authMethod)."
           );
         } else {
           this._postError(`Authentication failed: ${message}`);
