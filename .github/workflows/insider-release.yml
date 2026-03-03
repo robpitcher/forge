@@ -50,6 +50,9 @@ jobs:
           echo "🏷️ Insider Version: $INSIDER_VERSION"
           echo "🔖 Insider Tag: $INSIDER_TAG"
 
+      - name: Package extension
+        run: npx vsce package --out forge-${{ steps.version.outputs.insider_version }}.vsix
+
       - name: Create git tag
         run: |
           git config user.name "github-actions[bot]"
@@ -62,9 +65,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ steps.version.outputs.insider_tag }}" \
-            --title "${{ steps.version.outputs.insider_tag }}" \
-            --notes "This is an insider/development build of Squad. Install with:\`\`\`bash\nnpx github:bradygaster/squad#${{ steps.version.outputs.insider_tag }}\n\`\`\`\n\n**Note:** Insider builds may be unstable and are intended for early adopters and testing only." \
-            --prerelease
+            --title "Forge ${{ steps.version.outputs.insider_tag }}" \
+            --notes "Insider/development build of Forge. Download the \`.vsix\` below and install via:\n\`\`\`bash\ncode --install-extension forge-${{ steps.version.outputs.insider_version }}.vsix\n\`\`\`\n\n**Note:** Insider builds may be unstable and are intended for early adopters and testing only." \
+            --prerelease \
+            forge-${{ steps.version.outputs.insider_version }}.vsix
 
       - name: Verify release
         env:
