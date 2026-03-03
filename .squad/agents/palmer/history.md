@@ -42,3 +42,14 @@
 - **.vsix impact:** Size increases from ~1.5MB to ~105MB. Acceptable — GitHub Copilot's extension is hundreds of MB, and Rob explicitly prioritized "just works" UX over package size.
 - **Decision doc:** `.squad/decisions/inbox/palmer-cli-bundling.md`
 - **Note:** Build is pre-broken on this branch (highlight.js/marked-highlight resolution errors in media/chat.js) — unrelated to this change.
+
+### Windows-Safe Squad Logging Filenames (2026-03-03)
+- **Problem:** ISO 8601 UTC timestamps in squad log filenames (e.g., `2026-02-27T05:03:36Z`) contain colons, which are invalid in Windows filenames. Windows clones failed with "invalid path" errors.
+- **Solution:** Renamed all 51 tracked log files in `.squad/log/` and `.squad/orchestration-log/` to use hyphens instead of colons (e.g., `2026-02-27T05-03-36Z`).
+- **Prevention:** Updated guidance and templates to specify Windows-safe timestamp format:
+  - `.squad-templates/orchestration-log.md` — clarified `2026-02-27T14-39-00Z` format
+  - `.squad-templates/scribe-charter.md` — added Windows-safe guidance to session logging section
+  - `.github/agents/squad.agent.md` — updated Scribe spawn instructions to use Windows-safe timestamps
+- **Verification:** `git ls-files | grep ":"` returns zero — all tracked files are now Windows-safe.
+- **Commit:** `9e12441` — 53 files changed (51 renames + 3 template updates).
+- **Impact:** Windows developers can now clone and work on the repository without path errors.
