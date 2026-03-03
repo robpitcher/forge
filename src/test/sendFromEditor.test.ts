@@ -93,6 +93,7 @@ describe("sendFromEditor (forge.explain / forge.fix / forge.tests)", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey"

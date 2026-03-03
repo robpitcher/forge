@@ -1,0 +1,343 @@
+import { execFile } from "child_process";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { get as httpsGet } from "https";
+import { join } from "path";
+
+/**
+ * Subdirectory name within globalStoragePath for managed CLI installation.
+ */
+export const CLI_INSTALL_DIR = "copilot-cli";
+
+export interface CliInstallResult {
+  success: boolean;
+  cliPath?: string;
+  version?: string;
+  error?: string;
+  method?: "npm" | "http-tarball";
+}
+
+export interface CliInstallOptions {
+  globalStoragePath: string;
+  targetVersion?: string;
+}
+
+/**
+ * Gets the target CLI package version.
+ * If not provided, reads the @github/copilot-sdk version from package.json.
+ */
+function getTargetVersion(options: CliInstallOptions): string {
+  if (options.targetVersion) {
+    return options.targetVersion;
+  }
+
+  // Read SDK version from package.json
+  try {
+    const packageJsonPath = join(__dirname, "..", "package.json");
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+    const sdkVersion = packageJson.dependencies?.["@github/copilot-sdk"];
+    if (!sdkVersion) {
+      throw new Error("@github/copilot-sdk version not found in package.json");
+    }
+    // Strip any ^ or ~ prefix
+    return sdkVersion.replace(/^[~^]/, "");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to determine target CLI version: ${message}`);
+  }
+}
+
+/**
+ * Returns the path to the managed CLI binary if installed, undefined otherwise.
+ */
+export async function getManagedCliPath(
+  globalStoragePath: string
+): Promise<string | undefined> {
+  const installDir = join(globalStoragePath, CLI_INSTALL_DIR);
+  const cliEntryPoint = join(
+    installDir,
+    "node_modules",
+    "@github",
+    "copilot",
+    "npm-loader.js"
+  );
+
+  try {
+    if (existsSync(cliEntryPoint) && statSync(cliEntryPoint).isFile()) {
+      return cliEntryPoint;
+    }
+  } catch {
+    // File doesn't exist or isn't accessible
+  }
+
+  return undefined;
+}
+
+/**
+ * Checks if the managed CLI is installed.
+ */
+export async function isManagedCliInstalled(
+  globalStoragePath: string
+): Promise<boolean> {
+  return (await getManagedCliPath(globalStoragePath)) !== undefined;
+}
+
+/**
+ * Attempts to install the CLI using npm.
+ * Returns the CLI path on success, or throws on failure.
+ */
+async function installViaNpm(
+  installDir: string,
+  version: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "npm",
+      ["install", `@github/copilot@${version}`, "--prefix", installDir],
+      { timeout: 120000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            new Error(
+              `npm install failed: ${error.message}\nstdout: ${stdout}\nstderr: ${stderr}`
+            )
+          );
+          return;
+        }
+
+        const cliPath = join(
+          installDir,
+          "node_modules",
+          "@github",
+          "copilot",
+          "npm-loader.js"
+        );
+        if (existsSync(cliPath)) {
+          resolve(cliPath);
+        } else {
+          reject(new Error("npm install succeeded but CLI binary not found"));
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Downloads a file over HTTPS.
+ */
+async function downloadFile(url: string, destPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    httpsGet(url, (response) => {
+      if (response.statusCode === 302 || response.statusCode === 301) {
+        // Follow redirect
+        const redirectUrl = response.headers.location;
+        if (!redirectUrl) {
+          reject(new Error("Redirect without location header"));
+          return;
+        }
+        downloadFile(redirectUrl, destPath).then(resolve).catch(reject);
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        reject(
+          new Error(
+            `HTTP ${response.statusCode}: ${response.statusMessage}`
+          )
+        );
+        return;
+      }
+
+      const fileStream = createWriteStream(destPath);
+      response.pipe(fileStream);
+
+      fileStream.on("finish", () => {
+        fileStream.close();
+        resolve();
+      });
+
+      fileStream.on("error", (err) => {
+        fileStream.close();
+        reject(err);
+      });
+    }).on("error", reject);
+  });
+}
+
+/**
+ * Extracts a .tgz file using Node.js streams and the system tar command.
+ */
+async function extractTarGz(
+  tarGzPath: string,
+  destDir: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Use system tar for reliable extraction
+    execFile(
+      "tar",
+      ["-xzf", tarGzPath, "-C", destDir],
+      { timeout: 60000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            new Error(
+              `tar extraction failed: ${error.message}\nstderr: ${stderr}`
+            )
+          );
+          return;
+        }
+        resolve();
+      }
+    );
+  });
+}
+
+/**
+ * Attempts to install the CLI by downloading the tarball from npm registry.
+ */
+async function installViaHttpTarball(
+  installDir: string,
+  version: string
+): Promise<string> {
+  const tarballUrl = `https://registry.npmjs.org/@github/copilot/-/copilot-${version}.tgz`;
+  const tarballPath = join(installDir, "copilot.tgz");
+  const extractDir = join(installDir, "extracted");
+
+  // Download tarball
+  await downloadFile(tarballUrl, tarballPath);
+
+  // Create extraction directory
+  mkdirSync(extractDir, { recursive: true });
+
+  // Extract tarball
+  await extractTarGz(tarballPath, extractDir);
+
+  // npm tarballs extract to a "package" subdirectory
+  const packageDir = join(extractDir, "package");
+  const targetNodeModulesDir = join(installDir, "node_modules", "@github");
+  mkdirSync(targetNodeModulesDir, { recursive: true });
+
+  // Move package directory to node_modules/@github/copilot
+  const targetDir = join(targetNodeModulesDir, "copilot");
+  const { renameSync } = await import("fs");
+  renameSync(packageDir, targetDir);
+
+  // The @github/copilot package has optionalDependencies for platform-specific binaries.
+  // We need to manually install the platform-specific package since we're not using npm.
+  const platform = process.platform;
+  const arch = process.arch;
+  const platformPackage = `@github/copilot-${platform}-${arch}`;
+  const platformTarballUrl = `https://registry.npmjs.org/${platformPackage.replace(
+    "/",
+    "/"
+  )}/-/copilot-${platform}-${arch}-${version}.tgz`;
+  const platformTarballPath = join(installDir, "copilot-platform.tgz");
+  const platformExtractDir = join(installDir, "platform-extracted");
+
+  try {
+    await downloadFile(platformTarballUrl, platformTarballPath);
+    mkdirSync(platformExtractDir, { recursive: true });
+    await extractTarGz(platformTarballPath, platformExtractDir);
+
+    const platformPackageDir = join(platformExtractDir, "package");
+    const platformTargetDir = join(
+      targetNodeModulesDir,
+      `copilot-${platform}-${arch}`
+    );
+    renameSync(platformPackageDir, platformTargetDir);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to install platform-specific binary: ${message}`
+    );
+  }
+
+  const cliPath = join(targetDir, "npm-loader.js");
+  if (existsSync(cliPath)) {
+    return cliPath;
+  } else {
+    throw new Error("HTTP tarball install succeeded but CLI binary not found");
+  }
+}
+
+/**
+ * Installs the Copilot CLI into the extension's globalStoragePath.
+ *
+ * Tries npm first, falls back to HTTP tarball download if npm is not available.
+ */
+export async function installCopilotCli(
+  options: CliInstallOptions
+): Promise<CliInstallResult> {
+  const version = getTargetVersion(options);
+  const installDir = join(options.globalStoragePath, CLI_INSTALL_DIR);
+
+  // Create install directory
+  try {
+    mkdirSync(installDir, { recursive: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      error: `Failed to create install directory: ${message}`,
+    };
+  }
+
+  // Write minimal package.json
+  const packageJsonPath = join(installDir, "package.json");
+  const packageJson = {
+    name: "forge-copilot-cli",
+    private: true,
+  };
+  try {
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      error: `Failed to write package.json: ${message}`,
+    };
+  }
+
+  // Try npm install first
+  try {
+    const cliPath = await installViaNpm(installDir, version);
+    return {
+      success: true,
+      cliPath,
+      version,
+      method: "npm",
+    };
+  } catch (npmError) {
+    const npmMessage =
+      npmError instanceof Error ? npmError.message : String(npmError);
+
+    // Check if npm is not available (ENOENT) or if npm failed for other reasons
+    if (
+      npmMessage.toLowerCase().includes("enoent") ||
+      npmMessage.toLowerCase().includes("not found")
+    ) {
+      // npm not on PATH — try HTTP tarball fallback
+      try {
+        const cliPath = await installViaHttpTarball(installDir, version);
+        return {
+          success: true,
+          cliPath,
+          version,
+          method: "http-tarball",
+        };
+      } catch (httpError) {
+        const httpMessage =
+          httpError instanceof Error ? httpError.message : String(httpError);
+        return {
+          success: false,
+          error: `npm not available and HTTP tarball install failed: ${httpMessage}`,
+        };
+      }
+    } else {
+      // npm failed for reasons other than not being on PATH — report npm error
+      return {
+        success: false,
+        error: `npm install failed: ${npmMessage}`,
+      };
+    }
+  }
+}
