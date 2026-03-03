@@ -2328,3 +2328,214 @@ Centralizing the fix in `updateAuthStatus()` ensures all code paths send both me
 **Why:** Without this sync, `checkAuthStatus` always evaluated Entra ID auth (the default), making the welcome screen stuck after API key entry.  
 **Impact:** Auth method now correctly follows API key storage state. Sign-in flow and welcome screen state are synchronized.  
 **Related:** Issue #81 (auth UX), `.squad/log/2026-03-02T23-30-apikey-authmethod-fix.md`
+
+### 2026-03-03: Extract Actionable Entra ID Error Messages
+
+**Date:** 2025-03-03  
+**Author:** Blair (Extension Dev)  
+**Status:** Implemented
+
+## Context
+
+When using Entra ID authentication (the default), users were seeing verbose, confusing error messages that dumped the entire `ChainedTokenCredential` error chain. This included failures from all credential providers (EnvironmentCredential, ManagedIdentityCredential, VS Code auth, Azure CLI, PowerShell), even though most were irrelevant to the user's situation.
+
+Example of old error:
+```
+Entra ID authentication failed. Ensure you're signed in via Azure CLI... Details: ChainedTokenCredential authentication failed.
+CredentialUnavailableError: EnvironmentCredential is unavailable...
+CredentialUnavailableError: ManagedIdentityCredential: Authentication failed...
+CredentialUnavailableError: Visual Studio Code Authentication is not available...
+CredentialUnavailableError: ERROR: No subscription found. Run 'az account set' to select a subscription.
+[... many more lines ...]
+```
+
+Users reported this as a "false positive" since the error appeared during initial auth check but auth succeeded after running `az account set`.
+
+## Decision
+
+Added a helper method `_extractEntraIdErrorSummary(rawMessage: string): string` in `src/extension.ts` that:
+
+1. Parses the raw `ChainedTokenCredential` error to extract the most actionable failure
+2. Pattern-matches common Azure CLI issues:
+   - No subscription found → "Run 'az account set'"
+   - Not logged in → "Run 'az login'"
+   - AADSTS errors → "Run 'az login' and 'az account set'"
+   - MFA/interactive required → "Run 'az login'"
+   - Generic fallback → "Check your Azure CLI setup"
+3. Returns a SHORT (1-2 lines), actionable message instead of the full chain dump
+
+Updated two locations in `extension.ts`:
+- Line 676-682 (`_handleChatMessage`)
+- Line 990-995 (`resumeConversation` handler)
+
+Both now call `_extractEntraIdErrorSummary()` and present concise, actionable errors like:
+```
+Entra ID authentication failed. Azure CLI: No subscription found. Run 'az account set' to select a subscription, then try again. Or switch to API key auth in Settings (forge.copilot.authMethod).
+```
+
+## Rationale
+
+- **User experience:** Actionable, concise errors reduce confusion and help users fix auth issues quickly
+- **Signal-to-noise:** Most credential chain failures are irrelevant (e.g., ManagedIdentity on local dev)
+- **Azure CLI focus:** Forge users in air-gapped environments primarily use Azure CLI for Entra ID auth
+- **Follows charter:** "Keep error messages actionable — tell the user what to do, not just what went wrong"
+
+## Alternatives Considered
+
+1. **Show only the last error in the chain** — rejected because the last error isn't always the most actionable
+2. **Attempt to parse structured error objects** — rejected as `@azure/identity` errors are strings, not structured
+3. **Hide errors entirely until second failure** — rejected as users need immediate feedback
+
+## Impact
+
+- **Files changed:** `src/extension.ts`
+- **Tests:** All tests pass (232 passed, 3 skipped)
+- **TypeScript:** Type-checks clean
+- **Breaking changes:** None (internal implementation detail)
+
+### 2026-03-03: Auto-resolve copilot CLI path in getOrCreateClient
+
+**By:** Blair (Extension Dev)
+**Date:** 2025-07-25
+**Context:** .vsix sideload fails because SDK's `getBundledCliPath()` calls `import.meta.resolve('@github/copilot/sdk')` which the esbuild shim cannot resolve without `node_modules`.
+
+## Decision
+
+`getOrCreateClient()` now auto-resolves the copilot CLI binary from PATH using `which`/`where` before constructing `SDKCopilotClient`. This provides `cliPath` explicitly so the SDK never calls `getBundledCliPath()`.
+
+**Fallback chain:**
+1. `config.cliPath` set → use it (unchanged)
+2. `config.cliPath` empty → try `which copilot` / `where copilot` on PATH
+3. PATH lookup fails → let SDK try its bundled path (works in dev, fails in .vsix → caught by error handler)
+
+Also added `"cannot resolve"` to the error detection patterns to match the exact error the esbuild shim throws.
+
+## Impact
+
+- All agents: no changes needed to callers of `getOrCreateClient()`
+- Windows (tests): air-gap test updated to accept auto-resolved cliPath
+- Users: .vsix sideload now works if `copilot` is on PATH without manual config
+
+### 2026-03-03: Prefetched state pattern for auth polling
+
+**By:** Blair
+**Date:** 2026-03-02
+**What:** Functions that are called in sequence and need the same async data (config + auth status) should pass results down via optional params rather than re-fetching. `_sendConfigStatus(prefetched?: PrefetchedState)` and `refreshWebviewState(prefetched?)` now accept pre-computed data. `updateAuthStatus()` returns `AuthStatus` so callers can reuse it.
+**Why:** The 30s auth poll was making 2× `getToken()` calls — once in `updateAuthStatus()` and again in `_sendConfigStatus()`. For Entra ID, each `getToken()` may hit Azure Identity. This halves the auth overhead.
+
+### 2026-03-03: _sendConfigStatus Must Send UI-Critical Data Before Slow Auth Checks
+
+**Date:** 2025-01-22  
+**Author:** Blair (Extension Dev)  
+**Status:** Implemented
+
+## Context
+
+The extension appeared completely frozen on Windows machines with proper configuration (endpoint, models, Azure CLI logged in). Root cause: `_sendConfigStatus()` gated ALL webview messages (including models list) behind `checkAuthStatus()`, which uses `DefaultAzureCredential`. On Windows, this can hang for 15-60 seconds trying IMDS (managed identity endpoint 169.254.169.254 timeout) before falling through to Azure CLI.
+
+## Decision
+
+**UI-critical data (models, endpoint status) must be sent IMMEDIATELY before slow async operations like credential checks.**
+
+### Implementation Pattern
+
+```typescript
+private _sendConfigStatus(prefetched?, isCheckRequest = false): void {
+  const doWork = async () => {
+    // 1. Get config synchronously (no await for models/endpoint)
+    const syncConfig = getConfiguration();
+    
+    // 2. Send models/endpoint info IMMEDIATELY
+    this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
+    this._view?.webview.postMessage({ type: "configStatus", hasAuth: false, ... });
+    
+    // 3. THEN do async auth check with timeout
+    const status = await withTimeout(checkAuthStatus(...), 15000, "Auth timed out");
+    
+    // 4. Send updated status after auth completes
+    this._view?.webview.postMessage({ type: "configStatus", hasAuth: true, ... });
+  };
+  doWork().catch((error) => {
+    this._outputChannel.appendLine(`Error: ${error.message}`);
+  });
+}
+```
+
+### Key Principles
+
+1. **Non-blocking reads first:** Use synchronous `getConfiguration()` for VS Code settings (no SecretStorage).
+2. **Send preliminary state:** Webview gets models/endpoint immediately; auth status follows when ready.
+3. **Timeout long operations:** Wrap `DefaultAzureCredential.getToken()` with 15-second timeout.
+4. **Log, don't swallow:** Replace `.catch(() => {})` with output channel logging for diagnostics.
+5. **Webview dedup handles it:** The `applyConfigStatus()` dedup key (`${hasEndpoint}:${hasAuth}:${hasModels}`) naturally handles receiving preliminary status (hasAuth=false) then updated status (hasAuth=true).
+
+## Rationale
+
+- **User experience:** Models dropdown must populate instantly, not after 30+ seconds.
+- **Diagnosability:** Logging reveals when/why auth checks hang (useful for troubleshooting).
+- **Robustness:** Timeout prevents indefinite hangs from network issues or credential provider bugs.
+
+## Alternatives Considered
+
+- **Parallel auth check:** Start auth check in background but don't await it before sending models. Rejected — still need to coordinate two message sends, and error handling becomes complex.
+- **Skip auth check entirely on initial load:** Rejected — we need auth status for the welcome screen.
+
+## Impact
+
+- **Files changed:** `src/extension.ts` (added `withTimeout()` helper, restructured `_sendConfigStatus()`, added outputChannel to constructor)
+- **Breaking changes:** None — webview message API unchanged
+- **Tests:** All 232 tests pass
+
+## Follow-up
+
+- Consider caching credential provider token (with expiry) to avoid repeated `getToken()` calls during polling.
+- Monitor Forge output channel logs for common auth timeout patterns (user feedback requested).
+
+### 2026-03-03: Wrong Copilot Binary Detection
+
+**By:** Childs  
+**Date:** 2026-03-02  
+**Issue:** Windows 11 vsix install bug
+
+## Problem
+
+When the extension is installed via `.vsix` on Windows 11, the `@github/copilot` CLI isn't bundled (due to `.vscodeignore` excluding `node_modules/`). The SDK's `import.meta.resolve("@github/copilot/sdk")` shim fails → `getBundledCliPath()` returns undefined → our code falls back to `where copilot` on PATH.
+
+If the user has a different CLI tool named `copilot` on PATH (not `@github/copilot`), the SDK passes `--headless` to that binary, which doesn't support the flag. Error message: `"CLI server exited with code 1 stderr: error: unknown option '--headless'"`.
+
+The SDK hardcodes `--headless` in spawn args (v0.1.26, line 743 of `dist/client.js`).
+
+## Solution
+
+Enhanced error detection in `getOrCreateClient()` catch block to recognize `--headless` errors as "wrong binary" instead of generic errors.
+
+**Pattern matching:**
+- `message.includes("--headless")`
+- `message.includes("unknown option") && message.includes("exited with code")`
+- `message.includes("error: unknown option")`
+
+When detected, throw `CopilotCliNotFoundError` with actionable message:  
+"The 'copilot' binary found on your PATH does not appear to be the GitHub Copilot CLI (@github/copilot). Install it with: npm install -g @github/copilot — then restart VS Code. Or set forge.copilot.cliPath to the correct binary location."
+
+**File modified:** `src/copilotService.ts` (lines 64-95)
+
+## Design Decisions
+
+1. **Detection before general CLI-not-found check** — wrong binary errors are checked first, then generic "not found" errors, ensuring the most specific error message wins.
+
+2. **Case-sensitive matching for --headless** — the `--headless` flag and "unknown option" strings come from command-line tools and are unlikely to vary in case, so we use `includes()` without `.toLowerCase()` for performance.
+
+3. **Multi-pattern redundancy** — three patterns cover different CLI error message formats (short, long, with exit code) to maximize compatibility across shells and binaries.
+
+4. **No CLI resolution changes** — deliberately did NOT change how the CLI is resolved. The fix is purely error detection and messaging, keeping blast radius minimal.
+
+## Testing
+
+- TypeScript typecheck: ✅ `npx tsc --noEmit` passes
+- Unit tests: ✅ All 232 tests pass (15 files, 3 todo)
+- Build: ⚠️ Pre-existing highlight.js/marked-highlight dependency errors in `media/chat.js` (unrelated to this change)
+
+## Future Work
+
+The build failure suggests missing dependencies in the webview layer — that's Blair's domain (webview owner). This fix is SDK error handling only.
+

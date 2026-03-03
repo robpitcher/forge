@@ -76,3 +76,6 @@
 📌 Medium code review fixes (#112) (2026-03-02): Applied 7 medium findings from code review. M2: clarified bearerToken ~1hr expiry limitation with comment near usage. M4: added console.warn for MCP local server command logging (debugging visibility). M6: removed dead `getSessionCount()`. M7: added JSDoc warning that `removeSession()` does not abort — use `destroySession()` for clean cleanup. M19: added runtime shape assertions (`send`/`on` function checks) after both `as unknown as ICopilotSession` casts in `getOrCreateSession` and `resumeConversation` — exposed a mock array underflow in multi-turn.test.ts (fixed by adding 4th mock session). M21+M25: fixed endpoint examples in test config and package.json description to bare URL without `/openai/v1/` suffix (SDK auto-appends it). M22: typed `buildToolConfig` return as `{ excludedTools?: string[] }` instead of `Record<string, unknown>`. All 14 test files pass (201 tests).
 
 📌 Team update (2026-03-02T22:30:00Z): Welcome Screen State Management Pattern established and design decision for welcome screen style (Option B: replace chat area) merged — affects any future UI changes
+
+📌 Team update (2026-03-03T16:30:00Z): Wrong Copilot Binary Detection decision merged into decisions.md — established pattern for detecting --headless errors and providing actionable guidance for Windows .vsix sideload scenarios.
+

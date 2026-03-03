@@ -207,3 +207,6 @@
 - Pattern-matching error strings for keywords like "no subscription found", "az login", "az account set", "AADSTS" is sufficient for extracting actionable guidance.
 - Error messages must fit in 1-2 lines and always include an action ("run X", "switch to Y").
 - The helper method `_extractEntraIdErrorSummary()` follows the existing pattern of `_rewriteAuthError()` — both are private methods on ChatViewProvider that sanitize raw errors into user-friendly messages.
+
+📌 Team update (2026-03-03T16:30:00Z): Entra ID error message extraction and auth polling optimization merged into decisions.md. Also documented auto-resolution of copilot CLI path and _sendConfigStatus UI-critical data pattern.
+
