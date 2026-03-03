@@ -28,6 +28,14 @@ vi.mock("../auth/authStatusProvider.js", () => ({
   checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
 }));
 
+vi.mock("../copilotService.js", async () => {
+  const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
+  return {
+    ...actual,
+    discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
+  };
+});
+
 describe("WebviewView chat panel", () => {
   let mockSession: ReturnType<typeof createMockSession>;
   let mockClient: MockClient;
@@ -159,7 +167,7 @@ describe("WebviewView chat panel", () => {
       const types = messages
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus";
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus";
         })
         .map((m: unknown) => (m as { type: string }).type);
 

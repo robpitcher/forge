@@ -35,6 +35,14 @@ vi.mock("../auth/authStatusProvider.js", () => ({
   checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
 }));
 
+vi.mock("../copilotService.js", async () => {
+  const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
+  return {
+    ...actual,
+    discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -306,7 +314,7 @@ describe("Context attachment (#26)", () => {
     const types = getPostedMessages(mockView)
       .filter((m: unknown) => {
         const t = (m as { type: string }).type;
-        return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus";
+        return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus";
       })
       .map((m: unknown) => (m as { type: string }).type);
     expect(types[0]).toBe("streamStart");

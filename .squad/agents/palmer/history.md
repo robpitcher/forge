@@ -30,3 +30,15 @@
 - **Branch triggers kept broad:** `pull_request` on `[dev, main]`, `push` on `[dev]`. Do not narrow — this workflow is the primary CI for all PRs.
 
 📌 Team update (2026-03-02T13:36:00Z): Release pipeline fixes completed — annotated tags now used in release.yml, legacy squad-release.yml removed. PR #117 merged to dev. Commit 8d9f8fb verified.
+
+### CLI Binary Bundling — Copilot SDK Runtime Resolution (2026-03-03)
+- **Problem:** `.vscodeignore` excluded `node_modules/**`, causing the SDK's `import.meta.resolve("@github/copilot/sdk")` to fail when installed from .vsix. Users had to run `npm install -g @github/copilot` as a workaround.
+- **Solution:** Negated the `node_modules/**` exclusion for required packages:
+  - `!node_modules/@github/copilot/**` (103MB CLI binary + native modules)
+  - `!node_modules/@github/copilot-sdk/**` (SDK itself — needed for import.meta.resolve)
+  - `!node_modules/vscode-jsonrpc/**` (SDK runtime dep, not bundled by esbuild)
+  - `!node_modules/zod/**` (SDK runtime dep, not bundled by esbuild)
+- **Shim verification:** The esbuild `import.meta.resolve` shim starts at `__dirname` (which is `dist/` in the vsix) and walks UP to find `node_modules/` as a sibling. This structure is preserved in packaged .vsix files, so resolution works correctly.
+- **.vsix impact:** Size increases from ~1.5MB to ~105MB. Acceptable — GitHub Copilot's extension is hundreds of MB, and Rob explicitly prioritized "just works" UX over package size.
+- **Decision doc:** `.squad/decisions/inbox/palmer-cli-bundling.md`
+- **Note:** Build is pre-broken on this branch (highlight.js/marked-highlight resolution errors in media/chat.js) — unrelated to this change.

@@ -200,3 +200,29 @@
 - The esbuild shim's error message is "Cannot resolve module: ..." — added "cannot resolve" to the error detection patterns alongside "not found", "enoent", and "cannot find".
 - `child_process.execSync` is used (not `execFileSync`) because `which`/`where` are shell builtins on some platforms. Wrapped with `{ encoding: 'utf8', timeout: 5000 }` for safety.
 - Air-gap test updated to accept auto-resolved cliPath while still asserting no GitHub credentials leak into the constructor.
+
+📌 Improved Entra ID auth error messages (bug fix) — Users were seeing verbose, confusing error messages when using Entra ID auth (the default). The raw `ChainedTokenCredential` error dumped ALL sub-credential failures (EnvironmentCredential, ManagedIdentityCredential, VS Code auth, Azure CLI, PowerShell) even though most were irrelevant. Example: "CredentialUnavailableError: EnvironmentCredential is unavailable... CredentialUnavailableError: ManagedIdentityCredential: Authentication failed... CredentialUnavailableError: ERROR: No subscription found. Run 'az account set'..." (wall of text). Fixed by adding `_extractEntraIdErrorSummary(rawMessage: string): string` helper method that pattern-matches common Azure CLI issues and returns SHORT, actionable messages: "Azure CLI: No subscription found. Run 'az account set' to select a subscription, then try again." Updated two locations in extension.ts (lines 676-682 in `_handleChatMessage`, lines 990-995 in `resumeConversation` handler) to use this helper instead of appending raw error with `Details: ${message}`. TypeScript and all 232 tests pass.
+- `ChainedTokenCredential` from `@azure/identity` concatenates ALL sub-credential failures into a single error string — most are irrelevant noise for air-gapped users.
+- The most actionable error for Forge users is typically the Azure CLI failure (e.g., "No subscription found", "az login needed").
+- Pattern-matching error strings for keywords like "no subscription found", "az login", "az account set", "AADSTS" is sufficient for extracting actionable guidance.
+- Error messages must fit in 1-2 lines and always include an action ("run X", "switch to Y").
+- The helper method `_extractEntraIdErrorSummary()` follows the existing pattern of `_rewriteAuthError()` — both are private methods on ChatViewProvider that sanitize raw errors into user-friendly messages.
+
+📌 Team update (2026-03-03T16:30:00Z): Entra ID error message extraction and auth polling optimization merged into decisions.md. Also documented auto-resolution of copilot CLI path and _sendConfigStatus UI-critical data pattern.
+
+
+📌 CLI Preflight Validation (2025-03-03T17:15:00Z) — Added preflight validation that checks if the GitHub Copilot CLI is correctly installed during extension activation. Implemented `performCliPreflight()` in extension.ts that calls `discoverAndValidateCli()` from copilotService. Shows VS Code warning notifications with actionable buttons ("Open Settings", "Open Terminal") based on failure reason (not_found, wrong_binary, version_check_failed). Also posts `cliStatus` message to webview to display an in-chat banner using the same pattern as auth banners. Validation runs fire-and-forget during activation and re-runs when `forge.copilot.cliPath` config changes. Added webview handler `updateCliBanner()` that shows ✅ "CLI ready" (auto-dismisses in 2s) or ⚠️ error message with "Fix" button. Updated test files to mock `discoverAndValidateCli()` and filter `cliStatus` messages. All 246 tests pass, typecheck passes. Pre-existing highlight.js bundling issue on branch is unrelated to this work.
+- Preflight validation should NOT block activation — use async fire-and-forget pattern with `.catch()` logging
+- VS Code warning messages + webview banners together provide belt-and-suspenders UX
+- Reuse existing webview patterns (banner ID, CSS classes, button event handling) for consistency
+- Mock new service functions in ALL test files that call activate() to prevent preflight from posting unexpected messages
+- Add new message types to test filter lists alongside existing types (authStatus, modelsUpdated, modelSelected, configStatus)
+- When build errors appear unrelated to your changes, verify with git diff and git log to confirm pre-existing issues
+
+📌 PR Review Fixes — credentialProvider.ts and extension.ts (2025) — Addressed 5 PR review comments:
+1. **Multi-subscription guardrail**: `autoSelectSubscription()` now only auto-selects when exactly ONE enabled subscription exists. Zero or multiple subscriptions return false, and the caller surfaces "Multiple Azure subscriptions found. Run `az account set --subscription <id>` to select one."
+2. **Timeout on az commands**: Both `execFileSync` calls in `autoSelectSubscription()` now have `timeout: 10000` (10s) to prevent blocking the extension host.
+3. **execFileSync for injection safety**: Replaced `execSync` shell-string construction with `execFileSync("az", [...args])` to prevent command injection via subscription IDs. Updated import from `child_process`.
+4. **Double "v" in CLI log**: Removed extra `v` prefix from CLI version log line — `result.version` already includes the full version string.
+5. **CLI status caching**: Added `_lastCliValidation` field to `ChatViewProvider`. `postCliStatus()` caches the result. `webviewReady` handler re-sends cached CLI status alongside config status, preventing dropped `cliStatus` messages when preflight completes before webview is ready.
+- Updated test mocks from `execSync` → `execFileSync` with proper arg-based matching. All 246 tests pass.

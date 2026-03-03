@@ -508,6 +508,10 @@
       case "authStatus":
         updateAuthBanner(message.status, message.hasEndpoint);
         break;
+      
+      case "cliStatus":
+        updateCliBanner(message.result);
+        break;
 
       case "streamStart":
         currentAssistantMessage = null;
@@ -918,6 +922,53 @@
         vscode.postMessage({ command: "openSettings" });
       });
       banner.appendChild(troubleshootBtn);
+    }
+  }
+
+  function updateCliBanner(result) {
+    let banner = document.getElementById("cliBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "cliBanner";
+      banner.className = "auth-banner";
+      chatMessages.insertBefore(banner, chatMessages.firstChild);
+    }
+    
+    // Clear existing content
+    banner.innerHTML = "";
+    
+    if (result.valid) {
+      banner.className = "auth-banner authenticated";
+      banner.textContent = `✅ CLI ready`;
+      
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => {
+        if (banner.parentNode) {
+          banner.remove();
+        }
+      }, 2000);
+    } else {
+      // CLI validation failed
+      banner.className = "auth-banner error";
+      
+      let message = "";
+      if (result.reason === "not_found") {
+        message = "⚠️ Copilot CLI not found. Install with npm or configure path.";
+      } else if (result.reason === "wrong_binary") {
+        message = "⚠️ Wrong 'copilot' binary detected. Please configure the correct path.";
+      } else if (result.reason === "version_check_failed") {
+        const details = result.details ? ` (${result.details})` : "";
+        message = `⚠️ Could not verify Copilot CLI${details}.`;
+      }
+      
+      banner.appendChild(document.createTextNode(message + " "));
+      
+      const fixBtn = document.createElement("button");
+      fixBtn.textContent = "Fix";
+      fixBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "openSettings" });
+      });
+      banner.appendChild(fixBtn);
     }
   }
 

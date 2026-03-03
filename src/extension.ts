@@ -10,6 +10,8 @@ import {
   listConversations,
   resumeConversation,
   deleteConversation,
+  discoverAndValidateCli,
+  type CopilotCliValidationResult,
 } from "./copilotService.js";
 import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
 import { ForgeCodeActionProvider } from "./codeActionProvider.js";
@@ -52,12 +54,22 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel.appendLine(`Initial auth status check failed: ${err}`);
   });
   
+  // Preflight CLI validation
+  performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+    outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+  });
+  
   // Listen for config changes
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("forge.copilot")) {
       updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
         outputChannel.appendLine(`Auth status update on config change failed: ${err}`);
       });
+      if (e.affectsConfiguration("forge.copilot.cliPath")) {
+        performCliPreflight(getConfiguration(), outputChannel, provider).catch((err) => {
+          outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+        });
+      }
     }
   });
   
@@ -274,6 +286,66 @@ async function updateAuthStatus(
 }
 
 /**
+ * Perform CLI preflight check: discover and validate the Copilot CLI.
+ * Shows actionable notifications and webview banner when validation fails.
+ * Never throws — fire-and-forget.
+ */
+async function performCliPreflight(
+  config: ExtensionConfig,
+  outputChannel: vscode.OutputChannel,
+  provider: ChatViewProvider
+): Promise<void> {
+  try {
+    const result = await discoverAndValidateCli(config.cliPath);
+    
+    if (result.valid) {
+      outputChannel.appendLine(`[forge] Copilot CLI validated: ${result.version} at ${result.path}`);
+      provider.postCliStatus(result);
+      return;
+    }
+    
+    // CLI validation failed — show actionable notifications
+    provider.postCliStatus(result);
+    
+    if (result.reason === "not_found") {
+      vscode.window.showWarningMessage(
+        "Forge: Copilot CLI not found. Install it with `npm install -g @github/copilot` or set the path in settings.",
+        "Open Settings",
+        "Open Terminal"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        } else if (choice === "Open Terminal") {
+          const term = vscode.window.createTerminal("Install Copilot CLI");
+          term.sendText("npm install -g @github/copilot");
+          term.show();
+        }
+      });
+    } else if (result.reason === "wrong_binary") {
+      vscode.window.showWarningMessage(
+        "Forge: The 'copilot' binary on your PATH is not the GitHub Copilot CLI. Set the correct path in settings.",
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    } else if (result.reason === "version_check_failed") {
+      vscode.window.showWarningMessage(
+        "Forge: Could not verify the Copilot CLI. It may need to be updated. Details: " + (result.details ?? "Unknown error"),
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    }
+  } catch (err) {
+    outputChannel.appendLine(`CLI preflight check error: ${err}`);
+  }
+}
+
+/**
  * Wraps a promise with a timeout. If the promise doesn't resolve within the
  * specified time, rejects with a timeout error.
  */
@@ -301,6 +373,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _refreshAuthStatus?: () => void;
   private _lastAuthStatus?: string;
   private _selectedModel?: string;
+  private _lastCliValidation?: CopilotCliValidationResult;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -349,6 +422,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     this._lastAuthStatus = statusKey;
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
+  }
+
+  public postCliStatus(result: CopilotCliValidationResult): void {
+    this._lastCliValidation = result;
+    this._view?.webview.postMessage({ type: "cliStatus", result });
   }
 
   /** Re-sends all webview state (auth, models, config status). Accepts pre-fetched data to avoid redundant calls. */
@@ -441,6 +519,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachFile");
     } else if (message.command === "webviewReady") {
       this._sendConfigStatus();
+      if (this._lastCliValidation) {
+        this._view?.webview.postMessage({ type: "cliStatus", result: this._lastCliValidation });
+      }
     } else if (message.command === "openSettings") {
       await this.openSettings();
     } else if (message.command === "openEndpointSettings") {
@@ -674,11 +755,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (config.authMethod === "entraId") {
+        const summary = this._extractEntraIdErrorSummary(message);
         this._postError(
-          "Entra ID authentication failed. Ensure you're signed in via Azure CLI, " +
-          "VS Code Azure Account extension, or running on a VM with Managed Identity. " +
-          "Alternatively, switch to API key auth in Settings (forge.copilot.authMethod). " +
-          `Details: ${message}`
+          `Entra ID authentication failed. ${summary} ` +
+          "Or switch to API key auth in Settings (forge.copilot.authMethod)."
         );
       } else {
         this._postError(`Authentication failed: ${message}`);
@@ -793,6 +873,33 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
     }
     return message;
+  }
+
+  private _extractEntraIdErrorSummary(rawMessage: string): string {
+    const lower = rawMessage.toLowerCase();
+
+    // Azure CLI: No subscription found
+    if (lower.includes("no subscription found") || lower.includes("az account set")) {
+      return "Azure CLI: No subscription found. Run 'az account set' to select a subscription, then try again.";
+    }
+
+    // Azure CLI: Not logged in
+    if (lower.includes("az login") || lower.includes("please run 'az login'")) {
+      return "Azure CLI: Not logged in. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Azure AD errors (AADSTS codes)
+    if (lower.includes("aadsts")) {
+      return "Azure CLI: Authentication issue. Run 'az login' and 'az account set', then try again.";
+    }
+
+    // MFA or interactive login required
+    if (lower.includes("multi-factor") || lower.includes("mfa") || lower.includes("interactive")) {
+      return "Azure CLI: Interactive login required. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Generic fallback
+    return "Check your Azure CLI setup. Run 'az login' and 'az account set', then try again.";
   }
 
   private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
@@ -989,9 +1096,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         if (config.authMethod === "entraId") {
+          const summary = this._extractEntraIdErrorSummary(message);
           this._postError(
-            "Entra ID authentication failed. Ensure you're signed in via Azure CLI. " +
-            `Details: ${message}`
+            `Entra ID authentication failed. ${summary} ` +
+            "Or switch to API key auth in Settings (forge.copilot.authMethod)."
           );
         } else {
           this._postError(`Authentication failed: ${message}`);
