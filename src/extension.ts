@@ -30,6 +30,9 @@ const AUTH_POLL_INTERVAL_MS = 30_000;
 const SIGN_IN_RECHECK_MS = 5000;
 const TOOL_PERMISSION_TIMEOUT_MS = 120_000;
 
+/** Pre-fetched extension state to avoid redundant async calls. */
+type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync>>; authStatus: AuthStatus };
+
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Forge");
   const provider = new ChatViewProvider(context.extensionUri, context.secrets, context.workspaceState);
@@ -114,10 +117,7 @@ export function activate(context: vscode.ExtensionContext): void {
           signInChecksRemaining--;
           signInTimeoutHandle = setTimeout(async () => {
             try {
-              await updateAuthStatus(statusBarItem, provider, context.secrets);
-              // Stop polling once auth succeeds
-              const cfg = await getConfigurationAsync(context.secrets);
-              const status = await checkAuthStatus(cfg, context.secrets);
+              const status = await updateAuthStatus(statusBarItem, provider, context.secrets);
               if (status.state === "authenticated") {
                 signInTimeoutHandle = undefined;
                 return;
@@ -235,7 +235,7 @@ async function updateAuthStatus(
   statusBarItem: vscode.StatusBarItem,
   provider: ChatViewProvider,
   secrets: vscode.SecretStorage
-): Promise<void> {
+): Promise<AuthStatus> {
   const config = await getConfigurationAsync(secrets);
   const status = await checkAuthStatus(config, secrets);
   
@@ -269,7 +269,8 @@ async function updateAuthStatus(
   }
   
   provider.postAuthStatus(status, !!config.endpoint);
-  provider.refreshWebviewState();
+  provider.refreshWebviewState({ config, authStatus: status });
+  return status;
 }
 
 export async function deactivate(): Promise<void> {
@@ -336,18 +337,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
   }
 
-  public postConfigStatus(hasEndpoint: boolean, hasAuth: boolean, hasModels: boolean): void {
-    this._view?.webview.postMessage({
-      type: "configStatus",
-      hasEndpoint,
-      hasAuth,
-      hasModels,
-    });
-  }
-
-  /** Re-sends all webview state (auth, models, config status) from fresh config. */
-  public refreshWebviewState(): void {
-    this._sendConfigStatus();
+  /** Re-sends all webview state (auth, models, config status). Accepts pre-fetched data to avoid redundant calls. */
+  public refreshWebviewState(prefetched?: PrefetchedState): void {
+    this._sendConfigStatus(prefetched);
   }
 
   public resolveWebviewView(
@@ -526,28 +518,30 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._handleResumeConversation(message.sessionId as string);
     } else if (message.command === "deleteConversation") {
       await this._handleDeleteConversation(message.sessionId as string);
+    } else if (message.command === "checkConfig") {
+      this._sendConfigStatus();
     } else if (message.command === "openDocs") {
       await vscode.env.openExternal(vscode.Uri.parse("https://github.com/robpitcher/forge?tab=readme-ov-file#forge"));
     }
   }
 
-  private _sendConfigStatus(): void {
-    getConfigurationAsync(this._secrets)
-      .then(async (config) => {
-        const status = await checkAuthStatus(config, this._secrets);
-        this.postAuthStatus(status, !!config.endpoint);
-        this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
-        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
-        this._view?.webview.postMessage({
-          type: "configStatus",
-          hasEndpoint: !!config.endpoint,
-          hasAuth: status.state === "authenticated",
-          hasModels: config.models.length > 0,
-        });
-      })
-      .catch(() => {
-        // Silent failure — status bar will show the error
+  private _sendConfigStatus(prefetched?: PrefetchedState): void {
+    const doWork = async () => {
+      const config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
+      const status = prefetched?.authStatus ?? await checkAuthStatus(config, this._secrets);
+      this.postAuthStatus(status, !!config.endpoint);
+      this._view?.webview.postMessage({ type: "modelsUpdated", models: config.models });
+      this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(config.models) });
+      this._view?.webview.postMessage({
+        type: "configStatus",
+        hasEndpoint: !!config.endpoint,
+        hasAuth: status.state === "authenticated",
+        hasModels: config.models.length > 0,
       });
+    };
+    doWork().catch(() => {
+      // Silent failure — status bar will show the error
+    });
   }
 
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {
@@ -568,6 +562,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       for (const error of validationErrors) {
         this._postError(error.message);
       }
+      this._isProcessing = false;
+      return;
+    }
+
+    const activeModel = this._getActiveModel(config.models);
+    if (!activeModel) {
+      this._postError("No model deployment configured. Click ⚙️ → Open Model Settings to add at least one model.");
       this._isProcessing = false;
       return;
     }
@@ -606,7 +607,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         this._conversationId,
         config,
         authToken,
-        this._getActiveModel(config.models),
+        activeModel,
         this._createPermissionHandler(),
       );
     } catch (err: unknown) {

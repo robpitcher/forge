@@ -1,7 +1,26 @@
 (function () {
   const { marked } = require("marked");
   const DOMPurify = require("dompurify");
-  const hljs = require("highlight.js");
+  const hljs = require("highlight.js/lib/core");
+
+  // Register only languages commonly used in developer chat
+  hljs.registerLanguage("javascript", require("highlight.js/lib/languages/javascript"));
+  hljs.registerLanguage("typescript", require("highlight.js/lib/languages/typescript"));
+  hljs.registerLanguage("python", require("highlight.js/lib/languages/python"));
+  hljs.registerLanguage("java", require("highlight.js/lib/languages/java"));
+  hljs.registerLanguage("csharp", require("highlight.js/lib/languages/csharp"));
+  hljs.registerLanguage("go", require("highlight.js/lib/languages/go"));
+  hljs.registerLanguage("rust", require("highlight.js/lib/languages/rust"));
+  hljs.registerLanguage("ruby", require("highlight.js/lib/languages/ruby"));
+  hljs.registerLanguage("php", require("highlight.js/lib/languages/php"));
+  hljs.registerLanguage("sql", require("highlight.js/lib/languages/sql"));
+  hljs.registerLanguage("bash", require("highlight.js/lib/languages/bash"));
+  hljs.registerLanguage("json", require("highlight.js/lib/languages/json"));
+  hljs.registerLanguage("yaml", require("highlight.js/lib/languages/yaml"));
+  hljs.registerLanguage("xml", require("highlight.js/lib/languages/xml"));
+  hljs.registerLanguage("css", require("highlight.js/lib/languages/css"));
+  hljs.registerLanguage("markdown", require("highlight.js/lib/languages/markdown"));
+  hljs.registerLanguage("diff", require("highlight.js/lib/languages/diff"));
   const { markedHighlight } = require("marked-highlight");
 
   const COPY_FEEDBACK_MS = 2000;
@@ -44,6 +63,7 @@
   let messages = [];
   let renderTimeout = null;
   let configIsComplete = false;
+  let _lastWelcomeFlags = null;
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
@@ -125,11 +145,16 @@
     configIsComplete = hasEndpoint && hasAuth && hasModels;
 
     if (!configIsComplete) {
+      const flagsKey = `${hasEndpoint}:${hasAuth}:${hasModels}`;
+      if (_lastWelcomeFlags === flagsKey) { return; }
+      _lastWelcomeFlags = flagsKey;
+
       welcomeScreen.classList.remove("hidden");
       chatMessages.classList.add("hidden");
       inputArea.classList.add("hidden");
       renderWelcomeScreen(welcomeScreen, hasEndpoint, hasAuth, hasModels);
     } else {
+      _lastWelcomeFlags = null;
       welcomeScreen.classList.add("hidden");
       chatMessages.classList.remove("hidden");
       inputArea.classList.remove("hidden");
@@ -188,6 +213,18 @@
     steps.appendChild(step3);
 
     container.appendChild(steps);
+
+    // "Check Configuration" button
+    const checkDiv = document.createElement("div");
+    checkDiv.className = "check-config";
+    const checkBtn = document.createElement("button");
+    checkBtn.className = "check-config-btn";
+    checkBtn.textContent = "🔄 Check Configuration";
+    checkBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "checkConfig" });
+    });
+    checkDiv.appendChild(checkBtn);
+    container.appendChild(checkDiv);
 
     const helpDiv = document.createElement("div");
     helpDiv.className = "help-link";
