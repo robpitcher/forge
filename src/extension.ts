@@ -968,6 +968,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, "dist", "chat.js")
     );
+    const iconUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "resources", "icon.png")
+    );
 
     const nonce = crypto.randomUUID();
 
@@ -976,14 +979,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
     <link href="${styleUri}" rel="stylesheet">
     <title>Forge Chat</title>
 </head>
 <body>
     <div class="container">
         <div id="conversationList" class="conversation-list hidden"></div>
-        <div id="welcomeScreen" class="welcome-screen hidden">
+        <div id="welcomeScreen" class="welcome-screen hidden" data-icon-uri="${iconUri}">
           <!-- Populated by JS when configuration is incomplete -->
         </div>
         <div id="chatMessages"></div>

@@ -126,9 +126,10 @@
   function renderWelcomeScreen(container, hasEndpoint, hasAuth, hasModels) {
     container.innerHTML = "";
 
-    const icon = document.createElement("div");
+    const icon = document.createElement("img");
     icon.className = "welcome-icon";
-    icon.textContent = "🔨";
+    icon.src = container.dataset.iconUri;
+    icon.alt = "Forge";
     container.appendChild(icon);
 
     const title = document.createElement("h1");
