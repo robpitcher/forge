@@ -1,4 +1,4 @@
-name: Squad Insider Release
+name: Insider Release
 
 on:
   push:
@@ -18,9 +18,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Run tests
-        run: node --test test/*.test.js
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Read version from package.json
         id: version

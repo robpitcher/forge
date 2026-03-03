@@ -1,4 +1,4 @@
-name: Squad Preview Validation
+name: Preview Release Validation
 
 on:
   push:
@@ -16,6 +16,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Validate version consistency
         run: |
@@ -25,9 +41,6 @@ jobs:
             exit 1
           fi
           echo "✅ Version $VERSION validated in CHANGELOG.md"
-
-      - name: Run tests
-        run: node --test test/*.test.js
 
       - name: Check no .ai-team/ or .squad/ files are tracked
         run: |
