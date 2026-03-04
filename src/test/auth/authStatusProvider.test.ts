@@ -164,7 +164,7 @@ describe("checkAuthStatus", () => {
       expect(status).toEqual({
         state: "notAuthenticated",
         reason: "Azure CLI is required for Entra ID authentication",
-        installUrl: "https://aka.ms/installazurecli",
+        installUrl: "https://aka.ms/azure-cli",
       });
     });
 

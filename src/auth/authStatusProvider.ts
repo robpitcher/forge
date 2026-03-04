@@ -54,7 +54,7 @@ export async function checkAuthStatus(
           reason: cliMissing
             ? "Azure CLI is required for Entra ID authentication"
             : "Sign in with Azure CLI to use Entra ID authentication",
-          ...(cliMissing && { installUrl: "https://aka.ms/installazurecli" }),
+          ...(cliMissing && { installUrl: "https://aka.ms/azure-cli" }),
         };
       }
 

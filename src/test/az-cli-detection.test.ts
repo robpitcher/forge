@@ -231,7 +231,7 @@ describe("az CLI detection (forge.signIn)", () => {
       await handler!();
 
       const msg = vi.mocked(vscode.window.showErrorMessage).mock.calls[0]?.[0];
-      expect(msg).toContain("https://aka.ms/installazurecli");
+      expect(msg).toContain("https://aka.ms/azure-cli");
     });
 
     it("does NOT create a terminal when az is missing", async () => {
@@ -254,7 +254,7 @@ describe("az CLI detection (forge.signIn)", () => {
 
       expect(vscode.env.openExternal).toHaveBeenCalledTimes(1);
       const uri = vi.mocked(vscode.env.openExternal).mock.calls[0]?.[0];
-      expect(uri.toString()).toBe("https://aka.ms/installazurecli");
+      expect(uri.toString()).toBe("https://aka.ms/azure-cli");
     });
 
     it("does NOT open URL when user dismisses the error", async () => {

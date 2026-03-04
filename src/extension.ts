@@ -39,7 +39,7 @@ const TOOL_PERMISSION_TIMEOUT_MS = 120_000;
 /** Pre-fetched extension state to avoid redundant async calls. */
 type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync>>; authStatus: AuthStatus };
 
-const AZ_INSTALL_URL = "https://aka.ms/installazurecli";
+const AZ_INSTALL_URL = "https://aka.ms/azure-cli";
 
 /** Check whether the `az` CLI is available on the system PATH. */
 function isAzCliAvailable(): boolean {
@@ -138,7 +138,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (config.authMethod === "entraId") {
         if (!isAzCliAvailable()) {
           const action = await vscode.window.showErrorMessage(
-            "Azure CLI is required for Entra ID sign-in. Install it from https://aka.ms/installazurecli",
+            "Azure CLI is required for Entra ID sign-in. Install it from https://aka.ms/azure-cli",
             "Install Azure CLI"
           );
           if (action === "Install Azure CLI") {
