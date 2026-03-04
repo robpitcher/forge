@@ -11,6 +11,8 @@ specs/**
 !*.d.ts
 tsconfig.json
 esbuild.config.mjs
+eslint.config.mjs
+vitest.config.mts
 .gitignore
 .gitattributes
 package-lock.json

@@ -253,7 +253,7 @@
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "vscode:prepublish": "npm run build -- --production",
-    "package": "vsce package",
+    "package": "rm -rf dist/*.map && vsce package",
     "lint": "eslint src/",
     "lint:types": "tsc --noEmit",
     "test": "vitest run"
