@@ -165,11 +165,21 @@
     const feedbackEl = document.getElementById("configCheckFeedback");
     if (!feedbackEl) { return; }
 
+    // Clear any previous content
+    feedbackEl.innerHTML = "";
+
     if (allGood) {
-      feedbackEl.innerHTML = '<span class="config-feedback-ok">✅ All set!</span>';
+      const okSpan = document.createElement("span");
+      okSpan.className = "config-feedback-ok";
+      okSpan.textContent = "✅ All set!";
+      feedbackEl.appendChild(okSpan);
     } else {
-      const items = missing.map((m) => `<div class="config-feedback-item">❌ Missing: ${m}</div>`).join("");
-      feedbackEl.innerHTML = items;
+      missing.forEach((m) => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "config-feedback-item";
+        itemDiv.textContent = `❌ Missing: ${m}`;
+        feedbackEl.appendChild(itemDiv);
+      });
     }
 
     feedbackEl.classList.remove("hidden");
