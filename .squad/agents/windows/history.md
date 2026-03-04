@@ -86,3 +86,19 @@
 Wrote `cliInstaller.test.ts` with 18 unit tests covering npm success, HTTP tarball fallback, error cases, CLI compatibility probing, and platform-specific binaries. Initial tests required rework by coordinator to match actual spawn() behavior. Final: 18 tests passing, 269 total suite passing.
 
 **Outcome:** ✅ SUCCESS (with coordinator rework) — Full coverage of install paths.
+
+## 2026-03-04: Az CLI Detection Tests (forge.signIn)
+
+Wrote `src/test/az-cli-detection.test.ts` with 12 tests covering Blair's `isAzCliAvailable()` function and its integration in the `forge.signIn` command handler. Tests exercise the function indirectly through the registered command since it's module-private.
+
+**Coverage:**
+- **az found (entraId):** terminal created with `az login`, no error shown (2 tests)
+- **az NOT found (entraId):** error message with "Azure CLI is required" + install URL, no terminal created, openExternal on button click, no-op on dismiss (5 tests)
+- **Cross-platform:** `which` on Linux/macOS, `where.exe` on Windows (3 tests)
+- **apiKey regression:** no az detection, no terminal (2 tests)
+
+**Mock additions:** Added `showErrorMessage`, `showWarningMessage`, `env.openExternal`, and `Uri.parse` to `src/test/__mocks__/vscode.ts` — needed for these and future tests.
+
+**Key pattern:** `isAzCliAvailable()` is tested indirectly by extracting the `forge.signIn` handler from `registerCommand` mock calls. The `makeAzNotFound()` helper selectively throws on `which`/`where.exe` + `az` args while passing through other `execFileSync` calls.
+
+**Outcome:** ✅ SUCCESS — 12 new tests, 291 total passing (17 files), no regressions.

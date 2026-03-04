@@ -163,7 +163,8 @@ describe("checkAuthStatus", () => {
 
       expect(status).toEqual({
         state: "notAuthenticated",
-        reason: "Sign in with Azure CLI to use Entra ID authentication",
+        reason: "Azure CLI is required for Entra ID authentication",
+        installUrl: "https://aka.ms/azure-cli",
       });
     });
 
@@ -242,7 +243,7 @@ describe("checkAuthStatus", () => {
 
       expect(status).toEqual({
         state: "error",
-        message: "Entra ID configuration error — check Azure CLI setup",
+        message: "Entra ID authentication error: something went wrong",
       });
     });
   });
@@ -414,7 +415,7 @@ describe("checkAuthStatus", () => {
       const status = await statusPromise;
       expect(status.state).toBe("error");
       if (status.state === "error") {
-        expect(status.message).toBe("Entra ID configuration error — check Azure CLI setup");
+        expect(status.message).toBe("Entra ID authentication error: Network timeout");
       }
     });
   });

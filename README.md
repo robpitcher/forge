@@ -1,5 +1,5 @@
 # Forge
-<p align="center"><img src="resources/repoheader.png" alt="Forge" width="500"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/robpitcher/forge/dev/resources/repoheader.png" alt="Forge" width="500"></p>
 
 
 A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. All inference stays within your Azure tenant. No GitHub authentication required. Works in air-gapped and compliance-driven environments.
@@ -100,7 +100,7 @@ graph TD
 
 ### From VS Code Marketplace
 
-> *VS Code Marketplace availability is planned for a future release. For now, install via GitHub Releases above.*
+Forge publishes **pre-release** builds to the VS Code Marketplace. Insider/development versions appear under **Pre-Release** in the extension details. For stable installations in restricted or air-gapped environments, use GitHub Releases above.
 
 ## Configuration
 
@@ -174,6 +174,12 @@ Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 **Recommended environment:** The included `.devcontainer/devcontainer.json` provides a pre-configured development setup with Node.js, Git, GitHub CLI, and Azure CLI. Open in [GitHub Codespaces](https://github.com/codespaces/new?repo=robpitcher/forge) or [VS Code Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for a seamless setup.
 
+### Install dependencies
+
+```bash
+npm ci
+```
+
 ### Build
 
 ```bash
@@ -213,7 +219,7 @@ Runs automated tests with Vitest.
 npm run package
 ```
 
-Creates `forge-0.1.0.vsix` for sideloading or distribution.
+Creates a `.vsix` package (named `forge-<version>.vsix`) for sideloading or distribution.
 
 ---
 

@@ -564,6 +564,11 @@ button:active {
   color: var(--vscode-errorForeground);
 }
 
+.auth-banner.warning {
+  border-left-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+  background-color: var(--vscode-inputValidation-warningBackground);
+}
+
 .auth-banner button {
   background: none;
   border: none;
@@ -819,6 +824,14 @@ button:active {
   margin-top: 24px;
   font-size: 12px;
   opacity: 0.7;
+}
+
+.welcome-screen .setup-tip {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.55;
+  margin: 16px 0 0 0;
+  max-width: 320px;
 }
 
 .welcome-screen .check-config {

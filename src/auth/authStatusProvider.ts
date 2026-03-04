@@ -12,8 +12,8 @@ export type AuthState = "authenticated" | "notAuthenticated" | "error";
  */
 export type AuthStatus =
   | { state: "authenticated"; method: "entraId" | "apiKey"; account?: string }
-  | { state: "notAuthenticated"; reason?: string }
-  | { state: "error"; message: string };
+  | { state: "notAuthenticated"; reason?: string; installUrl?: string }
+  | { state: "error"; message: string; installUrl?: string };
 
 /**
  * Probes the current authentication status by attempting to validate credentials.
@@ -48,15 +48,19 @@ export async function checkAuthStatus(
         error instanceof Error ? error.message : String(error);
 
       if (isNotLoggedInError(msg)) {
+        const cliMissing = isCliNotFoundError(msg);
         return {
           state: "notAuthenticated",
-          reason: "Sign in with Azure CLI to use Entra ID authentication",
+          reason: cliMissing
+            ? "Azure CLI is required for Entra ID authentication"
+            : "Sign in with Azure CLI to use Entra ID authentication",
+          ...(cliMissing && { installUrl: "https://aka.ms/azure-cli" }),
         };
       }
 
       return {
         state: "error",
-        message: "Entra ID configuration error — check Azure CLI setup",
+        message: `Entra ID authentication error: ${msg}`,
       };
     }
   }
@@ -94,6 +98,16 @@ const NOT_LOGGED_IN_PATTERNS: RegExp[] = [
 /** Distinguishes "not logged in" from genuine config/network errors. */
 function isNotLoggedInError(message: string): boolean {
   return NOT_LOGGED_IN_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+const CLI_NOT_FOUND_PATTERNS: RegExp[] = [
+  /azure cli.*(not found|could not be found|not installed|cannot be found)/i,
+  /az(.exe)?\s.*(not found|not recognized|no such file)/i,
+];
+
+/** Distinguishes "Azure CLI not installed" from "not logged in". */
+function isCliNotFoundError(message: string): boolean {
+  return CLI_NOT_FOUND_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 /**

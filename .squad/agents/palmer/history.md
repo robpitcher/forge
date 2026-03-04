@@ -53,3 +53,34 @@
 - **Verification:** `git ls-files | grep ":"` returns zero — all tracked files are now Windows-safe.
 - **Commit:** `9e12441` — 53 files changed (51 renames + 3 template updates).
 - **Impact:** Windows developers can now clone and work on the repository without path errors.
+
+### Marketplace Pre-Release Publishing (2026-03-03)
+- **Goal:** Extend insider-release.yml to publish pre-release builds to VS Code Marketplace using Rob's PAT (`ADO_MARKETPLACE_PAT`).
+- **package.json changes:**
+  - Added `"vscode:prepublish": "npm run build -- --production"` — convention for VS Code extensions; runs automatically before `vsce package/publish`.
+  - Updated `package` script to just `"vsce package"` — build now delegated to `vscode:prepublish` lifecycle hook.
+- **insider-release.yml changes:**
+  - New marketplace publish step runs AFTER GitHub Release verification (GitHub Release is primary artifact).
+  - **Version strategy:** Compute `{major}.{minor}.{github.run_number}` (e.g., `0.2.15`) to ensure each insider build has a unique marketplace version.
+  - Use `npm version --no-git-tag-version` to update package.json in CI without committing.
+  - Package and publish with `--pre-release` flag to show "Pre-Release" badge on marketplace.
+  - **Error handling:** `continue-on-error: true` on marketplace publish — if marketplace fails, GitHub Release still succeeds.
+- **Key files:** `package.json` (scripts), `.github/workflows/insider-release.yml` (marketplace publish steps).
+- **Decision doc:** `.squad/decisions/inbox/palmer-marketplace-prerelease.md` — documents the dual-version strategy (insider tags vs marketplace versions).
+
+### Dead Code & VSIX Cleanup — Code Review Pass (2026-03-04)
+- **Problem:** Stale workflow references, unnecessary config files in extension package, and non-deterministic sourcemap handling.
+- **Findings:**
+  - squad-promote.yml line 117 mentioned non-existent "squad-release.yml" — CI/CD team would follow broken messaging on release flow
+  - .vscodeignore was correctly excluding dist/*.map but eslint.config.mjs and vitest.config.mts were shipping in .vsix (dev-only tools bloating package)
+  - package.json npm script had no cleanup for stale sourcemaps; if dev built, then npm run vscode:prepublish ran, old .map files persisted in dist/ and could cause confusion
+- **Changes Made:**
+  - **squad-promote.yml:** Updated echo message to reference correct workflow (release.yml, not squad-release.yml)
+  - **.vscodeignore:** Added eslint.config.mjs and vitest.config.mts to exclusion list — these config files are dev-only, never needed in extension package
+  - **package.json:** Updated "package" script from `vsce package` to `rm -rf dist/*.map && vsce package` — now cleans stale sourcemaps before every packaging run for deterministic builds
+- **Risk Mitigation:** All changes are safe:
+  - Workflow messaging fix has zero functional impact, just clarity
+  - Config file exclusion matches existing pattern and vsce [respects .vscodeignore](https://github.com/microsoft/vscode-vsce/blob/master/README.md#publish)
+  - Sourcemap cleanup runs AFTER production build (which doesn't create .map files), so it's a no-op for clean builds but catches dev artifacts
+- **Validation:** npm run build && npm run lint && tsc --noEmit && npm test — all 291 tests passing, no regressions
+- **Commit:** 0bb3593 on feat/notif-cleanup-and-review
