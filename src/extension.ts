@@ -1078,7 +1078,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "error", message });
   }
 
-  private async _handleCliAutoInstall(_errorMessage: string): Promise<void> {
+  private async _handleCliAutoInstall(errorMessage: string): Promise<void> {
+    this._outputChannel.appendLine(`[forge] Copilot CLI auto-install prompt reason: ${errorMessage}`);
     // Show ask-first dialog
     const choice = await vscode.window.showInformationMessage(
       "Forge needs the GitHub Copilot CLI to work. Install it now?",

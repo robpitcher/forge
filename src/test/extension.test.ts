@@ -6,7 +6,6 @@ import {
   setMockClient,
   type MockClient,
 } from "./__mocks__/copilot-sdk.js";
-import { stopClient } from "../copilotService.js";
 import * as copilotService from "../copilotService.js";
 import { activate } from "../extension.js";
 import {
@@ -111,7 +110,7 @@ describe("WebviewView chat panel", () => {
   });
 
   afterEach(async () => {
-    await stopClient();
+    await copilotService.stopClient();
     vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
   });
 
@@ -241,28 +240,12 @@ describe("WebviewView chat panel", () => {
         details: "No managed Copilot CLI found in extension storage and no cliPath configured",
       });
       vi.mocked(vscode.window.showInformationMessage).mockClear();
-
-      const stateStore = new Map<string, unknown>();
-      const mockExtContext = {
-        subscriptions: [] as { dispose: () => void }[],
-        extensionUri: { toString: () => "mock-ext-uri" },
-        globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
-        secrets: {
-          get: vi.fn().mockImplementation((key: string) =>
-            key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
-          ),
-          store: vi.fn().mockResolvedValue(undefined),
-          delete: vi.fn().mockResolvedValue(undefined),
-          onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-        },
-        workspaceState: {
-          get: vi.fn((key: string, defaultValue?: unknown) => stateStore.get(key) ?? defaultValue),
-          update: vi.fn((key: string, value: unknown) => { stateStore.set(key, value); return Promise.resolve(); }),
-          keys: vi.fn(() => [...stateStore.keys()]),
-        },
-      };
-
-      activate(mockExtContext as unknown as import("vscode").ExtensionContext);
+      const configChangeHandler = vi.mocked(vscode.workspace.onDidChangeConfiguration).mock.calls.at(-1)?.[0];
+      expect(configChangeHandler).toBeTypeOf("function");
+      await configChangeHandler!({
+        affectsConfiguration: (key: string) =>
+          key === "forge.copilot" || key === "forge.copilot.cliPath",
+      } as unknown as vscode.ConfigurationChangeEvent);
 
       await vi.waitFor(() => {
         expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
