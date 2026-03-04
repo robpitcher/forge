@@ -232,6 +232,12 @@
 
     container.appendChild(steps);
 
+    // Sidebar tip
+    const tip = document.createElement("p");
+    tip.className = "setup-tip";
+    tip.textContent = "💡 Tip: You can drag Forge to the right sidebar to group it alongside the integrated chat.";
+    container.appendChild(tip);
+
     // "Check Configuration" button
     const checkDiv = document.createElement("div");
     checkDiv.className = "check-config";
@@ -890,17 +896,29 @@
         banner.appendChild(document.createTextNode("🔐 "));
       }
 
-      // Auth options
-      banner.appendChild(document.createTextNode("Sign in with "));
+      // If Azure CLI is not installed, show install link
+      if (status.installUrl) {
+        banner.appendChild(document.createTextNode("Azure CLI is required. "));
+        const installLink = document.createElement("button");
+        installLink.textContent = "Install Azure CLI";
+        installLink.addEventListener("click", () => {
+          vscode.postMessage({ command: "openUrl", url: status.installUrl });
+        });
+        banner.appendChild(installLink);
+        banner.appendChild(document.createTextNode(" or "));
+      } else {
+        // Auth options
+        banner.appendChild(document.createTextNode("Sign in with "));
 
-      const entraLink = document.createElement("button");
-      entraLink.textContent = "Entra ID";
-      entraLink.addEventListener("click", () => {
-        vscode.postMessage({ command: "signIn" });
-      });
-      banner.appendChild(entraLink);
+        const entraLink = document.createElement("button");
+        entraLink.textContent = "Entra ID";
+        entraLink.addEventListener("click", () => {
+          vscode.postMessage({ command: "signIn" });
+        });
+        banner.appendChild(entraLink);
 
-      banner.appendChild(document.createTextNode(" or "));
+        banner.appendChild(document.createTextNode(" or "));
+      }
 
       const apiKeyLink = document.createElement("button");
       apiKeyLink.textContent = "configure an API key";
@@ -916,6 +934,16 @@
       const shortMsg = rawMsg.length > 80 ? rawMsg.slice(0, 80) + "…" : rawMsg;
       banner.textContent = `⚠️ Authentication issue — ${shortMsg} `;
       
+      if (status.installUrl) {
+        const installLink = document.createElement("button");
+        installLink.textContent = "Install Azure CLI";
+        installLink.addEventListener("click", () => {
+          vscode.postMessage({ command: "openUrl", url: status.installUrl });
+        });
+        banner.appendChild(installLink);
+        banner.appendChild(document.createTextNode(" "));
+      }
+
       const troubleshootBtn = document.createElement("button");
       troubleshootBtn.textContent = "Troubleshoot";
       troubleshootBtn.addEventListener("click", () => {
@@ -949,20 +977,41 @@
       }, 2000);
     } else {
       // CLI validation failed
-      banner.className = "auth-banner error";
       
-      let message = "";
       if (result.reason === "not_found") {
         const details = (result.details || "").toLowerCase();
         if (details.includes("no clipath configured")) {
-          // Startup preflight already prompts auto-install in this case; avoid redundant red error banner.
+          // Startup preflight already prompts auto-install in this case; avoid redundant banner.
           if (banner.parentNode) {
             banner.remove();
           }
           return;
         }
-        message = "⚠️ Copilot CLI not found. Install GitHub Copilot CLI or configure path.";
-      } else if (result.reason === "wrong_binary") {
+
+        // Show persistent warning banner only when config is complete
+        if (!configIsComplete) {
+          if (banner.parentNode) {
+            banner.remove();
+          }
+          return;
+        }
+
+        banner.className = "auth-banner warning";
+        banner.appendChild(document.createTextNode("⚠️ Copilot CLI is required to chat. "));
+
+        const installBtn = document.createElement("button");
+        installBtn.textContent = "Install";
+        installBtn.addEventListener("click", () => {
+          vscode.postMessage({ command: "installCli" });
+        });
+        banner.appendChild(installBtn);
+        return;
+      }
+
+      banner.className = "auth-banner error";
+      
+      let message = "";
+      if (result.reason === "wrong_binary") {
         message = "⚠️ Wrong 'copilot' binary detected. Please configure the correct path.";
       } else if (result.reason === "version_check_failed") {
         const details = result.details ? ` (${result.details})` : "";

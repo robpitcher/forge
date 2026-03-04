@@ -136,7 +136,7 @@ describe("cliInstaller", () => {
       expect(result).not.toContain("npm-loader.js");
     });
 
-    it("falls back to npm-loader.js when platform binary not found", async () => {
+    it("returns undefined when platform binary not found (no npm-loader.js fallback)", async () => {
       mockExistsSync.mockImplementation((p: string) => {
         // Platform dir does not exist
         if (p.includes(`copilot-${process.platform}-${process.arch}`)) {
@@ -147,8 +147,7 @@ describe("cliInstaller", () => {
       mockStatSync.mockReturnValue({ isFile: () => true });
 
       const result = await getManagedCliPath("/test/storage");
-      expect(result).toBeDefined();
-      expect(result).toContain("npm-loader.js");
+      expect(result).toBeUndefined();
     });
 
     it("returns undefined when not installed", async () => {

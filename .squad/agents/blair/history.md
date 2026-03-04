@@ -241,3 +241,31 @@
 Wired CLI auto-install into extension.ts with ask-first dialog, progress notification, and globalStoragePath threading. Show "Forge needs the GitHub Copilot CLI to work. Install it now?" dialog on `CopilotCliNeedsInstallError`. Success shows confirmation, errors point to Settings. Respects user consent (no surprise installs).
 
 **Outcome:** ✅ SUCCESS — Extension ready for CLI auto-install UX.
+
+## Learnings
+
+📌 CLI UX Improvements — Azure CLI Install Link & Persistent CLI Banner (2025-07-24)
+
+### Item 1: Azure CLI Install Link in Auth Errors
+- **AuthStatus type** (`src/auth/authStatusProvider.ts`): Added optional `installUrl?: string` to both `notAuthenticated` and `error` variants of the `AuthStatus` union type.
+- **CLI-not-found detection**: Added `isCliNotFoundError()` helper with regex patterns for "Azure CLI not found/could not be found/not installed". This distinguishes "CLI missing" from "not logged in" within the broader `isNotLoggedInError` path.
+- **Auth banner** (`media/chat.js` `updateAuthBanner()`): When `status.installUrl` is present on `notAuthenticated`, renders "Install Azure CLI" button instead of "Sign in with Entra ID". On `error` state, adds "Install Azure CLI" button before "Troubleshoot" button.
+- **openUrl handler** (`src/extension.ts`): New `openUrl` command handler validates URL starts with `https://` before calling `vscode.env.openExternal`. Keeps URL-opening generic for future reuse.
+
+### Item 2: Persistent CLI Banner in Webview
+- **Warning banner** (`media/chat.js` `updateCliBanner()`): Changed `not_found` CLI errors from red error banner to amber/yellow warning banner (`auth-banner warning` class). Shows "Copilot CLI is required to chat" with an "Install" button.
+- **Config gating**: Banner only shows when `configIsComplete` is true (endpoint + auth + models configured), preventing it from appearing during initial setup.
+- **Install action**: "Install" button sends `installCli` command to extension, which calls `_handleCliAutoInstall()` — the existing ask-first install dialog flow.
+- **Auto-hide**: Banner auto-removes when subsequent `cliStatus` reports `valid: true`.
+- **CSS** (`media/chat.css`): Added `.auth-banner.warning` class using VS Code warning color tokens, matching the existing not-authenticated banner style.
+
+### Key Patterns
+- The `configIsComplete` variable in chat.js is set by `applyConfigStatus()` — use it to gate any "post-setup" UI.
+- `openUrl` command is generic; any webview can send `{ command: "openUrl", url: "https://..." }` to open a URL externally.
+- `installCli` command reuses `_handleCliAutoInstall()` which already has ask-first consent, progress indicator, and error handling.
+
+📌 Added proactive az CLI detection to `forge.signIn` command handler. Before opening a terminal to run `az login`, we now check if `az` is on the system PATH using `execFileSync` + `which`/`where.exe` (cross-platform). If not found, shows an actionable error message with an "Install Azure CLI" button linking to https://aka.ms/installazurecli and returns early — no terminal opened. Key learnings: (1) Use `execFileSync` not `execSync` to avoid shell injection — security convention. (2) `platform() === "win32"` → `where.exe`, else `which` — cross-platform CLI detection. (3) Helper `isAzCliAvailable()` is a module-level function for testability. (4) This is the PROACTIVE check (before launch); `isCliNotFoundError` in authStatusProvider.ts handles the REACTIVE case (after token fetch fails).
+
+📌 Added "pro tip" to the welcome/setup view telling users they can drag Forge to the right sidebar. In `media/chat.js`, added a `<p class="setup-tip">` element between the setup steps and the "Check Configuration" button (~line 236). In `media/chat.css`, added `.welcome-screen .setup-tip` styling: 12px italic text at 0.55 opacity, max-width 320px — visually muted and distinct from numbered setup steps. Not a numbered step; just a friendly hint with 💡 emoji.
+
+📌 PR147 cleanup follow-up: replaced `scripts.package` shell cleanup with a cross-platform Node one-liner that removes only `dist/*.map` before `vsce package`; updated `isAzCliAvailable()` to pass `{ stdio: "ignore", windowsHide: true }` to `execFileSync`; and removed duplicated Azure CLI install URL text by reusing `AZ_INSTALL_URL` in the sign-in error message. Updated `az-cli-detection.test.ts` expectations to include `windowsHide: true`.

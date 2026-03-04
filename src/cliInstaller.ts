@@ -114,40 +114,17 @@ function getPlatformBinaryPath(installDir: string): string | undefined {
 /**
  * Returns the path to the managed CLI binary if installed, undefined otherwise.
  *
- * Prefers the platform-specific native binary over npm-loader.js to avoid
- * console window popups on Windows (npm-loader.js spawns the binary without
- * windowsHide).
+ * Only returns the platform-specific native binary — never npm-loader.js.
+ * npm-loader.js spawns the platform binary via spawnSync() without
+ * windowsHide, causing visible console windows on Windows.  If the platform
+ * binary is missing the managed install is considered absent and the normal
+ * "CLI not found → install" flow takes over.
  */
 export async function getManagedCliPath(
   globalStoragePath: string
 ): Promise<string | undefined> {
   const installDir = join(globalStoragePath, CLI_INSTALL_DIR);
-
-  // Prefer the native platform binary — avoids npm-loader.js console window issue.
-  const platformBinary = getPlatformBinaryPath(installDir);
-  if (platformBinary) {
-    return platformBinary;
-  }
-
-  // Fall back to npm-loader.js (e.g. unsupported platform, or platform binary
-  // package was not installed).
-  const cliEntryPoint = join(
-    installDir,
-    "node_modules",
-    "@github",
-    "copilot",
-    "npm-loader.js"
-  );
-
-  try {
-    if (existsSync(cliEntryPoint) && statSync(cliEntryPoint).isFile()) {
-      return cliEntryPoint;
-    }
-  } catch {
-    // File doesn't exist or isn't accessible
-  }
-
-  return undefined;
+  return getPlatformBinaryPath(installDir);
 }
 
 /**
@@ -182,24 +159,14 @@ async function installViaNpm(
           return;
         }
 
-        // Prefer native platform binary over npm-loader.js
+        // Only return the native platform binary — never npm-loader.js
         const platformBinary = getPlatformBinaryPath(installDir);
         if (platformBinary) {
           resolve(platformBinary);
-          return;
-        }
-
-        const cliPath = join(
-          installDir,
-          "node_modules",
-          "@github",
-          "copilot",
-          "npm-loader.js"
-        );
-        if (existsSync(cliPath)) {
-          resolve(cliPath);
         } else {
-          reject(new Error("npm install succeeded but CLI binary not found"));
+          reject(new Error(
+            `npm install succeeded but platform binary not found for ${process.platform}-${process.arch}`
+          ));
         }
       }
     );
@@ -336,18 +303,14 @@ async function installViaHttpTarball(
     );
   }
 
-  // Prefer native platform binary over npm-loader.js
+  // Only return the native platform binary — never npm-loader.js
   const platformBinary = getPlatformBinaryPath(installDir);
   if (platformBinary) {
     return platformBinary;
   }
-
-  const cliPath = join(targetDir, "npm-loader.js");
-  if (existsSync(cliPath)) {
-    return cliPath;
-  } else {
-    throw new Error("HTTP tarball install succeeded but CLI binary not found");
-  }
+  throw new Error(
+    `HTTP tarball install succeeded but platform binary not found for ${process.platform}-${process.arch}`
+  );
 }
 
 /**
