@@ -40,33 +40,33 @@ type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Forge");
   const provider = new ChatViewProvider(
-    context.extensionUri, 
-    context.secrets, 
-    context.workspaceState, 
+    context.extensionUri,
+    context.secrets,
+    context.workspaceState,
     outputChannel,
     context.globalStorageUri.fsPath
   );
-  
+
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
   statusBarItem.show();
-  
+
   // Wire auth refresh callback so provider methods can trigger status updates
   const refreshAuth = () => {
     updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
   };
   provider.setAuthRefreshCallback(refreshAuth);
-  
+
   // Initial auth status update
   updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
     outputChannel.appendLine(`Initial auth status check failed: ${err}`);
   });
-  
+
   // Preflight CLI validation
   performCliPreflight(getConfiguration(), outputChannel, provider, context.globalStorageUri.fsPath).catch((err) => {
     outputChannel.appendLine(`CLI preflight check failed: ${err}`);
   });
-  
+
   // Listen for config changes
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("forge.copilot")) {
@@ -80,23 +80,23 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }
   });
-  
+
   // Poll auth status every 30s (catches `az login` completions that don't trigger config changes)
   const authPollInterval = setInterval(() => {
     updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
   }, AUTH_POLL_INTERVAL_MS);
   const authPollDisposable = new vscode.Disposable(() => clearInterval(authPollInterval));
-  
+
   // Re-check auth when the window regains focus
   const focusListener = vscode.window.onDidChangeWindowState((e) => {
     if (e.focused) {
       updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
     }
   });
-  
+
   // Track sign-in timeout so it can be disposed on deactivation
   let signInTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
-  
+
   context.subscriptions.push(
     outputChannel,
     statusBarItem,
@@ -258,7 +258,7 @@ async function updateAuthStatus(
 ): Promise<AuthStatus> {
   const config = await getConfigurationAsync(secrets);
   const status = await checkAuthStatus(config, secrets);
-  
+
   switch (status.state) {
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
@@ -287,7 +287,7 @@ async function updateAuthStatus(
       break;
     }
   }
-  
+
   provider.postAuthStatus(status, !!config.endpoint);
   provider.refreshWebviewState({ config, authStatus: status });
   return status;
@@ -306,16 +306,16 @@ async function performCliPreflight(
 ): Promise<void> {
   try {
     const result = await discoverAndValidateCli(config.cliPath, globalStoragePath);
-    
+
     if (result.valid) {
       outputChannel.appendLine(`[forge] Copilot CLI validated: ${result.version} at ${result.path}`);
       provider.postCliStatus(result);
       return;
     }
-    
+
     // CLI validation failed — show actionable notifications
     provider.postCliStatus(result);
-    
+
     if (result.reason === "not_found") {
       const hasConfiguredCliPath = config.cliPath.trim() !== "";
       if (!hasConfiguredCliPath) {
@@ -469,10 +469,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
-    
+
     // Reset dedup state so initial status always goes through
     this._lastAuthStatus = undefined;
-    
+
     // Send initial config status (also re-sent on webviewReady to handle race condition)
     this._sendConfigStatus();
   }
@@ -637,19 +637,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private _sendConfigStatus(prefetched?: PrefetchedState, isCheckRequest = false): void {
     this._outputChannel.appendLine(`[_sendConfigStatus] Starting config status update (isCheckRequest: ${isCheckRequest})`);
-    
+
     const doWork = async () => {
       // Step 1: Get config synchronously (or use prefetched) and send models/endpoint info IMMEDIATELY
       const syncConfig = prefetched?.config ?? getConfiguration();
       const hasModels = syncConfig.models.length > 0;
       const hasEndpoint = !!syncConfig.endpoint;
-      
+
       this._outputChannel.appendLine(`[_sendConfigStatus] Config read: endpoint=${hasEndpoint ? 'present' : 'missing'}, models=${hasModels ? syncConfig.models.length : 0}`);
-      
+
       // Send models and model selection immediately
       this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
       this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(syncConfig.models) });
-      
+
       // Send preliminary configStatus with hasAuth=false (will update after auth check)
       this._view?.webview.postMessage({
         type: "configStatus",
@@ -657,15 +657,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         hasAuth: false,
         hasModels,
       });
-      
+
       // Step 2: Now do the async auth check with timeout
       let config: ExtensionConfig;
       let status: AuthStatus;
-      
+
       try {
         // Get full config with API key
         config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
-        
+
         // Check auth with 15-second timeout
         if (prefetched?.authStatus) {
           status = prefetched.authStatus;
@@ -683,19 +683,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         // Timeout or other error — treat as not authenticated
         const errorMsg = error instanceof Error ? error.message : String(error);
         this._outputChannel.appendLine(`[_sendConfigStatus] Auth check failed: ${errorMsg}`);
-        
+
         config = prefetched?.config ?? getConfiguration();
         status = {
           state: "notAuthenticated",
-          reason: errorMsg.includes("timed out") 
+          reason: errorMsg.includes("timed out")
             ? "Authentication check timed out — try running 'az login' again"
             : "Authentication check failed",
         };
       }
-      
+
       // Step 3: Send the updated auth status to webview
       this.postAuthStatus(status, !!config.endpoint);
-      
+
       const hasAuth = status.state === "authenticated";
       this._view?.webview.postMessage({
         type: "configStatus",
@@ -703,7 +703,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         hasAuth,
         hasModels: config.models.length > 0,
       });
-      
+
       // Step 4: Handle checkConfig request
       if (isCheckRequest) {
         const missing: string[] = [];
@@ -716,10 +716,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           allGood: missing.length === 0,
         });
       }
-      
+
       this._outputChannel.appendLine(`[_sendConfigStatus] Status update complete`);
     };
-    
+
     doWork().catch((error) => {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this._outputChannel.appendLine(`[_sendConfigStatus] Unhandled error: ${errorMsg}`);
@@ -819,7 +819,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       // Cache messages after successful response
       const cacheKey = `forge.messages.${this._conversationId}`;
       await this._workspaceState.update(cacheKey, this._conversationMessages);
-      
+
       // Store as last session
       await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
@@ -989,12 +989,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         if (settled) { return; }
         settled = true;
         cleanup();
-        
+
         // Add assistant message to cache
         if (accumulatedContent) {
           this._conversationMessages.push({ role: "assistant", content: accumulatedContent });
         }
-        
+
         this._view?.webview.postMessage({ type: "streamEnd" });
         resolve();
       });
@@ -1129,7 +1129,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       } else if (installResult?.success) {
         await vscode.window.showInformationMessage(
-          "Copilot CLI installed successfully. Try sending a message again."
+          "Copilot CLI installed successfully."
         );
       } else {
         const errorDetail = installResult?.error ?? "Unknown error";
