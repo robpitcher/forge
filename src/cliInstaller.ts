@@ -7,7 +7,10 @@ import { join } from "path";
  * Subdirectory name within globalStoragePath for managed CLI installation.
  */
 export const CLI_INSTALL_DIR = "copilot-cli";
-const BUNDLED_COPILOT_VERSION_FALLBACK = "0.0.414";
+
+// Injected at build time by esbuild from @github/copilot-sdk's package.json.
+// See esbuild.config.mjs — no hardcoded version to maintain.
+declare const __COPILOT_CLI_VERSION__: string;
 
 export interface CliInstallResult {
   success: boolean;
@@ -64,8 +67,8 @@ function getTargetVersion(options: CliInstallOptions): string {
       return normalizeVersion(directCopilotVersion);
     } catch {
       // .vsix packages exclude node_modules, so metadata files can be unavailable at runtime.
-      // Fall back to a bundled known-compatible CLI version.
-      return BUNDLED_COPILOT_VERSION_FALLBACK;
+      // Fall back to the CLI version injected at build time from the SDK's package.json.
+      return __COPILOT_CLI_VERSION__;
     }
   }
 }
