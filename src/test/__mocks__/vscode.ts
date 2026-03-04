@@ -35,6 +35,8 @@ export const window = {
   showQuickPick: vi.fn().mockResolvedValue(undefined),
   showInputBox: vi.fn().mockResolvedValue(undefined),
   showInformationMessage: vi.fn().mockResolvedValue(undefined),
+  showErrorMessage: vi.fn().mockResolvedValue(undefined),
+  showWarningMessage: vi.fn().mockResolvedValue(undefined),
   createOutputChannel: vi.fn().mockReturnValue({
     appendLine: vi.fn(),
     append: vi.fn(),
@@ -59,6 +61,10 @@ export const window = {
   }),
 };
 
+export const env = {
+  openExternal: vi.fn().mockResolvedValue(true),
+};
+
 export const commands = {
   executeCommand: vi.fn().mockResolvedValue(undefined),
   registerCommand: vi.fn().mockReturnValue({ dispose: vi.fn() }),
@@ -78,11 +84,18 @@ export class CancellationTokenSource {
 }
 
 export class Uri {
+  readonly _value: string;
+  constructor(value = "mock-uri") {
+    this._value = value;
+  }
   static joinPath(..._args: unknown[]): Uri {
     return new Uri();
   }
+  static parse(value: string): Uri {
+    return new Uri(value);
+  }
   toString(): string {
-    return "mock-uri";
+    return this._value;
   }
 }
 
