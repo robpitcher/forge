@@ -302,10 +302,10 @@ async function performCliPreflight(
   config: ExtensionConfig,
   outputChannel: vscode.OutputChannel,
   provider: ChatViewProvider,
-  _globalStoragePath?: string
+  globalStoragePath?: string
 ): Promise<void> {
   try {
-    const result = await discoverAndValidateCli(config.cliPath);
+    const result = await discoverAndValidateCli(config.cliPath, globalStoragePath);
     
     if (result.valid) {
       outputChannel.appendLine(`[forge] Copilot CLI validated: ${result.version} at ${result.path}`);
@@ -327,7 +327,7 @@ async function performCliPreflight(
       });
     } else if (result.reason === "wrong_binary") {
       vscode.window.showWarningMessage(
-        "Forge: The 'copilot' binary on your PATH is not the GitHub Copilot CLI. Set the correct path in settings.",
+        "Forge: Copilot CLI validation failed. Set forge.copilot.cliPath to the GitHub Copilot CLI executable.",
         "Open Settings"
       ).then(choice => {
         if (choice === "Open Settings") {
@@ -1219,7 +1219,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const config = await getConfigurationAsync(this._secrets);
-      await deleteConversation(sessionId, config);
+      await deleteConversation(sessionId, config, this._globalStoragePath);
 
       // Remove cached messages
       const cacheKey = `forge.messages.${sessionId}`;

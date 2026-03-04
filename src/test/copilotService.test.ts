@@ -437,6 +437,29 @@ describe("copilotService", () => {
       }
     });
 
+    it("does not discover from PATH on Windows when globalStoragePath is provided", async () => {
+      const missingStoragePath = `${process.cwd()}/.tmp-missing-managed-cli-${Date.now()}`;
+      const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+      mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");
+
+      try {
+        Object.defineProperty(process, "platform", { value: "win32" });
+
+        const result = await discoverAndValidateCli(undefined, missingStoragePath);
+
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+          expect(result.reason).toBe("not_found");
+          expect(result.details).toContain("managed Copilot CLI");
+        }
+        expect(mockExecSync).not.toHaveBeenCalled();
+      } finally {
+        if (originalPlatform) {
+          Object.defineProperty(process, "platform", originalPlatform);
+        }
+      }
+    });
+
     it("discovers and validates CLI from PATH when no config", async () => {
       // First call (execSync): which/where copilot
       mockExecSync.mockReturnValueOnce("/usr/local/bin/copilot\n");

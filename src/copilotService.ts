@@ -226,16 +226,40 @@ export async function probeCliCompatibility(
 /**
  * Discovers and validates the Copilot CLI binary.
  * 
- * If a configuredPath is provided, validates it directly. Otherwise, searches PATH
- * using resolveCopilotCliFromPath() and validates the result.
+ * Resolution order:
+ * 1. If configuredPath is provided, validate it directly.
+ * 2. If globalStoragePath is provided, validate the managed CLI install path.
+ * 3. On Windows with globalStoragePath, skip PATH discovery.
+ * 4. Otherwise, discover from PATH and validate.
  * 
  * @param configuredPath - Optional explicit CLI path from user configuration
+ * @param globalStoragePath - Optional extension global storage path for managed CLI lookup
  * @returns Validation result with discovered/configured CLI path
  */
-export async function discoverAndValidateCli(configuredPath?: string): Promise<CopilotCliValidationResult> {
+export async function discoverAndValidateCli(
+  configuredPath?: string,
+  globalStoragePath?: string
+): Promise<CopilotCliValidationResult> {
   // If configured path is provided, validate it directly
   if (configuredPath && configuredPath.trim() !== "") {
     return validateCopilotCli(configuredPath);
+  }
+
+  // If extension storage is available, only trust the managed install path.
+  // On Windows, this avoids auto-picking unrelated system-level "copilot.exe" binaries.
+  if (globalStoragePath) {
+    const managedPath = await getManagedCliPath(globalStoragePath);
+    if (managedPath) {
+      return validateCopilotCli(managedPath);
+    }
+
+    if (process.platform === "win32") {
+      return {
+        valid: false,
+        reason: "not_found",
+        details: "No managed Copilot CLI found in extension storage and no cliPath configured",
+      };
+    }
   }
 
   // Otherwise, discover from PATH
@@ -282,7 +306,7 @@ export async function getOrCreateClient(
   // Resolution chain:
   // 1. Configured path (forge.copilot.cliPath) — explicit user override
   // 2. Managed copy — check globalStoragePath
-  // 3. PATH discovery — existing resolveCopilotCliFromPath()
+  // 3. PATH discovery (skip on Windows when globalStoragePath is available)
   // 4. If none found, throw CopilotCliNeedsInstallError
 
   let resolvedCliPath: string | undefined;
@@ -321,8 +345,8 @@ export async function getOrCreateClient(
     }
   }
 
-  // Step 3: Check PATH if still not found
-  if (!resolvedCliPath) {
+  // Step 3: Check PATH unless we're on Windows with extension storage path available
+  if (!resolvedCliPath && (!globalStoragePath || process.platform !== "win32")) {
     const pathDiscovery = resolveCopilotCliFromPath();
     if (pathDiscovery) {
       const validation = await validateCopilotCli(pathDiscovery);
