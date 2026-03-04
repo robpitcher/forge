@@ -48,7 +48,7 @@ function resolveCliSpawnArgs(cliPath: string, args: readonly string[]): { comman
 function resolveCopilotCliFromPath(): string | undefined {
   try {
     const cmd = process.platform === "win32" ? "where copilot" : "which copilot";
-    const result = execSync(cmd, { encoding: "utf8", timeout: 5000 })
+    const result = execSync(cmd, { encoding: "utf8", timeout: 5000, windowsHide: true })
       .trim()
       .split("\n")[0];
     return result || undefined;
@@ -89,6 +89,7 @@ export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidatio
         encoding: "utf8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       }).trim();
 
       // If we got output without error, check if it looks like a version

@@ -14,6 +14,7 @@ const mockMkdirSync = vi.fn();
 const mockWriteFileSync = vi.fn();
 const mockReadFileSync = vi.fn();
 const mockCreateWriteStream = vi.fn();
+const mockReaddirSync = vi.fn();
 const mockHttpsGet = vi.fn();
 
 vi.mock("child_process", () => ({
@@ -35,6 +36,7 @@ vi.mock("fs", () => ({
   readFileSync: mockReadFileSync,
   createWriteStream: mockCreateWriteStream,
   createReadStream: vi.fn(),
+  readdirSync: mockReaddirSync,
   renameSync: vi.fn(),
 }));
 
@@ -86,6 +88,7 @@ describe("cliInstaller", () => {
     mockExecFile.mockReset();
     mockSpawn.mockReset();
     mockCreateWriteStream.mockReset();
+    mockReaddirSync.mockReset();
     mockHttpsGet.mockReset();
     mockSpawn.mockImplementation(() => createMockSpawnedProcess());
 
@@ -98,6 +101,7 @@ describe("cliInstaller", () => {
   describe("isManagedCliInstalled", () => {
     it("returns true when CLI exists at expected location", async () => {
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
       mockStatSync.mockReturnValue({ isFile: () => true });
 
       const result = await isManagedCliInstalled("/test/storage");
@@ -120,13 +124,30 @@ describe("cliInstaller", () => {
   });
 
   describe("getManagedCliPath", () => {
-    it("returns the CLI path when installed", async () => {
+    it("returns the platform binary when available", async () => {
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
       mockStatSync.mockReturnValue({ isFile: () => true });
 
       const result = await getManagedCliPath("/test/storage");
       expect(result).toBeDefined();
       expect(result).toContain("/test/storage");
+      expect(result).toContain(`copilot-${process.platform}-${process.arch}`);
+      expect(result).not.toContain("npm-loader.js");
+    });
+
+    it("falls back to npm-loader.js when platform binary not found", async () => {
+      mockExistsSync.mockImplementation((p: string) => {
+        // Platform dir does not exist
+        if (p.includes(`copilot-${process.platform}-${process.arch}`)) {
+          return false;
+        }
+        return true;
+      });
+      mockStatSync.mockReturnValue({ isFile: () => true });
+
+      const result = await getManagedCliPath("/test/storage");
+      expect(result).toBeDefined();
       expect(result).toContain("npm-loader.js");
     });
 
@@ -160,6 +181,8 @@ describe("cliInstaller", () => {
         },
       );
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
+      mockStatSync.mockReturnValue({ isFile: () => true });
 
       const result = await installCopilotCli({
         globalStoragePath: "/test/storage",
@@ -168,7 +191,8 @@ describe("cliInstaller", () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe("npm");
-      expect(result.cliPath).toContain("npm-loader.js");
+      // Prefers platform binary over npm-loader.js
+      expect(result.cliPath).toContain(`copilot-${process.platform}-${process.arch}`);
     });
 
     it("falls back to HTTP when npm not found", async () => {
@@ -209,9 +233,10 @@ describe("cliInstaller", () => {
       });
 
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
+      mockStatSync.mockReturnValue({ isFile: () => true });
 
-      const result = await installCopilotCli({
-        globalStoragePath: "/test/storage",
+      const result = await installCopilotCli({        globalStoragePath: "/test/storage",
         targetVersion: "0.1.26",
       });
 
@@ -230,6 +255,8 @@ describe("cliInstaller", () => {
         },
       );
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
+      mockStatSync.mockReturnValue({ isFile: () => true });
 
       await installCopilotCli({
         globalStoragePath: "/test/storage",
@@ -258,6 +285,8 @@ describe("cliInstaller", () => {
         },
       );
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
+      mockStatSync.mockReturnValue({ isFile: () => true });
 
       await installCopilotCli({ globalStoragePath: "/test/storage" });
 
@@ -280,6 +309,8 @@ describe("cliInstaller", () => {
         },
       );
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["copilot", "package.json"]);
+      mockStatSync.mockReturnValue({ isFile: () => true });
 
       await installCopilotCli({ globalStoragePath: "/test/storage" });
 
