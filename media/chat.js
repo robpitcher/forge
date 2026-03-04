@@ -953,6 +953,14 @@
       
       let message = "";
       if (result.reason === "not_found") {
+        const details = (result.details || "").toLowerCase();
+        if (details.includes("no clipath configured")) {
+          // Startup preflight already prompts auto-install in this case; avoid redundant red error banner.
+          if (banner.parentNode) {
+            banner.remove();
+          }
+          return;
+        }
         message = "⚠️ Copilot CLI not found. Install GitHub Copilot CLI or configure path.";
       } else if (result.reason === "wrong_binary") {
         message = "⚠️ Wrong 'copilot' binary detected. Please configure the correct path.";

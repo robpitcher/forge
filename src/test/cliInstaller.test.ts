@@ -242,9 +242,9 @@ describe("cliInstaller", () => {
       );
     });
 
-    it("defaults version to SDK version when not specified", async () => {
+    it("defaults version to SDK's @github/copilot dependency when not specified", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot": "^0.0.414" },
       }));
 
       let capturedArgs: string[] = [];
@@ -261,7 +261,7 @@ describe("cliInstaller", () => {
 
       await installCopilotCli({ globalStoragePath: "/test/storage" });
 
-      expect(capturedArgs).toContain("@github/copilot@0.1.26");
+      expect(capturedArgs).toContain("@github/copilot@0.0.414");
     });
   });
 
