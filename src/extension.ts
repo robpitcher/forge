@@ -317,14 +317,19 @@ async function performCliPreflight(
     provider.postCliStatus(result);
     
     if (result.reason === "not_found") {
-      vscode.window.showWarningMessage(
-        "Forge: Copilot CLI not found. Install GitHub Copilot CLI (npm, winget, Homebrew, or install script) or set the path in settings.",
-        "Open Settings"
-      ).then(choice => {
-        if (choice === "Open Settings") {
-          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
-        }
-      });
+      const hasConfiguredCliPath = config.cliPath.trim() !== "";
+      if (!hasConfiguredCliPath) {
+        await provider.promptCliAutoInstall(result.details ?? "Copilot CLI not found");
+      } else {
+        vscode.window.showWarningMessage(
+          "Forge: Copilot CLI not found at the configured path. Set forge.copilot.cliPath to a valid GitHub Copilot CLI executable.",
+          "Open Settings"
+        ).then(choice => {
+          if (choice === "Open Settings") {
+            vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+          }
+        });
+      }
     } else if (result.reason === "wrong_binary") {
       vscode.window.showWarningMessage(
         "Forge: Copilot CLI validation failed. Set forge.copilot.cliPath to the GitHub Copilot CLI executable.",
@@ -432,6 +437,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   public postCliStatus(result: CopilotCliValidationResult): void {
     this._lastCliValidation = result;
     this._view?.webview.postMessage({ type: "cliStatus", result });
+  }
+
+  public async promptCliAutoInstall(errorMessage: string): Promise<void> {
+    await this._handleCliAutoInstall(errorMessage);
   }
 
   /** Re-sends all webview state (auth, models, config status). Accepts pre-fetched data to avoid redundant calls. */
