@@ -45,7 +45,7 @@ const AZ_INSTALL_URL = "https://aka.ms/azure-cli";
 function isAzCliAvailable(): boolean {
   try {
     const cmd = platform() === "win32" ? "where.exe" : "which";
-    execFileSync(cmd, ["az"], { stdio: "ignore" });
+    execFileSync(cmd, ["az"], { stdio: "ignore", windowsHide: true });
     return true;
   } catch {
     return false;
@@ -138,7 +138,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (config.authMethod === "entraId") {
         if (!isAzCliAvailable()) {
           const action = await vscode.window.showErrorMessage(
-            "Azure CLI is required for Entra ID sign-in. Install it from https://aka.ms/azure-cli",
+            `Azure CLI is required for Entra ID sign-in. Install it from ${AZ_INSTALL_URL}`,
             "Install Azure CLI"
           );
           if (action === "Install Azure CLI") {
