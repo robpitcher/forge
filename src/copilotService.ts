@@ -190,6 +190,7 @@ export async function probeCliCompatibility(
       const spawnInfo = resolveCliSpawnArgs(cliPath, [...PROBE_REQUIRED_FLAGS]);
       child = spawn(spawnInfo.command, spawnInfo.args, {
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
