@@ -3030,3 +3030,94 @@ Users hitting Entra ID auth failures because Azure CLI isn't installed had no wa
 - `AuthStatus` type in `src/auth/authStatusProvider.ts` — consumers should handle the new optional field
 - New webview commands: `openUrl`, `installCli`
 - New CSS class: `.auth-banner.warning`
+
+# Decision: Marketplace Pre-Release Publishing for Insider Builds
+
+**Date:** 2026-03-03  
+**Decider:** Palmer (DevOps Specialist)  
+**Context:** Rob Pitcher requested marketplace publishing for insider builds using publisher `robpitcher` and PAT stored as `ADO_MARKETPLACE_PAT`.
+
+## Decision
+
+Extend `.github/workflows/insider-release.yml` to publish pre-release builds to the VS Code Marketplace after creating the GitHub Release.
+
+### Dual-Version Strategy
+
+1. **GitHub Release tags:** Continue using `{version}-insider+{short-sha}` format (e.g., `0.2.0-insider+abc1234`) for GitHub tags and releases.
+2. **Marketplace versions:** Use `{major}.{minor}.{github.run_number}` (e.g., `0.2.15`) for marketplace publishing.
+
+**Rationale:** 
+- GitHub releases need semantic, human-readable versions with commit context for traceability.
+- VS Code Marketplace requires unique numeric versions for each publish — run_number provides this.
+- These are separate concerns with different requirements, so separate versioning is appropriate.
+
+### Implementation
+
+**package.json changes:**
+- Added `"vscode:prepublish": "npm run build -- --production"` — VS Code extension convention, auto-runs before vsce operations.
+- Changed `package` script from `"npm run build -- --production && vsce package"` to `"vsce package"` — build delegated to lifecycle hook.
+
+**insider-release.yml workflow:**
+- Added marketplace publishing steps AFTER GitHub Release verification.
+- Version computation: `npm version {major}.{minor}.{run_number} --no-git-tag-version` — updates package.json in CI only, not committed.
+- Package and publish with `npx @vscode/vsce package --pre-release` and `npx @vscode/vsce publish --pre-release --pat`.
+- Error handling: `continue-on-error: true` — if marketplace publish fails, GitHub Release still succeeds.
+
+### Trade-offs
+
+**Pros:**
+- Insider builds available on marketplace with "Pre-Release" badge.
+- Automatic publishing reduces manual release overhead.
+- Unique marketplace versions prevent conflicts.
+
+**Cons:**
+- Marketplace version (`0.2.15`) diverges from GitHub tag (`0.2.0-insider+abc1234`) — could confuse users looking at both sources.
+- Marketplace publish failures are silently ignored (workflow succeeds even if marketplace step fails).
+
+**Mitigation:**
+- The GitHub Release is the authoritative artifact — marketplace is convenience distribution.
+- Run logs will show marketplace publish failures even if workflow succeeds overall.
+
+## Impact
+
+- Users can install insider builds directly from VS Code Marketplace without manual .vsix downloads.
+- `vscode:prepublish` hook ensures production builds run automatically before packaging.
+- Marketplace pre-release channel is now active for early adopters.
+
+## References
+
+- Issue/PR: [context from Rob's request]
+- Files changed: `package.json`, `.github/workflows/insider-release.yml`
+- PAT secret: `ADO_MARKETPLACE_PAT` (stored in repo secrets)
+
+---
+
+# Decision: Proactive az CLI detection in forge.signIn
+
+**Author:** Blair (Extension Dev)  
+**Date:** 2025-07-17  
+**Scope:** `src/extension.ts` — `forge.signIn` command handler
+
+## Context
+
+When a new user configures Entra ID auth and clicks "Sign in with Entra ID", the extension previously opened a terminal and ran `az login` unconditionally. If `az` CLI wasn't installed, the user saw a confusing shell error.
+
+## Decision
+
+Add a proactive `az` CLI availability check **before** opening the terminal:
+
+- Use `execFileSync` with `which` (POSIX) / `where.exe` (Windows) to detect `az` on PATH.
+- If not found, show `showErrorMessage` with an "Install Azure CLI" button linking to `https://aka.ms/installazurecli`.
+- Return early — no terminal opened.
+
+## Rationale
+
+- **Actionable errors** — user immediately knows what's wrong and how to fix it.
+- **Security** — `execFileSync` avoids shell injection (`execSync` banned by convention).
+- **Complementary** — this is the PROACTIVE guard (pre-launch). `isCliNotFoundError` in `authStatusProvider.ts` remains the REACTIVE guard (post-token-fetch failure).
+- **Cross-platform** — `where.exe` on Windows, `which` on macOS/Linux.
+
+## Impact
+
+- Blair owns `src/extension.ts` — no cross-domain impact.
+- No test changes required (existing 67+ tests unaffected).
