@@ -88,7 +88,6 @@ jobs:
           echo "📦 Marketplace Version: $MARKETPLACE_VERSION"
 
       - name: Publish to VS Code Marketplace (Pre-Release)
-        continue-on-error: true
         env:
           VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
         run: |
