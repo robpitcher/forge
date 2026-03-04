@@ -100,7 +100,7 @@ graph TD
 
 ### From VS Code Marketplace
 
-> *VS Code Marketplace availability is planned for a future release. For now, install via GitHub Releases above.*
+Forge publishes **pre-release** builds to the VS Code Marketplace. Insider/development versions appear under **Pre-Release** in the extension details. For stable installations in restricted or air-gapped environments, use GitHub Releases above.
 
 ## Configuration
 
@@ -219,7 +219,7 @@ Runs automated tests with Vitest.
 npm run package
 ```
 
-Creates `forge-0.1.0.vsix` for sideloading or distribution.
+Creates a `.vsix` package (named `forge-<version>.vsix`) for sideloading or distribution.
 
 ---
 

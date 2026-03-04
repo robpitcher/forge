@@ -253,7 +253,7 @@
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "vscode:prepublish": "npm run build -- --production",
-    "package": "vsce package",
+    "package": "node -e \"const fs=require('fs');if(fs.existsSync('dist')){for(const f of fs.readdirSync('dist')){if(f.endsWith('.map'))fs.rmSync('dist/'+f,{force:true});}}\" && vsce package",
     "lint": "eslint src/",
     "lint:types": "tsc --noEmit",
     "test": "vitest run"

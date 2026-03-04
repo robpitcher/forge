@@ -285,7 +285,7 @@ describe("az CLI detection (forge.signIn)", () => {
       expect(mockExecFileSync).toHaveBeenCalledWith(
         "which",
         ["az"],
-        { stdio: "ignore" },
+        { stdio: "ignore", windowsHide: true },
       );
     });
 
@@ -299,7 +299,7 @@ describe("az CLI detection (forge.signIn)", () => {
       expect(mockExecFileSync).toHaveBeenCalledWith(
         "which",
         ["az"],
-        { stdio: "ignore" },
+        { stdio: "ignore", windowsHide: true },
       );
     });
 
@@ -313,7 +313,7 @@ describe("az CLI detection (forge.signIn)", () => {
       expect(mockExecFileSync).toHaveBeenCalledWith(
         "where.exe",
         ["az"],
-        { stdio: "ignore" },
+        { stdio: "ignore", windowsHide: true },
       );
     });
   });

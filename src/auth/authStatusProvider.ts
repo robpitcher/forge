@@ -60,7 +60,7 @@ export async function checkAuthStatus(
 
       return {
         state: "error",
-        message: "Entra ID configuration error — check Azure CLI setup",
+        message: `Entra ID authentication error: ${msg}`,
       };
     }
   }
