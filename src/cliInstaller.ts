@@ -1,5 +1,5 @@
 import { execFile } from "child_process";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { get as httpsGet } from "https";
 import { join } from "path";
 
@@ -74,12 +74,63 @@ function getTargetVersion(options: CliInstallOptions): string {
 }
 
 /**
+ * Returns the path to the platform-specific native CLI binary if it exists.
+ *
+ * The @github/copilot package ships optional platform packages
+ * (e.g. @github/copilot-win32-x64) containing a native binary.  Returning
+ * this path instead of npm-loader.js avoids an intermediate Node.js process
+ * that spawns the binary without `windowsHide: true`, which causes visible
+ * console windows on Windows.
+ */
+function getPlatformBinaryPath(installDir: string): string | undefined {
+  const platformDir = join(
+    installDir,
+    "node_modules",
+    "@github",
+    `copilot-${process.platform}-${process.arch}`
+  );
+
+  try {
+    if (!existsSync(platformDir)) {
+      return undefined;
+    }
+    // Scan for the binary — named "copilot" on Unix, "copilot.exe" on Windows
+    const entries = readdirSync(platformDir);
+    const binaryName = entries.find(
+      (e) => e === "copilot.exe" || (e === "copilot" && !e.includes("."))
+    );
+    if (binaryName) {
+      const binaryPath = join(platformDir, binaryName);
+      if (statSync(binaryPath).isFile()) {
+        return binaryPath;
+      }
+    }
+  } catch {
+    // Fall through
+  }
+  return undefined;
+}
+
+/**
  * Returns the path to the managed CLI binary if installed, undefined otherwise.
+ *
+ * Prefers the platform-specific native binary over npm-loader.js to avoid
+ * console window popups on Windows (npm-loader.js spawns the binary without
+ * windowsHide).
  */
 export async function getManagedCliPath(
   globalStoragePath: string
 ): Promise<string | undefined> {
   const installDir = join(globalStoragePath, CLI_INSTALL_DIR);
+
+  // Prefer the native platform binary — avoids npm-loader.js console window issue.
+  const platformBinary = getPlatformBinaryPath(installDir);
+  if (platformBinary) {
+    return platformBinary;
+  }
+
+  // Fall back to npm-loader.js (e.g. unsupported platform, or platform binary
+  // package was not installed).
   const cliEntryPoint = join(
     installDir,
     "node_modules",
@@ -120,7 +171,7 @@ async function installViaNpm(
     execFile(
       "npm",
       ["install", `@github/copilot@${version}`, "--prefix", installDir],
-      { timeout: 120000 },
+      { timeout: 120000, windowsHide: true },
       (error, stdout, stderr) => {
         if (error) {
           reject(
@@ -128,6 +179,13 @@ async function installViaNpm(
               `npm install failed: ${error.message}\nstdout: ${stdout}\nstderr: ${stderr}`
             )
           );
+          return;
+        }
+
+        // Prefer native platform binary over npm-loader.js
+        const platformBinary = getPlatformBinaryPath(installDir);
+        if (platformBinary) {
+          resolve(platformBinary);
           return;
         }
 
@@ -202,7 +260,7 @@ async function extractTarGz(
     execFile(
       "tar",
       ["-xzf", tarGzPath, "-C", destDir],
-      { timeout: 60000 },
+      { timeout: 60000, windowsHide: true },
       (error, stdout, stderr) => {
         if (error) {
           reject(
@@ -276,6 +334,12 @@ async function installViaHttpTarball(
     throw new Error(
       `Failed to install platform-specific binary: ${message}`
     );
+  }
+
+  // Prefer native platform binary over npm-loader.js
+  const platformBinary = getPlatformBinaryPath(installDir);
+  if (platformBinary) {
+    return platformBinary;
   }
 
   const cliPath = join(targetDir, "npm-loader.js");
