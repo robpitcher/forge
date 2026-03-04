@@ -174,6 +174,12 @@ Configure settings in VS Code (`Ctrl+,` / `Cmd+,`):
 
 **Recommended environment:** The included `.devcontainer/devcontainer.json` provides a pre-configured development setup with Node.js, Git, GitHub CLI, and Azure CLI. Open in [GitHub Codespaces](https://github.com/codespaces/new?repo=robpitcher/forge) or [VS Code Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for a seamless setup.
 
+### Install dependencies
+
+```bash
+npm ci
+```
+
 ### Build
 
 ```bash
