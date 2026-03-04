@@ -241,3 +241,25 @@
 Wired CLI auto-install into extension.ts with ask-first dialog, progress notification, and globalStoragePath threading. Show "Forge needs the GitHub Copilot CLI to work. Install it now?" dialog on `CopilotCliNeedsInstallError`. Success shows confirmation, errors point to Settings. Respects user consent (no surprise installs).
 
 **Outcome:** ✅ SUCCESS — Extension ready for CLI auto-install UX.
+
+## Learnings
+
+📌 CLI UX Improvements — Azure CLI Install Link & Persistent CLI Banner (2025-07-24)
+
+### Item 1: Azure CLI Install Link in Auth Errors
+- **AuthStatus type** (`src/auth/authStatusProvider.ts`): Added optional `installUrl?: string` to both `notAuthenticated` and `error` variants of the `AuthStatus` union type.
+- **CLI-not-found detection**: Added `isCliNotFoundError()` helper with regex patterns for "Azure CLI not found/could not be found/not installed". This distinguishes "CLI missing" from "not logged in" within the broader `isNotLoggedInError` path.
+- **Auth banner** (`media/chat.js` `updateAuthBanner()`): When `status.installUrl` is present on `notAuthenticated`, renders "Install Azure CLI" button instead of "Sign in with Entra ID". On `error` state, adds "Install Azure CLI" button before "Troubleshoot" button.
+- **openUrl handler** (`src/extension.ts`): New `openUrl` command handler validates URL starts with `https://` before calling `vscode.env.openExternal`. Keeps URL-opening generic for future reuse.
+
+### Item 2: Persistent CLI Banner in Webview
+- **Warning banner** (`media/chat.js` `updateCliBanner()`): Changed `not_found` CLI errors from red error banner to amber/yellow warning banner (`auth-banner warning` class). Shows "Copilot CLI is required to chat" with an "Install" button.
+- **Config gating**: Banner only shows when `configIsComplete` is true (endpoint + auth + models configured), preventing it from appearing during initial setup.
+- **Install action**: "Install" button sends `installCli` command to extension, which calls `_handleCliAutoInstall()` — the existing ask-first install dialog flow.
+- **Auto-hide**: Banner auto-removes when subsequent `cliStatus` reports `valid: true`.
+- **CSS** (`media/chat.css`): Added `.auth-banner.warning` class using VS Code warning color tokens, matching the existing not-authenticated banner style.
+
+### Key Patterns
+- The `configIsComplete` variable in chat.js is set by `applyConfigStatus()` — use it to gate any "post-setup" UI.
+- `openUrl` command is generic; any webview can send `{ command: "openUrl", url: "https://..." }` to open a URL externally.
+- `installCli` command reuses `_handleCliAutoInstall()` which already has ask-first consent, progress indicator, and error handling.

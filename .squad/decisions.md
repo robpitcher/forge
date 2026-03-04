@@ -3004,3 +3004,29 @@ The ask-first pattern respects user agency while still making installation conve
 - **User-facing:** Clear, predictable installation flow with escape hatches (cancel, settings, manual)
 - **Code:** Minimal — single error catch block + dialog method, no retry logic complexity
 - **Testing:** Covered by existing error handling tests; install dialog is standard VS Code API (no custom mocking needed)
+# Decision: CLI UX Improvements — Install Links and Persistent Banners
+
+**Author:** Blair (Extension Dev)
+**Date:** 2025-07-24
+
+## Context
+
+Users hitting Entra ID auth failures because Azure CLI isn't installed had no way to install it from the error UI. Similarly, once the CLI-missing notification balloon was dismissed, there was no persistent way to trigger CLI installation.
+
+## Decisions
+
+1. **`AuthStatus` type extended** with optional `installUrl` field on `notAuthenticated` and `error` states. This is a backwards-compatible union extension.
+
+2. **Generic `openUrl` command** added to the webview→extension message protocol. Validates `https://` prefix before opening. Reusable for future external links.
+
+3. **`installCli` command** added to webview→extension protocol. Calls existing `_handleCliAutoInstall()` flow (ask-first dialog).
+
+4. **CLI banner uses warning style** (amber) instead of error (red) when CLI is not found and config is complete. This is less alarming and more actionable.
+
+5. **Config gating** — CLI missing banner is hidden during initial setup (before endpoint/auth/models are configured) to avoid overwhelming new users.
+
+## Impact
+
+- `AuthStatus` type in `src/auth/authStatusProvider.ts` — consumers should handle the new optional field
+- New webview commands: `openUrl`, `installCli`
+- New CSS class: `.auth-banner.warning`
