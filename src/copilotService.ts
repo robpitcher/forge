@@ -27,6 +27,21 @@ export type CopilotCliValidationResult =
   | { valid: false; reason: "not_found" | "wrong_binary" | "version_check_failed"; path?: string; details?: string };
 
 /**
+ * Resolves spawn command and arguments for a CLI path.
+ *
+ * On Windows, `.js` files cannot be executed directly (no shebang support),
+ * so we prepend the current Node.js binary (`process.execPath`) as the command.
+ * The SDK does this internally for CopilotClient, but our own validation and
+ * probe functions also spawn the CLI and need the same treatment.
+ */
+function resolveCliSpawnArgs(cliPath: string, args: readonly string[]): { command: string; args: string[] } {
+  if (cliPath.endsWith(".js")) {
+    return { command: process.execPath, args: [cliPath, ...args] };
+  }
+  return { command: cliPath, args: [...args] };
+}
+
+/**
  * Attempts to find the `copilot` CLI binary on PATH.
  * Returns the resolved path or undefined if not found.
  */
@@ -69,7 +84,8 @@ export function validateCopilotCli(cliPath: string): Promise<CopilotCliValidatio
         // Ignore stat errors here and defer to execFileSync for final validation.
       }
 
-      const output = execFileSync(cliPath, ["--version"], {
+      const spawnInfo = resolveCliSpawnArgs(cliPath, ["--version"]);
+      const output = execFileSync(spawnInfo.command, spawnInfo.args, {
         encoding: "utf8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "pipe"],
@@ -171,7 +187,8 @@ export async function probeCliCompatibility(
     };
 
     try {
-      child = spawn(cliPath, [...PROBE_REQUIRED_FLAGS], {
+      const spawnInfo = resolveCliSpawnArgs(cliPath, [...PROBE_REQUIRED_FLAGS]);
+      child = spawn(spawnInfo.command, spawnInfo.args, {
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (err: unknown) {
