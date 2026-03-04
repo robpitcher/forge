@@ -14,8 +14,9 @@ import {
   stopClient,
   validateCopilotCli,
   discoverAndValidateCli,
+  probeCliCompatibility,
 } from "../copilotService.js";
-import { execSync, execFileSync } from "child_process";
+import { execSync, execFileSync, spawn } from "child_process";
 
 vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
@@ -414,6 +415,105 @@ describe("copilotService", () => {
         expect(result.reason).toBe("version_check_failed");
         expect(result.details).toContain("points to a directory");
       }
+    });
+
+    it("prepends node for .js CLI paths", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await validateCopilotCli("/path/to/npm-loader.js");
+
+      expect(result.valid).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        process.execPath,
+        ["/path/to/npm-loader.js", "--version"],
+        expect.any(Object)
+      );
+    });
+
+    it("does not prepend node for non-.js CLI paths", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await validateCopilotCli("/usr/local/bin/copilot");
+
+      expect(result.valid).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        "/usr/local/bin/copilot",
+        ["--version"],
+        expect.any(Object)
+      );
+    });
+
+    it("prepends node for case-insensitive .JS paths (Windows)", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await validateCopilotCli("C:\\Path\\To\\npm-loader.JS");
+
+      expect(result.valid).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        process.execPath,
+        ["C:\\Path\\To\\npm-loader.JS", "--version"],
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe("probeCliCompatibility", () => {
+    const mockSpawn = vi.mocked(spawn);
+
+    beforeEach(() => {
+      mockSpawn.mockReset();
+    });
+
+    it("prepends node for .js CLI paths", async () => {
+      const mockChild = {
+        pid: 12345,
+        exitCode: null,
+        signalCode: null,
+        kill: vi.fn(),
+        on: vi.fn().mockReturnThis(),
+        stderr: { on: vi.fn().mockReturnThis() },
+      };
+      mockSpawn.mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
+
+      // Probe starts a timer; resolve after grace period
+      const probePromise = probeCliCompatibility("/path/to/npm-loader.js");
+
+      // Let the grace timer fire
+      await vi.waitFor(async () => {
+        const result = await probePromise;
+        expect(result.compatible).toBe(true);
+      }, { timeout: 2000 });
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        process.execPath,
+        ["/path/to/npm-loader.js", "--headless", "--no-auto-update", "--stdio"],
+        expect.any(Object)
+      );
+    });
+
+    it("does not prepend node for non-.js CLI paths", async () => {
+      const mockChild = {
+        pid: 12345,
+        exitCode: null,
+        signalCode: null,
+        kill: vi.fn(),
+        on: vi.fn().mockReturnThis(),
+        stderr: { on: vi.fn().mockReturnThis() },
+      };
+      mockSpawn.mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
+
+      const probePromise = probeCliCompatibility("/usr/local/bin/copilot");
+
+      await vi.waitFor(async () => {
+        const result = await probePromise;
+        expect(result.compatible).toBe(true);
+      }, { timeout: 2000 });
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        "/usr/local/bin/copilot",
+        ["--headless", "--no-auto-update", "--stdio"],
+        expect.any(Object)
+      );
     });
   });
 
