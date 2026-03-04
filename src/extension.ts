@@ -375,6 +375,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _conversationId: string = `conv-${crypto.randomUUID()}`;
   private _isProcessing = false;
+  private _isInstallingCli = false;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
   private _conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
@@ -1079,6 +1080,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _handleCliAutoInstall(errorMessage: string): Promise<void> {
+    if (this._isInstallingCli) {
+      this._outputChannel.appendLine(`[forge] Copilot CLI install already in progress, skipping duplicate prompt`);
+      return;
+    }
     this._outputChannel.appendLine(`[forge] Copilot CLI auto-install prompt reason: ${errorMessage}`);
     // Show ask-first dialog
     const choice = await vscode.window.showInformationMessage(
@@ -1088,26 +1093,31 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     );
 
     if (choice === "Install") {
+      this._isInstallingCli = true;
       // Run install inside progress, then show result AFTER progress dismisses
       let installResult: CliInstallResult | undefined;
       let installError: string | undefined;
 
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Installing Copilot CLI...",
-          cancellable: false,
-        },
-        async () => {
-          try {
-            installResult = await installCopilotCli({
-              globalStoragePath: this._globalStoragePath,
-            });
-          } catch (err: unknown) {
-            installError = err instanceof Error ? err.message : String(err);
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Installing Copilot CLI...",
+            cancellable: false,
+          },
+          async () => {
+            try {
+              installResult = await installCopilotCli({
+                globalStoragePath: this._globalStoragePath,
+              });
+            } catch (err: unknown) {
+              installError = err instanceof Error ? err.message : String(err);
+            }
           }
-        }
-      );
+        );
+      } finally {
+        this._isInstallingCli = false;
+      }
 
       if (installError) {
         const retry = await vscode.window.showErrorMessage(
