@@ -7,6 +7,7 @@ import { join } from "path";
  * Subdirectory name within globalStoragePath for managed CLI installation.
  */
 export const CLI_INSTALL_DIR = "copilot-cli";
+const BUNDLED_COPILOT_VERSION_FALLBACK = "0.0.414";
 
 export interface CliInstallResult {
   success: boolean;
@@ -51,7 +52,7 @@ function getTargetVersion(options: CliInstallOptions): string {
       );
     }
     return normalizeVersion(copilotVersion);
-  } catch (sdkErr) {
+  } catch {
     // Fallback: support repos that pin @github/copilot directly.
     try {
       const packageJsonPath = join(__dirname, "..", "package.json");
@@ -61,12 +62,10 @@ function getTargetVersion(options: CliInstallOptions): string {
         throw new Error("@github/copilot version not found in package.json");
       }
       return normalizeVersion(directCopilotVersion);
-    } catch (pkgErr) {
-      const sdkMessage = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
-      const pkgMessage = pkgErr instanceof Error ? pkgErr.message : String(pkgErr);
-      throw new Error(
-        `Failed to determine target CLI version: ${sdkMessage}; fallback failed: ${pkgMessage}`
-      );
+    } catch {
+      // .vsix packages exclude node_modules, so metadata files can be unavailable at runtime.
+      // Fall back to a bundled known-compatible CLI version.
+      return BUNDLED_COPILOT_VERSION_FALLBACK;
     }
   }
 }
