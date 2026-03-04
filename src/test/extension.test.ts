@@ -6,7 +6,7 @@ import {
   setMockClient,
   type MockClient,
 } from "./__mocks__/copilot-sdk.js";
-import { stopClient } from "../copilotService.js";
+import * as copilotService from "../copilotService.js";
 import { activate } from "../extension.js";
 import {
   createMockWebviewView,
@@ -110,7 +110,7 @@ describe("WebviewView chat panel", () => {
   });
 
   afterEach(async () => {
-    await stopClient();
+    await copilotService.stopClient();
     vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
   });
 
@@ -229,6 +229,31 @@ describe("WebviewView chat panel", () => {
         (e: unknown) => (e as { message: string }).message
       );
       expect(messages.some((m: string) => m.includes("endpoint"))).toBe(true);
+    });
+  });
+
+  describe("CLI preflight", () => {
+    it("prompts install during startup when CLI is missing and cliPath is empty", async () => {
+      vi.mocked(copilotService.discoverAndValidateCli).mockResolvedValueOnce({
+        valid: false,
+        reason: "not_found",
+        details: "No managed Copilot CLI found in extension storage and no cliPath configured",
+      });
+      vi.mocked(vscode.window.showInformationMessage).mockClear();
+      const configChangeHandler = vi.mocked(vscode.workspace.onDidChangeConfiguration).mock.calls.at(-1)?.[0];
+      expect(configChangeHandler).toBeTypeOf("function");
+      await configChangeHandler!({
+        affectsConfiguration: (key: string) =>
+          key === "forge.copilot" || key === "forge.copilot.cliPath",
+      } as unknown as vscode.ConfigurationChangeEvent);
+
+      await vi.waitFor(() => {
+        expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+          "Forge needs the GitHub Copilot CLI to work. Install it now?",
+          "Install",
+          "Cancel"
+        );
+      });
     });
   });
 
