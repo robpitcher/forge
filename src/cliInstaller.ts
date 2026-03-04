@@ -23,26 +23,51 @@ export interface CliInstallOptions {
 
 /**
  * Gets the target CLI package version.
- * If not provided, reads the @github/copilot-sdk version from package.json.
+ * If not provided, resolves @github/copilot version from @github/copilot-sdk metadata.
  */
 function getTargetVersion(options: CliInstallOptions): string {
+  const normalizeVersion = (version: string): string =>
+    version.trim().replace(/^[~^]/, "");
+
   if (options.targetVersion) {
-    return options.targetVersion;
+    return normalizeVersion(options.targetVersion);
   }
 
-  // Read SDK version from package.json
+  // Prefer the copilot dependency declared by the installed SDK package.
   try {
-    const packageJsonPath = join(__dirname, "..", "package.json");
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-    const sdkVersion = packageJson.dependencies?.["@github/copilot-sdk"];
-    if (!sdkVersion) {
-      throw new Error("@github/copilot-sdk version not found in package.json");
+    const sdkPackageJsonPath = join(
+      __dirname,
+      "..",
+      "node_modules",
+      "@github",
+      "copilot-sdk",
+      "package.json"
+    );
+    const sdkPackageJson = JSON.parse(readFileSync(sdkPackageJsonPath, "utf8"));
+    const copilotVersion = sdkPackageJson.dependencies?.["@github/copilot"];
+    if (!copilotVersion) {
+      throw new Error(
+        "@github/copilot dependency not found in @github/copilot-sdk package metadata"
+      );
     }
-    // Strip any ^ or ~ prefix
-    return sdkVersion.replace(/^[~^]/, "");
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to determine target CLI version: ${message}`);
+    return normalizeVersion(copilotVersion);
+  } catch (sdkErr) {
+    // Fallback: support repos that pin @github/copilot directly.
+    try {
+      const packageJsonPath = join(__dirname, "..", "package.json");
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+      const directCopilotVersion = packageJson.dependencies?.["@github/copilot"];
+      if (!directCopilotVersion) {
+        throw new Error("@github/copilot version not found in package.json");
+      }
+      return normalizeVersion(directCopilotVersion);
+    } catch (pkgErr) {
+      const sdkMessage = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
+      const pkgMessage = pkgErr instanceof Error ? pkgErr.message : String(pkgErr);
+      throw new Error(
+        `Failed to determine target CLI version: ${sdkMessage}; fallback failed: ${pkgMessage}`
+      );
+    }
   }
 }
 
