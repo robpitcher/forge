@@ -232,6 +232,12 @@
 
     container.appendChild(steps);
 
+    // Sidebar tip
+    const tip = document.createElement("p");
+    tip.className = "setup-tip";
+    tip.textContent = "💡 Tip: Drag the Forge icon to the right sidebar to use it alongside your file explorer.";
+    container.appendChild(tip);
+
     // "Check Configuration" button
     const checkDiv = document.createElement("div");
     checkDiv.className = "check-config";
