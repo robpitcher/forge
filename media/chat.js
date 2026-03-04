@@ -235,7 +235,7 @@
     // Sidebar tip
     const tip = document.createElement("p");
     tip.className = "setup-tip";
-    tip.textContent = "💡 Tip: Drag the Forge icon to the right sidebar to use it alongside your file explorer.";
+    tip.textContent = "💡 Tip: You can drag Forge to the right sidebar to group it alongside the integrated chat.";
     container.appendChild(tip);
 
     // "Check Configuration" button
