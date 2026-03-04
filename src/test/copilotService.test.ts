@@ -442,6 +442,19 @@ describe("copilotService", () => {
         expect.any(Object)
       );
     });
+
+    it("prepends node for case-insensitive .JS paths (Windows)", async () => {
+      mockExecFileSync.mockReturnValue("@github/copilot v1.2.3\n");
+
+      const result = await validateCopilotCli("C:\\Path\\To\\npm-loader.JS");
+
+      expect(result.valid).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        process.execPath,
+        ["C:\\Path\\To\\npm-loader.JS", "--version"],
+        expect.any(Object)
+      );
+    });
   });
 
   describe("probeCliCompatibility", () => {

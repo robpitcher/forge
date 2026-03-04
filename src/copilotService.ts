@@ -29,13 +29,13 @@ export type CopilotCliValidationResult =
 /**
  * Resolves spawn command and arguments for a CLI path.
  *
- * On Windows, `.js` files cannot be executed directly (no shebang support),
- * so we prepend the current Node.js binary (`process.execPath`) as the command.
- * The SDK does this internally for CopilotClient, but our own validation and
- * probe functions also spawn the CLI and need the same treatment.
+ * `.js` files cannot be spawned as executables on Windows (no shebang support)
+ * and may lack execute permissions on Unix after npm install. We prepend the
+ * current Node.js binary (`process.execPath`) as the command for all platforms,
+ * matching the SDK's own behavior in CopilotClient.start().
  */
 function resolveCliSpawnArgs(cliPath: string, args: readonly string[]): { command: string; args: string[] } {
-  if (cliPath.endsWith(".js")) {
+  if (cliPath.toLowerCase().endsWith(".js")) {
     return { command: process.execPath, args: [cliPath, ...args] };
   }
   return { command: cliPath, args: [...args] };
