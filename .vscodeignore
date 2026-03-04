@@ -17,3 +17,4 @@ package-lock.json
 custom-instructions/**
 enclave-*.vsix
 dist/**/*.map
+resources/repoheader.png

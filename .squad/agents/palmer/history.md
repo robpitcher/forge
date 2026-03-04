@@ -53,3 +53,17 @@
 - **Verification:** `git ls-files | grep ":"` returns zero — all tracked files are now Windows-safe.
 - **Commit:** `9e12441` — 53 files changed (51 renames + 3 template updates).
 - **Impact:** Windows developers can now clone and work on the repository without path errors.
+
+### Marketplace Pre-Release Publishing (2026-03-03)
+- **Goal:** Extend insider-release.yml to publish pre-release builds to VS Code Marketplace using Rob's PAT (`ADO_MARKETPLACE_PAT`).
+- **package.json changes:**
+  - Added `"vscode:prepublish": "npm run build -- --production"` — convention for VS Code extensions; runs automatically before `vsce package/publish`.
+  - Updated `package` script to just `"vsce package"` — build now delegated to `vscode:prepublish` lifecycle hook.
+- **insider-release.yml changes:**
+  - New marketplace publish step runs AFTER GitHub Release verification (GitHub Release is primary artifact).
+  - **Version strategy:** Compute `{major}.{minor}.{github.run_number}` (e.g., `0.2.15`) to ensure each insider build has a unique marketplace version.
+  - Use `npm version --no-git-tag-version` to update package.json in CI without committing.
+  - Package and publish with `--pre-release` flag to show "Pre-Release" badge on marketplace.
+  - **Error handling:** `continue-on-error: true` on marketplace publish — if marketplace fails, GitHub Release still succeeds.
+- **Key files:** `package.json` (scripts), `.github/workflows/insider-release.yml` (marketplace publish steps).
+- **Decision doc:** `.squad/decisions/inbox/palmer-marketplace-prerelease.md` — documents the dual-version strategy (insider tags vs marketplace versions).

@@ -76,3 +76,22 @@ jobs:
         run: |
           gh release view "${{ steps.version.outputs.insider_tag }}"
           echo "✅ Insider Release ${{ steps.version.outputs.insider_tag }} created and verified."
+
+      - name: Compute marketplace version
+        id: marketplace
+        run: |
+          BASE_VERSION=$(node -e "console.log(require('./package.json').version)")
+          MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          MARKETPLACE_VERSION="${MAJOR}.${MINOR}.${{ github.run_number }}"
+          echo "version=$MARKETPLACE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Marketplace Version: $MARKETPLACE_VERSION"
+
+      - name: Publish to VS Code Marketplace (Pre-Release)
+        continue-on-error: true
+        env:
+          VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
+        run: |
+          npm version ${{ steps.marketplace.outputs.version }} --no-git-tag-version
+          npx @vscode/vsce package --pre-release
+          npx @vscode/vsce publish --pre-release --pat $VSCE_PAT

@@ -252,7 +252,8 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "package": "npm run build -- --production && vsce package",
+    "vscode:prepublish": "npm run build -- --production",
+    "package": "vsce package",
     "lint": "eslint src/",
     "lint:types": "tsc --noEmit",
     "test": "vitest run"
