@@ -1088,7 +1088,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     );
 
     if (choice === "Install") {
-      // Show progress notification during install
+      // Run install inside progress, then show result AFTER progress dismisses
+      let installResult: CliInstallResult | undefined;
+      let installError: string | undefined;
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -1097,36 +1100,37 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         },
         async () => {
           try {
-            const result: CliInstallResult = await installCopilotCli({
+            installResult = await installCopilotCli({
               globalStoragePath: this._globalStoragePath,
             });
-
-            if (result.success) {
-              await vscode.window.showInformationMessage(
-                "Copilot CLI installed successfully. Try sending a message again."
-              );
-            } else {
-              const errorDetail = result.error ?? "Unknown error";
-              const choice = await vscode.window.showErrorMessage(
-                `Failed to install Copilot CLI: ${errorDetail}`,
-                "Open Settings"
-              );
-              if (choice === "Open Settings") {
-                await this.openSettings();
-              }
-            }
           } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : String(err);
-            const choice = await vscode.window.showErrorMessage(
-              `Failed to install Copilot CLI: ${message}`,
-              "Open Settings"
-            );
-            if (choice === "Open Settings") {
-              await this.openSettings();
-            }
+            installError = err instanceof Error ? err.message : String(err);
           }
         }
       );
+
+      if (installError) {
+        const retry = await vscode.window.showErrorMessage(
+          `Failed to install Copilot CLI: ${installError}`,
+          "Open Settings"
+        );
+        if (retry === "Open Settings") {
+          await this.openSettings();
+        }
+      } else if (installResult?.success) {
+        await vscode.window.showInformationMessage(
+          "Copilot CLI installed successfully. Try sending a message again."
+        );
+      } else {
+        const errorDetail = installResult?.error ?? "Unknown error";
+        const retry = await vscode.window.showErrorMessage(
+          `Failed to install Copilot CLI: ${errorDetail}`,
+          "Open Settings"
+        );
+        if (retry === "Open Settings") {
+          await this.openSettings();
+        }
+      }
     } else {
       // User cancelled — show manual install instructions
       const choice = await vscode.window.showInformationMessage(
