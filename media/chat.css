@@ -564,6 +564,11 @@ button:active {
   color: var(--vscode-errorForeground);
 }
 
+.auth-banner.warning {
+  border-left-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+  background-color: var(--vscode-inputValidation-warningBackground);
+}
+
 .auth-banner button {
   background: none;
   border: none;

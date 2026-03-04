@@ -632,6 +632,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._sendConfigStatus(undefined, true);
     } else if (message.command === "openDocs") {
       await vscode.env.openExternal(vscode.Uri.parse("https://github.com/robpitcher/forge?tab=readme-ov-file#forge"));
+    } else if (message.command === "openUrl") {
+      const url = typeof message.url === "string" ? message.url : "";
+      if (url.startsWith("https://")) {
+        await vscode.env.openExternal(vscode.Uri.parse(url));
+      }
+    } else if (message.command === "installCli") {
+      await this._handleCliAutoInstall("User requested install from banner");
     }
   }
 
