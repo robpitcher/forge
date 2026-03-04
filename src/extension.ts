@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
+import { execFileSync } from "child_process";
+import { platform } from "os";
 import { getConfiguration, getConfigurationAsync, validateConfiguration, type ExtensionConfig } from "./configuration.js";
 import { createCredentialProvider } from "./auth/credentialProvider.js";
 import {
@@ -36,6 +38,19 @@ const TOOL_PERMISSION_TIMEOUT_MS = 120_000;
 
 /** Pre-fetched extension state to avoid redundant async calls. */
 type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync>>; authStatus: AuthStatus };
+
+const AZ_INSTALL_URL = "https://aka.ms/installazurecli";
+
+/** Check whether the `az` CLI is available on the system PATH. */
+function isAzCliAvailable(): boolean {
+  try {
+    const cmd = platform() === "win32" ? "where.exe" : "which";
+    execFileSync(cmd, ["az"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Forge");
@@ -121,6 +136,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("forge.signIn", async () => {
       const config = await getConfigurationAsync(context.secrets);
       if (config.authMethod === "entraId") {
+        if (!isAzCliAvailable()) {
+          const action = await vscode.window.showErrorMessage(
+            "Azure CLI is required for Entra ID sign-in. Install it from https://aka.ms/installazurecli",
+            "Install Azure CLI"
+          );
+          if (action === "Install Azure CLI") {
+            await vscode.env.openExternal(vscode.Uri.parse(AZ_INSTALL_URL));
+          }
+          return;
+        }
         const terminal = vscode.window.createTerminal("Azure Sign In");
         terminal.sendText("az login");
         terminal.show();
