@@ -263,6 +263,28 @@ describe("cliInstaller", () => {
 
       expect(capturedArgs).toContain("@github/copilot@0.0.414");
     });
+
+    it("falls back to bundled CLI version when metadata files are unavailable", async () => {
+      mockReadFileSync.mockImplementation(() => {
+        throw new Error("ENOENT: metadata file not found");
+      });
+
+      let capturedArgs: string[] = [];
+      mockExecFile.mockImplementation(
+        (cmd: string, args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
+          if (cmd === "npm") {
+            capturedArgs = args;
+            if (callback) callback(null, "installed", "");
+          }
+          return { kill: vi.fn(), pid: 12345 };
+        },
+      );
+      mockExistsSync.mockReturnValue(true);
+
+      await installCopilotCli({ globalStoragePath: "/test/storage" });
+
+      expect(capturedArgs).toContain("@github/copilot@0.0.414");
+    });
   });
 
   describe("installCopilotCli - error paths", () => {

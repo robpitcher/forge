@@ -8,6 +8,10 @@ import { join } from "path";
  */
 export const CLI_INSTALL_DIR = "copilot-cli";
 
+// Injected at build time by esbuild from @github/copilot-sdk's package.json.
+// See esbuild.config.mjs — no hardcoded version to maintain.
+declare const __COPILOT_CLI_VERSION__: string;
+
 export interface CliInstallResult {
   success: boolean;
   cliPath?: string;
@@ -51,7 +55,7 @@ function getTargetVersion(options: CliInstallOptions): string {
       );
     }
     return normalizeVersion(copilotVersion);
-  } catch (sdkErr) {
+  } catch {
     // Fallback: support repos that pin @github/copilot directly.
     try {
       const packageJsonPath = join(__dirname, "..", "package.json");
@@ -61,12 +65,10 @@ function getTargetVersion(options: CliInstallOptions): string {
         throw new Error("@github/copilot version not found in package.json");
       }
       return normalizeVersion(directCopilotVersion);
-    } catch (pkgErr) {
-      const sdkMessage = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
-      const pkgMessage = pkgErr instanceof Error ? pkgErr.message : String(pkgErr);
-      throw new Error(
-        `Failed to determine target CLI version: ${sdkMessage}; fallback failed: ${pkgMessage}`
-      );
+    } catch {
+      // .vsix packages exclude node_modules, so metadata files can be unavailable at runtime.
+      // Fall back to the CLI version injected at build time from the SDK's package.json.
+      return __COPILOT_CLI_VERSION__;
     }
   }
 }
