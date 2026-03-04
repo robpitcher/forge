@@ -515,6 +515,31 @@ function buildToolConfig(config: ExtensionConfig): { excludedTools?: string[] } 
   return {};
 }
 
+/**
+ * Builds the session config object for createSession/resumeSession.
+ * Consolidates provider, tool, MCP, and system message configuration.
+ */
+function buildSessionConfig(
+  config: ExtensionConfig,
+  authToken: string,
+  model: string,
+  onPermissionRequest?: PermissionHandler,
+) {
+  const provider = buildProviderConfig(config, authToken);
+  const toolConfig = buildToolConfig(config);
+  const mcpServers = buildMcpServersConfig(config);
+
+  return {
+    model,
+    provider,
+    streaming: true as const,
+    ...toolConfig,
+    ...(mcpServers && { mcpServers }),
+    ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
+    ...(onPermissionRequest && { onPermissionRequest }),
+  };
+}
+
 export async function getOrCreateSession(
   conversationId: string,
   config: ExtensionConfig,
@@ -533,23 +558,15 @@ export async function getOrCreateSession(
   }
 
   const copilotClient = await getOrCreateClient(config, globalStoragePath);
-  const provider = buildProviderConfig(config, authToken);
-  const toolConfig = buildToolConfig(config);
-  const mcpServers = buildMcpServersConfig(config);
+  const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest);
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
-    model,
-    provider,
-    streaming: true,
-    ...toolConfig,
-    ...(mcpServers && { mcpServers }),
-    ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
-    ...(onPermissionRequest && { onPermissionRequest }),
+    ...sessionConfig,
   })) as unknown as ICopilotSession;
 
-  if (typeof session.send !== 'function' || typeof session.on !== 'function') {
-    throw new Error('SDK session shape mismatch — check @github/copilot-sdk version');
+  if (typeof session.send !== "function" || typeof session.on !== "function") {
+    throw new Error("SDK session shape mismatch — check @github/copilot-sdk version");
   }
 
   sessions.set(conversationId, session);
@@ -589,6 +606,7 @@ export async function destroyAllSessions(): Promise<void> {
       console.warn(`Session ${conversationId} is undefined, skipping abort`);
       continue;
     }
+
     let abortPromise: Promise<void>;
     try {
       abortPromise = session.abort();
@@ -597,6 +615,7 @@ export async function destroyAllSessions(): Promise<void> {
       console.warn(`Failed to abort session ${conversationId}: ${message}`);
       continue;
     }
+
     abortPromises.push(
       abortPromise.catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -648,27 +667,15 @@ export async function resumeConversation(
 ): Promise<ICopilotSession> {
   try {
     const copilotClient = await getOrCreateClient(config, globalStoragePath);
-    const provider = buildProviderConfig(config, authToken);
-    const toolConfig = buildToolConfig(config);
-    const mcpServers = buildMcpServersConfig(config);
-
-    const resumeConfig: ResumeSessionConfig = {
-      model,
-      provider,
-      streaming: true,
-      ...toolConfig,
-      ...(mcpServers && { mcpServers }),
-      ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
-      ...(onPermissionRequest && { onPermissionRequest }),
-    };
+    const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest);
 
     const session = (await copilotClient.resumeSession(
       sessionId,
-      resumeConfig
+      sessionConfig as ResumeSessionConfig
     )) as unknown as ICopilotSession;
 
-    if (typeof session.send !== 'function' || typeof session.on !== 'function') {
-      throw new Error('SDK session shape mismatch — check @github/copilot-sdk version');
+    if (typeof session.send !== "function" || typeof session.on !== "function") {
+      throw new Error("SDK session shape mismatch — check @github/copilot-sdk version");
     }
 
     // Store in local sessions map so it can be managed alongside new sessions

@@ -34,10 +34,10 @@
    ```
 
 4. **Verify .vsix file:**
-   - Check that `forge-0.1.0.vsix` exists in the project root
+   - Check that `forge-<version>.vsix` exists in the project root
    - Verify file size is under 10 MB (should be ~40 KB)
    ```bash
-   ls -lh forge-0.1.0.vsix
+   ls -lh forge-*.vsix
    ```
 
 ---
@@ -47,7 +47,7 @@
 1. **Install the extension:**
    - In VS Code, open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
    - Run: `Extensions: Install from VSIX...`
-   - Select `forge-0.1.0.vsix`
+   - Select the `.vsix` file (e.g., `forge-0.2.0.vsix`)
    - Wait for installation to complete
 
 2. **Verify installation:**
@@ -58,7 +58,7 @@
    - Open Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Search for "Forge"
    - ✅ Extension appears with name "Forge"
-   - ✅ Version shows `0.1.0`
+   - ✅ Version matches the `.vsix` package (e.g., `0.2.0`)
 
 ---
 
