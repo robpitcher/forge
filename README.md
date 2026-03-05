@@ -6,6 +6,27 @@ A VS Code chat extension that routes AI chat through your own Azure AI Foundry e
 
 The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint within your Azure tenant.
 
+## Features
+
+### Authentication Methods
+
+Forge supports two authentication methods, controlled by `forge.copilot.authMethod`:
+
+- **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
+- **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for environments without Entra ID.
+
+### Code Actions
+
+Right-click on code or use the editor lightbulb menu (💡) to access:
+
+- **Explain with Forge** — Get an explanation of selected code
+- **Fix with Forge** — Ask Forge to fix selected code
+- **Write Tests with Forge** — Generate tests for selected code
+
+### Model Selector
+
+Use the model dropdown in the chat UI to switch between configured deployment names. Models are configured via `forge.copilot.models` — values must match the **deployment name** in Azure AI Foundry, not the underlying model name.
+
 ## Prerequisites
 
 - **VS Code** 1.93 or later
@@ -35,27 +56,6 @@ Ensure you've installed the [prerequisites](#prerequisites) before starting.
 
 5. **Multi-turn conversations:** The chat maintains session context within the same session
 
-## Features
-
-### Authentication Methods
-
-Forge supports two authentication methods, controlled by `forge.copilot.authMethod`:
-
-- **Entra ID** (default) — Uses `DefaultAzureCredential` from `@azure/identity`. Authenticate via `az login` or managed identity. Recommended for environments with Azure AD.
-- **API Key** — Uses a static API key stored securely in VS Code SecretStorage. Set via the ⚙️ gear icon → "Set API Key (secure)". Use for environments without Entra ID.
-
-### Code Actions
-
-Right-click on code or use the editor lightbulb menu (💡) to access:
-
-- **Explain with Forge** — Get an explanation of selected code
-- **Fix with Forge** — Ask Forge to fix selected code
-- **Write Tests with Forge** — Generate tests for selected code
-
-### Model Selector
-
-Use the model dropdown in the chat UI to switch between configured deployment names. Models are configured via `forge.copilot.models` — values must match the **deployment name** in Azure AI Foundry, not the underlying model name.
-
 ## Usage
 
 ### Start a chat
@@ -81,12 +81,12 @@ graph TD
         cli["Copilot CLI<br/>(local subprocess)"]
     end
 
-    azure["Azure AI Foundry<br/>(Private Endpoint)"]
+    azure["Azure AI Foundry"]
 
     sidebar <-->|"postMessage"| exthost
     exthost -.->|"getToken()"| creds
     exthost <-->|"JSON-RPC (stdio)"| cli
-    cli -->|"HTTPS (private network)"| azure
+    cli -->|"HTTPS"| azure
 ```
 
 ## Installation
