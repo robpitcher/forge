@@ -102,3 +102,36 @@ Wrote `src/test/az-cli-detection.test.ts` with 12 tests covering Blair's `isAzCl
 **Key pattern:** `isAzCliAvailable()` is tested indirectly by extracting the `forge.signIn` handler from `registerCommand` mock calls. The `makeAzNotFound()` helper selectively throws on `which`/`where.exe` + `az` args while passing through other `execFileSync` calls.
 
 **Outcome:** ✅ SUCCESS — 12 new tests, 291 total passing (17 files), no regressions.
+
+## 2026-03-05: Workspace Awareness Tests
+
+Added tests for Blair's workspace awareness feature across two test files:
+
+### copilotService.test.ts (6 new tests):
+- `workingDirectory` included in session config when `workspaceRoot` provided
+- `workingDirectory` NOT included when `workspaceRoot` is undefined
+- `workingDirectory` NOT included when `workspaceRoot` is empty string (falsy guard)
+- Session recreated when `workspaceRoot` changes (configHash invalidation)
+- Session reused when `workspaceRoot` is unchanged
+- Session recreated when `workspaceRoot` goes from defined to undefined
+
+### extension.test.ts (3 new tests):
+- `_postWorkspaceInfo()` posts `workspaceInfo` with `folderName` when folder open
+- `_postWorkspaceInfo()` posts `workspaceInfo` with `null` folderName when no folder
+- `_postWorkspaceInfo()` extracts folder name from Windows-style backslash paths
+
+### Fix: tool-approval.test.ts
+- Fixed `waitFor` filter at line 395 missing `cliStatus` and `workspaceInfo` — caused false assertion by counting infrastructure messages.
+
+### Mock updates: vscode.ts
+- Already had `onDidChangeWorkspaceFolders` and `workspaceFolders` from Blair's commit
+
+**Key patterns:**
+- `buildSessionConfig()` is private — tested indirectly via `getOrCreateSession()` by inspecting `mockClient.createSession` call args
+- `configHash` includes `workspaceRoot ?? ""` so undefined→defined and vice versa both trigger session recreation
+- `_postWorkspaceInfo()` uses regex split `[\\/]` for cross-platform path parsing
+- The `resolveProvider()` helper triggers `_postWorkspaceInfo()` since it's called in `resolveWebviewView()`
+
+**Outcome:** ✅ SUCCESS — 9 new tests, 300 total passing (17 files), no regressions. Typecheck clean.
+
+📌 Team update (2026-03-05): Workspace Awareness feature complete — decided by MacReady, Windows. Decisions merged to .squad/decisions.md. All 9 tests green. Ready for merge to dev.

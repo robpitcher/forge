@@ -269,3 +269,18 @@ Wired CLI auto-install into extension.ts with ask-first dialog, progress notific
 📌 Added "pro tip" to the welcome/setup view telling users they can drag Forge to the right sidebar. In `media/chat.js`, added a `<p class="setup-tip">` element between the setup steps and the "Check Configuration" button (~line 236). In `media/chat.css`, added `.welcome-screen .setup-tip` styling: 12px italic text at 0.55 opacity, max-width 320px — visually muted and distinct from numbered setup steps. Not a numbered step; just a friendly hint with 💡 emoji.
 
 📌 PR147 cleanup follow-up: replaced `scripts.package` shell cleanup with a cross-platform Node one-liner that removes only `dist/*.map` before `vsce package`; updated `isAzCliAvailable()` to pass `{ stdio: "ignore", windowsHide: true }` to `execFileSync`; and removed duplicated Azure CLI install URL text by reusing `AZ_INSTALL_URL` in the sign-in error message. Updated `az-cli-detection.test.ts` expectations to include `windowsHide: true`.
+
+📌 Implemented workspace awareness (Issue #XX). The copilot-sdk already supports `workingDirectory` on SessionConfig — we just weren't passing it.
+### Changes
+- **`src/copilotService.ts`**: Added `workspaceRoot?: string` parameter to `buildSessionConfig()`, `getOrCreateSession()`, and `resumeConversation()`. Passed as `workingDirectory` in session config. Included in `configHash` so sessions are recreated when workspace changes.
+- **`src/extension.ts`**: Added `_workspaceRoot` getter reading `vscode.workspace.workspaceFolders?.[0]?.uri.fsPath`. Passes it to all `getOrCreateSession()` and `resumeConversation()` calls. Added `onDidChangeWorkspaceFolders` listener calling `notifyWorkspaceChanged()`. Added `_postWorkspaceInfo()` method sending `{ type: "workspaceInfo", folderName }` to webview. Sends on `resolveWebviewView()` and on folder change. Added `<span id="workspaceIndicator">` in `.context-actions` div.
+- **`media/chat.js`**: Handles `workspaceInfo` message — sets `📂 folder-name` text in `#workspaceIndicator`, toggles `hidden` class.
+- **`media/chat.css`**: Added `.workspace-indicator` style: `margin-left: auto`, 12px font, 0.7 opacity, ellipsis overflow at 160px max-width. Added `align-items: center` to `.context-actions`.
+- **Test mocks**: Added `onDidChangeWorkspaceFolders` to vscode workspace mock. Updated 3 test files to filter `workspaceInfo` from streaming message type assertions.
+
+### Learnings
+- The VS Code mock in `src/test/__mocks__/vscode.ts` must be kept in sync when new `vscode.workspace.*` APIs are used in `activate()`.
+- Tests that assert on posted message ordering filter out "status" messages — new message types sent during `resolveWebviewView` must be added to those filters.
+- `workspaceFolders[0]` is the standard single-root convention matching Copilot behavior.
+
+📌 Team update (2026-03-05): Workspace Awareness feature complete — decided by MacReady, Windows. Decisions merged to .squad/decisions.md. Ready for merge to dev.

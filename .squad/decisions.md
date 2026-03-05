@@ -3121,3 +3121,94 @@ Add a proactive `az` CLI availability check **before** opening the terminal:
 
 - Blair owns `src/extension.ts` — no cross-domain impact.
 - No test changes required (existing 67+ tests unaffected).
+
+---
+
+### 2026-03-05: Workspace Awareness via workingDirectory
+
+**Author:** MacReady (Architecture & Design)  
+**Date:** 2026-03-05  
+**Status:** Implemented by Blair, tested by Windows  
+
+## Problem
+
+When a user chats with Forge, the AI has no awareness of which workspace folder is open in VS Code. Tool operations (shell, read, write) run in whatever directory the CLI process happens to use — not the user's project folder. The AI can't give workspace-relative answers ("what files are in my project?", "fix the bug in src/app.ts").
+
+## Discovery
+
+The `@github/copilot-sdk` has a `workingDirectory` field on `SessionConfig` (and `ResumeSessionConfig`) with the comment "Tool operations will be relative to this directory." The `buildSessionConfig()` function in `copilotService.ts` constructs the session config but was not setting `workingDirectory`.
+
+## Decision
+
+- Capture the primary workspace folder at session creation time: `vscode.workspace.workspaceFolders?.[0]?.uri.fsPath`
+- Pass `workspaceRoot` as `workingDirectory` in session config (in `buildSessionConfig`, `getOrCreateSession`, `resumeConversation`)
+- Include `workspaceRoot` in the `configHash` so sessions are recreated when the workspace changes
+- Show a passive `📂 folder-name` indicator in the webview context-actions bar
+- Send `workspaceInfo` message to webview on initial load and on `onDidChangeWorkspaceFolders`
+- Multi-root workspaces use first folder only, matching Copilot's behavior
+
+## Rationale
+
+- Uses SDK's native mechanism — avoids prompt injection, uses the platform's intended design
+- No new settings needed — fully automatic based on the open workspace
+- Indicator is passive (not interactive) — just shows user what folder the SDK is aware of
+- Session isolation via configHash prevents cache collisions across workspaces
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `src/copilotService.ts` | Add `workspaceRoot?` param to `buildSessionConfig`, `getOrCreateSession`, `resumeConversation`; add to `configHash`; pass as `workingDirectory` in session config |
+| `src/extension.ts` | Add `_workspaceRoot` getter; add `onDidChangeWorkspaceFolders` listener; add `postWorkspaceInfo()` method; update HTML template |
+| `media/chat.js` | Handle `workspaceInfo` message; show/hide indicator |
+| `media/chat.css` | Style `.workspace-indicator` |
+
+## Impact
+
+- Tool operations execute in the user's project folder context
+- Multi-turn conversations maintain workspace awareness
+- Workspace changes transparently create new session with updated context
+- Feature matches behavior of GitHub Copilot
+
+---
+
+### 2026-03-05: Test Filter Pattern for Workspace Awareness Messages
+
+**Author:** Windows (QA & Testing)  
+**Date:** 2026-03-05  
+**Scope:** Test assertions that filter streaming order messages
+
+## Context
+
+Workspace awareness feature adds `_postWorkspaceInfo()` method that fires during `resolveWebviewView()`. This message arrives as an infrastructure message before any chat interaction.
+
+## Decision
+
+Any test that filters posted webview messages to assert on streaming protocol order (streamStart → streamDelta → streamEnd) must exclude `workspaceInfo` from the filter, alongside existing infrastructure message types: `authStatus`, `modelsUpdated`, `modelSelected`, `configStatus`, `cliStatus`.
+
+## Rationale
+
+Tests that count or order non-infrastructure messages will break if they don't exclude `workspaceInfo`. The message is infrastructure (system state), not domain (chat protocol), so it must be filtered out.
+
+## Pattern
+
+```typescript
+const types = getPostedMessages(mockView)
+  .filter((m: unknown) => {
+    const t = (m as { type: string }).type;
+    return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo";
+  })
+  .map((m: unknown) => (m as { type: string }).type);
+```
+
+Apply this filter to all streaming order assertions and count-based checks in:
+- `copilotService.test.ts`
+- `extension.test.ts`
+- `tool-approval.test.ts`
+
+## Impact
+
+- Ensures test stability across workspace awareness feature
+- Future tests must follow this pattern when asserting on streaming order
+- Removes false test failures from infrastructure noise
+
