@@ -38,7 +38,7 @@ Use the model dropdown in the chat UI to switch between configured deployment na
 
 Ensure you've installed the [prerequisites](#prerequisites) before starting.
 
-1. **Install the Forge extension** — download the `.vsix` from [GitHub Releases](https://github.com/robpitcher/forge/releases) and sideload it (see [Installation](#installation) for details).
+1. **Install the Forge extension** — Search for "Forge" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge). If your environment doesn't have Marketplace access, see [Installation](#installation) for the sideload option.
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
@@ -95,16 +95,19 @@ graph TD
 
 ## Installation
 
-### From GitHub Releases (recommended for restricted or air-gapped networks)
+### From VS Code Marketplace (recommended)
+
+1. Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for **"Forge"** or visit the [Forge Marketplace page](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge)
+3. Click **Install**
+4. Forge publishes **pre-release** builds to the marketplace — check the **Pre-Release** tab for development versions
+
+### From GitHub Releases (for restricted or air-gapped networks)
 
 1. Download the latest `.vsix` file from [GitHub Releases](https://github.com/robpitcher/forge/releases)
 2. In VS Code, open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
 3. Click `...` → **Install from VSIX...**
 4. Select the downloaded `.vsix` file
-
-### From VS Code Marketplace
-
-Forge publishes **pre-release** builds to the VS Code Marketplace. Insider/development versions appear under **Pre-Release** in the extension details. For stable installations in restricted or air-gapped environments, use GitHub Releases above.
 
 ## Configuration
 
