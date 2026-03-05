@@ -48,16 +48,19 @@
   const chatMessages = document.getElementById("chatMessages");
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
+  const stopBtn = document.getElementById("stopBtn");
   const newConvBtn = document.getElementById("newConvBtn");
   const attachSelectionBtn = document.getElementById("attachSelection");
   const attachFileBtn = document.getElementById("attachFile");
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
   const modelSelector = document.getElementById("modelSelector");
+  const progressIndicator = document.getElementById("progressIndicator");
 
   let currentAssistantMessage = null;
   let currentAssistantRawText = "";
   let isStreaming = false;
+  let processingPhase = "idle";
   let pendingContext = [];
   let lastAutoAttachedContent = null;
   let messages = [];
@@ -67,6 +70,7 @@
 
   sendBtn.addEventListener("click", sendMessage);
   newConvBtn.addEventListener("click", newConversation);
+  stopBtn.addEventListener("click", stopRequest);
   modelSelector.addEventListener("change", () => {
     vscode.postMessage({ command: "modelChanged", model: modelSelector.value });
   });
@@ -107,6 +111,7 @@
 
   function resetUIState() {
     isStreaming = false;
+    processingPhase = "idle";
     currentAssistantRawText = "";
     currentAssistantMessage = null;
     pendingContext = [];
@@ -115,6 +120,39 @@
     autoAttachedChipElement = null;
     autoAttachedCtx = null;
     setInputEnabled(true);
+    updateProgressIndicator();
+    updateStopButtonVisibility();
+  }
+
+  function stopRequest() {
+    stopBtn.disabled = true;
+    vscode.postMessage({ command: "stopRequest" });
+  }
+
+  function updateProgressIndicator() {
+    if (!progressIndicator) { return; }
+    const textEl = progressIndicator.querySelector(".progress-text");
+    if (processingPhase === "idle") {
+      progressIndicator.classList.add("hidden");
+    } else if (processingPhase === "thinking") {
+      if (textEl) { textEl.textContent = "Forge is thinking..."; }
+      progressIndicator.classList.remove("hidden");
+      progressIndicator.scrollIntoView({ behavior: "smooth", block: "end" });
+    } else if (processingPhase === "generating") {
+      if (textEl) { textEl.textContent = "Generating response..."; }
+      progressIndicator.classList.remove("hidden");
+      progressIndicator.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }
+
+  function updateStopButtonVisibility() {
+    if (processingPhase === "idle" || !configIsComplete) {
+      stopBtn.classList.add("hidden");
+      stopBtn.disabled = false;
+    } else {
+      stopBtn.classList.remove("hidden");
+      stopBtn.disabled = false;
+    }
   }
 
   function sendMessage() {
@@ -527,6 +565,12 @@
       
       case "cliStatus":
         updateCliBanner(message.result);
+        break;
+
+      case "processingPhaseUpdate":
+        processingPhase = message.phase;
+        updateProgressIndicator();
+        updateStopButtonVisibility();
         break;
 
       case "streamStart":

@@ -402,8 +402,9 @@ export async function deactivate(): Promise<void> {
 class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _conversationId: string = `conv-${crypto.randomUUID()}`;
-  private _isProcessing = false;
+  private _processingPhase: "idle" | "thinking" | "generating" = "idle";
   private _isInstallingCli = false;
+  private _currentSession?: ICopilotSession;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
   private _conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
@@ -683,6 +684,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     } else if (message.command === "installCli") {
       await this._handleCliAutoInstall("User requested install from banner");
+    } else if (message.command === "stopRequest") {
+      if (this._currentSession && this._processingPhase !== "idle") {
+        this._currentSession.abort().catch(() => {});
+        this._currentSession = undefined;
+        this._postProcessingPhase("idle");
+      }
     }
   }
 
@@ -777,16 +784,21 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private _postProcessingPhase(phase: "idle" | "thinking" | "generating"): void {
+    this._processingPhase = phase;
+    this._view?.webview.postMessage({ type: "processingPhaseUpdate", phase });
+  }
+
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {
-    if (this._isProcessing) { return; }
-    this._isProcessing = true;
+    if (this._processingPhase !== "idle") { return; }
+    this._postProcessingPhase("thinking");
 
     let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
     try {
       config = await getConfigurationAsync(this._secrets);
     } catch {
       this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
     const validationErrors = validateConfiguration(config);
@@ -795,14 +807,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       for (const error of validationErrors) {
         this._postError(error.message);
       }
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
 
     const activeModel = this._getActiveModel(config.models);
     if (!activeModel) {
       this._postError("No model deployment configured. Click ⚙️ → Open Model Settings to add at least one model.");
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
 
@@ -812,7 +824,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this._postError(`Failed to initialize authentication: ${message}. Click ⚙️ to check your auth settings.`);
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
     let authToken: string;
@@ -829,7 +841,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       } else {
         this._postError(`Authentication failed: ${message}`);
       }
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
 
@@ -847,7 +859,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err: unknown) {
       if (err instanceof CopilotCliNeedsInstallError) {
         // Copilot CLI not found — offer to install it automatically
-        this._isProcessing = false;
+        this._postProcessingPhase("idle");
         await this._handleCliAutoInstall(err.message);
         return;
       } else if (err instanceof CopilotCliNotFoundError) {
@@ -856,7 +868,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         const message = err instanceof Error ? err.message : String(err);
         this._postError(`Failed to start Copilot service: ${message}`);
       }
-      this._isProcessing = false;
+      this._postProcessingPhase("idle");
       return;
     }
 
@@ -866,6 +878,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       // Add user message to cache
       this._conversationMessages.push({ role: "user", content: prompt });
 
+      this._currentSession = session;
+      this._postProcessingPhase("generating");
       await this._streamResponse(enrichedPrompt, session);
 
       // Cache messages after successful response
@@ -880,7 +894,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
-      this._isProcessing = false;
+      this._currentSession = undefined;
+      this._postProcessingPhase("idle");
     }
   }
 
@@ -1338,6 +1353,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
           <!-- Populated by JS when configuration is incomplete -->
         </div>
         <div id="chatMessages"></div>
+        <div id="progressIndicator" class="progress-indicator hidden">
+          <div class="progress-text">Forge is thinking...</div>
+          <div class="progress-dots">
+            <span>.</span><span>.</span><span>.</span>
+          </div>
+        </div>
         <div class="input-area">
             <div class="context-actions">
                 <span id="workspaceIndicator" class="workspace-indicator hidden"></span>
@@ -1348,6 +1369,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
             <div class="button-row">
                 <button id="sendBtn">Send</button>
+                <button id="stopBtn" class="stop-btn hidden">Stop</button>
                 <button id="newConvBtn">New Conversation</button>
                 <select id="modelSelector" title="Select model deployment"></select>
             </div>
