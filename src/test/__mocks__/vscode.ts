@@ -17,6 +17,8 @@ export const workspace = {
     update: vi.fn().mockResolvedValue(undefined),
   }),
   onDidChangeConfiguration: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  onDidChangeWorkspaceFolders: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  workspaceFolders: undefined as undefined | Array<{ uri: { fsPath: string }; name: string }>,
   asRelativePath: vi.fn((pathOrUri: unknown) => {
     const str = typeof pathOrUri === "string" ? pathOrUri : String(pathOrUri);
     return str.replace(/^file:\/\/\//, "");

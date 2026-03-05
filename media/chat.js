@@ -689,6 +689,22 @@
         }
         break;
       }
+
+      case "workspaceInfo": {
+        const indicator = document.getElementById("workspaceIndicator");
+        if (indicator) {
+          if (message.name) {
+            indicator.textContent = `📁 ${message.name}`;
+            indicator.title = message.path || message.name;
+            indicator.classList.remove("hidden");
+          } else {
+            indicator.textContent = "";
+            indicator.title = "";
+            indicator.classList.add("hidden");
+          }
+        }
+        break;
+      }
     }
   });
 

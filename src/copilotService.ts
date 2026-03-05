@@ -524,6 +524,7 @@ function buildSessionConfig(
   authToken: string,
   model: string,
   onPermissionRequest?: PermissionHandler,
+  workspaceRoot?: string,
 ) {
   const provider = buildProviderConfig(config, authToken);
   const toolConfig = buildToolConfig(config);
@@ -537,6 +538,7 @@ function buildSessionConfig(
     ...(mcpServers && { mcpServers }),
     ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
     ...(onPermissionRequest && { onPermissionRequest }),
+    ...(workspaceRoot && { workingDirectory: workspaceRoot }),
   };
 }
 
@@ -547,8 +549,9 @@ export async function getOrCreateSession(
   model: string,
   globalStoragePath?: string,
   onPermissionRequest?: PermissionHandler,
+  workspaceRoot?: string,
 ): Promise<ICopilotSession> {
-  const configHash = config.endpoint + "|" + config.authMethod + "|" + model + "|" + config.wireApi + "|" + authToken;
+  const configHash = config.endpoint + "|" + config.authMethod + "|" + model + "|" + config.wireApi + "|" + authToken + "|" + (workspaceRoot ?? "");
   const existing = sessions.get(conversationId);
   if (existing) {
     if (sessionConfigHashes.get(conversationId) === configHash) {
@@ -558,7 +561,7 @@ export async function getOrCreateSession(
   }
 
   const copilotClient = await getOrCreateClient(config, globalStoragePath);
-  const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest);
+  const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest, workspaceRoot);
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
@@ -664,10 +667,11 @@ export async function resumeConversation(
   model: string,
   globalStoragePath?: string,
   onPermissionRequest?: PermissionHandler,
+  workspaceRoot?: string,
 ): Promise<ICopilotSession> {
   try {
     const copilotClient = await getOrCreateClient(config, globalStoragePath);
-    const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest);
+    const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest, workspaceRoot);
 
     const session = (await copilotClient.resumeSession(
       sessionId,
