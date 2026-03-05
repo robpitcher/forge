@@ -84,3 +84,14 @@
   - Sourcemap cleanup runs AFTER production build (which doesn't create .map files), so it's a no-op for clean builds but catches dev artifacts
 - **Validation:** npm run build && npm run lint && tsc --noEmit && npm test — all 291 tests passing, no regressions
 - **Commit:** 0bb3593 on feat/notif-cleanup-and-review
+
+### Stable Release Marketplace Publish Fix (2026-03-05)
+- **Problem:** Copilot added a minimal `vsce publish` step to release.yml that re-built from source instead of publishing the already-tested `.vsix`. This meant the GitHub Release artifact and marketplace artifact could differ (two separate builds from same source).
+- **Root cause:** `vsce publish` without `--packagePath` triggers `vscode:prepublish` and re-packages from scratch. Also, the version step ran AFTER the package step, so `--out` couldn't reference the version.
+- **Additional finding:** `npm run package` (which runs bare `vsce package`) would produce `forge-ai-{version}.vsix` (using the package name), but the GitHub Release step referenced `forge-{version}.vsix`. The `--out` flag fixes this by producing the exact expected filename.
+- **Changes:**
+  1. Moved "Read version" step before "Package extension" so version is available as an output
+  2. Added `--out forge-$VERSION.vsix` to package step for deterministic filename matching insider convention
+  3. Changed publish step to `vsce publish --packagePath forge-$VERSION.vsix` — publishes the exact `.vsix` that was tested and attached to GitHub Release
+- **Key principle:** Build once, publish everywhere. The same `.vsix` flows through: build → test → GitHub Release → Marketplace.
+- **Commit:** 6fe3e19 on copilot/update-release-workflow-for-vscode-marketplace

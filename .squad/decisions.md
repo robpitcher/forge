@@ -3274,25 +3274,25 @@ Apply this filter to all streaming order assertions and count-based checks in:
 - Future tests must follow this pattern when asserting on streaming order
 - Removes false test failures from infrastructure noise
 
-# Decision: README Section Reordering and Architecture Diagram Simplification
+# Decision: README Documentation Improvements — Features, Architecture & Installation Paths
 
-**Date:** 2026-03-15  
-**Owner:** Fuchs (Technical Writer)  
-**Status:** Decided  
-**Stakeholders:** Rob Pitcher (Product), Nauls (Architecture)
+**Date:** 2026-03-15
+**Author:** Fuchs (Technical Writer)
+**Scope:** `README.md`
+**Status:** Merged
+**Commits:** 
+  - fc5e30b (Features & diagram)
+  - 0914c65 (Installation reordering)
 
-## Scope
+## Problem
 
-Two documentation improvements to README.md:
+Three README issues identified:
 
-1. **Reorder sections:** Move Features section before Prerequisites
-2. **Simplify architecture diagram:** Remove private networking qualifiers
+1. **Features buried:** Features section was positioned after Prerequisites, making it less discoverable. New developers don't immediately see that Forge supports flexible authentication (Entra ID & API Key) — key differentiators for air-gapped environments.
 
-## Context
+2. **Architecture diagram misleading:** Labeled as "Azure AI Foundry (Private Endpoint)" with connection "HTTPS (private network)", overstating scope and suggesting a complete private connectivity implementation not actually depicted.
 
-**Problem:** New developers visiting the repo don't immediately see that Forge supports flexible authentication (Entra ID and API Key). The Features section was buried after Prerequisites, making it less discoverable.
-
-**Private Networking Artifact:** The original diagram labeled the Azure node as "Azure AI Foundry (Private Endpoint)" and the connection as "HTTPS (private network)". This suggested a complete private connectivity implementation (ExpressRoute, VPN tunnels), which is not depicted. It overstates the diagram's scope.
+3. **Installation pathway unclear:** README's Quick Start and Installation sections positioned GitHub Releases sideloading as the primary/recommended path, misaligned with standard VS Code extension distribution (Marketplace is the user expectation).
 
 ## Decision
 
@@ -3311,8 +3311,7 @@ Two documentation improvements to README.md:
 10. License
 
 **Rationale:**
-- Visitors see authentication options and code actions immediately — key differentiators for air-gapped environments
-- Quick Start naturally follows Features and Prerequisites
+- Visitors see authentication options and code actions immediately
 - Better narrative flow: "Here's what Forge offers → here's what you need → let's get started"
 
 ### 2. Simplify Architecture Diagram
@@ -3322,17 +3321,261 @@ Two documentation improvements to README.md:
 - Change CLI→Azure connection label from "HTTPS (private network)" to just "HTTPS"
 
 **Rationale:**
-- Diagram now accurately represents a **minimal viable deployment** without implying full private networking
-- Prevents misunderstanding that the architecture alone provides air-gap compliance (it doesn't — that comes from network topology)
-- Nauls will create a separate enterprise architecture doc showing private connectivity patterns
+- Diagram accurately represents a **minimal viable deployment** without implying full private networking
+- Prevents misunderstanding that the architecture alone provides air-gap compliance
+- Enterprise architecture doc (docs/enterprise-architecture.md) covers private connectivity patterns
 
-## Outcomes
+### 3. Marketplace-First Installation Path
 
-✅ README.md updated (commit fc5e30b)  
-✅ Features section now visible to new visitors  
-✅ Architecture diagram honest about scope  
-✅ Team knows to refer advanced networking questions to enterprise arch doc  
+**Changes made:**
 
-## Related Issues
+- **Quick Start (line 41):** Primary instruction is to search for "Forge" in VS Code Extensions panel or use Marketplace link. Fallback note: "If your environment doesn't have Marketplace access, see Installation for the sideload option"
 
-- N/A (documentation improvement)
+- **Installation (lines 96–110):**
+  - Reordered: Marketplace subsection first, GitHub Releases second
+  - Marketplace header: "(recommended)" — signals it's the primary path
+  - Releases header: "(for restricted or air-gapped networks)" — signals it's an alternative with a use case
+
+**Rationale:**
+- User expectations: 99% of VS Code users expect Marketplace as the primary installation method
+- Air-gapped support: Sideload remains fully documented and prominent — just reframed as "when you need it"
+- Tone: Marketplace = easy/default; sideload = valid/alternative. Reflects Forge's dual nature
+- Accuracy: Marketplace publishes pre-release builds, so it's current and actively maintained
+
+## Impact
+
+✅ Improves onboarding for mainstream VS Code users  
+✅ Maintains full support for air-gapped/restricted deployments  
+✅ Architecture diagram honest about scope; prevents misunderstanding  
+✅ Marketplace pathway prominent; GitHub Release sideload still available  
+✅ Features section visible to new visitors  
+✅ All existing workflows still work (no breaking changes)  
+
+---
+
+# Decision: APIM Private Endpoint Redundancy in Enterprise Architecture
+
+**Decision Owner:** Bennings (Azure Cloud Architect)  
+**Date:** 2025 (session)  
+**Status:** Implemented  
+**References:** Microsoft Learn - "Use a virtual network to secure inbound or outbound traffic for Azure API Management"
+
+## Problem
+
+The Forge enterprise architecture diagram showed **both**:
+1. APIM Subnet (VNet-injected, internal mode)
+2. Private Endpoint (APIM)
+
+This raised the question: Are these redundant? If APIM is already VNet-injected with a private IP in the dedicated subnet, why also create a separate Private Endpoint?
+
+## Analysis
+
+Microsoft Learn documentation clarifies that VNet injection and inbound Private Endpoints are **separate, alternative networking models**, not complementary:
+
+| Model | Access | Use Case |
+|-------|--------|----------|
+| **VNet Injection (Internal Mode)** | Private IP via internal load balancer; accessed via VPN/ExpressRoute | Air-gap, hybrid cloud, internal-only APIs |
+| **Inbound Private Endpoint** | Multiple private connections via Azure Private Link | Fallback for basic tiers; multi-path external access |
+
+For Forge's architecture:
+- APIM is Premium tier (required for VNet injection)
+- APIM is in **internal mode** (no public endpoint)
+- Clients are on-premises or in corp network (VPN/ExpressRoute)
+- Traffic flow: Developer → VPN/ExpressRoute → VNet → APIM Subnet → APIM (private IP)
+
+With VNet-injected APIM, the private IP is already available within the subnet. Adding a Private Endpoint creates a redundant access path and unnecessarily complicates the topology.
+
+## Decision
+
+✅ **Remove the APIM Private Endpoint block from the enterprise architecture diagram.**
+
+Rationale:
+1. VNet injection already provides private IP access with full network control
+2. Private Endpoint is an alternative for scenarios that can't use injection
+3. Adding PE when already using injection adds operational overhead without security or resilience benefit
+4. Single, clear data path is preferable for air-gap compliance: VPN/ExpressRoute → VNet → APIMSubnet → APIM
+
+## Changes Made
+
+- Removed `PEAPIM` (Private Endpoint for APIM) node from diagram
+- Removed VNet → PEAPIM → APIM edges; traffic now flows VPN → VNet → APIMSubnet → APIM
+- Updated Components table (removed APIM PE row)
+- Clarified Private DNS Zones: `*.azure-api.net` resolves to internal subnet IP, not a separate PE
+- Added guidance that VNet injection is the recommended air-gap approach
+
+## Impact
+
+**Reduces complexity** without sacrificing security or functionality. Enterprise customers deploying Forge now have a clearer, more accurate reference architecture aligned with Azure best practices.
+
+---
+
+**To Merge:**  
+The decision will be merged into `.squad/decisions.md` by the Scribe during standard decision processing. No action required.
+
+---
+
+# Decision: Enterprise Architecture Documentation Overhaul
+
+**Date:** 2025-07-17
+**Author:** Bennings (Azure Cloud Architect)
+**Artifacts:** `docs/enterprise-architecture.md`
+**Status:** Complete
+
+## Summary
+
+Reviewed and corrected the enterprise architecture reference documentation. Found 6 significant issues and multiple minor gaps. All corrections applied directly to `docs/enterprise-architecture.md`.
+
+## Issues Found & Corrected
+
+### Critical
+
+1. **Auth flow was wrong.** The diagram showed the Copilot CLI authenticating with Entra ID. In reality, the **Extension Host** acquires the token via `DefaultAzureCredential.getToken()` and passes it as a static `bearerToken` to the CLI. The CLI never talks to Entra ID. Fixed the diagram and auth flow section.
+
+2. **Private Endpoint topology was incomplete.** Only one PE was shown, placed between VNet and APIM with ambiguous direction. Enterprise deployments need **two** Private Endpoints: one for clients to reach APIM, and one for APIM to reach AI Foundry. Both are now in the diagram.
+
+3. **Missing client-to-VNet connectivity.** The original diagram had no VPN Gateway or ExpressRoute — leaving the question of how on-prem clients reach the private network unanswered. Added VPN Gateway/ExpressRoute to the diagram and networking section.
+
+### Moderate
+
+4. **Missing Key Vault.** Enterprise deployments need Key Vault for API keys, certs, and APIM policy secrets. Added to diagram and component table.
+
+5. **Missing Private DNS Zones.** Critical for PE resolution. Were mentioned in notes but absent from diagram. Now a first-class component.
+
+6. **APIM tier not specified.** VNet injection requires Premium tier (or v2). Original doc said "APIM auto-scales" which is misleading. Added tier comparison table and cost context.
+
+7. **APIM → AI Foundry auth via managed identity.** The original doc didn't mention how APIM authenticates to the backend. Added managed identity pattern (no keys to rotate).
+
+### Minor
+
+8. **Token Endpoint was a misleading separate node.** Removed — it's just Entra ID's OAuth endpoint.
+9. **App Insights attribution corrected.** AI Foundry doesn't natively emit to App Insights. Diagnostic settings go to Log Analytics. App Insights is for optional client-side telemetry.
+10. **Added APIM policy details** with actual policy names (`validate-jwt`, `rate-limit-by-key`, `authentication-managed-identity`, etc.).
+11. **Added token refresh limitation note** referencing issue #27.
+
+## Impact
+
+- Documentation only — no code changes.
+- All squad members referencing the enterprise architecture should use the updated doc.
+- The auth flow correction is important for Blair/Childs to understand: the extension host owns authentication, the CLI is a passive consumer of the token.
+
+---
+
+# Decision: Stop/Cancel Lifecycle Pattern
+
+**Author:** Blair (Extension Dev)
+**Date:** 2025-07-24
+**Context:** PR #155 review — stop button edge cases
+
+## Decision
+
+For async operations with a multi-phase lifecycle (thinking → generating → idle), use a **request-scoped cancellation flag + request ID counter** pattern:
+
+1. **Cancellation flag** (`_cancelRequested`): Set by the stop handler, checked at each phase boundary before expensive work begins. Reset at the start of each new request.
+
+2. **Request ID** (`_requestId`): Incremented per request. `finally` blocks only clean up if their captured ID matches the current one, preventing stale cleanup from clobbering newer requests.
+
+3. **Always `await` SDK abort calls** in try/catch — fire-and-forget `.catch(() => {})` can mask errors that later surface as confusing messages.
+
+4. **Webview safety timeouts**: When the webview sends a command that should trigger a phase update, set a ~3s fallback timer to reset UI state if the extension doesn't respond. Clear the timer when the real update arrives.
+
+## Rationale
+
+The original stop handler only worked during the `generating` phase (when `_currentSession` exists). During `thinking`, the session hasn't been created yet, so `session.abort()` is impossible. The cancellation flag bridges this gap. The request ID prevents race conditions when stop is quickly followed by a new send.
+
+---
+
+# Decision: CONTRIBUTING.md Rewrite
+
+**Date:** 2026-03-16  
+**Author:** Fuchs (Technical Writer)  
+**Status:** Implemented  
+
+## Context
+
+The existing `CONTRIBUTING.md` contained only a bare list of npm commands. Contributors had no guidance on:
+- Forking, cloning, or setting up the dev environment
+- Branch strategy (when to use `dev` vs `main`)
+- PR submission workflow
+- Code style expectations
+- How to run a complete quality check before committing
+
+## Decision
+
+Rewrote `CONTRIBUTING.md` as a comprehensive 10-section guide:
+
+1. **Welcome** — Brief intro, MIT license note
+2. **Getting Started** — Fork/clone + dev container (recommended) + manual setup
+3. **Development Workflow** — Build commands table + full quality check command + F5 testing in VS Code
+4. **Branch Strategy** — `dev` as default, `main` as release-only; squad branch naming
+5. **Making Changes** — Step-by-step workflow from branch creation to PR
+6. **Pull Request Guidelines** — Checklist, description template, review expectations
+7. **Code Style** — TypeScript conventions (strict mode, import type, .js paths), linting, testing
+8. **Reporting Issues** — Bug reports, features, security process
+9. **Documentation** — Where docs live, what to edit
+10. **License** — MIT contributions clarification
+
+## Key Structural Choices
+
+### Dev Containers as Recommended Path
+Positioned `.devcontainer/devcontainer.json` as the **recommended** onboarding path (Codespaces or VS Code Dev Containers), with manual Node 22 + npm setup as a fallback. This reduces friction for new contributors while respecting developers who prefer local setup.
+
+### Full Quality Check Command
+Made the **pre-commit check explicit:**
+```bash
+npm run build && npx tsc --noEmit && npm test
+```
+This combines build, type checking, and tests into one memorable command. It now appears in three places: Development Workflow table, Making Changes workflow, and as a bolded reminder in Pull Request Guidelines.
+
+### Unchanged npm Commands
+All existing npm commands remain **exactly as they are** in the original CONTRIBUTING.md. No renaming, no new commands. Simplifies transition for existing contributors.
+
+### Squad Branch Naming Included
+Documented squad branch convention `squad/{issue}-{slug}` alongside descriptive feature names. This acknowledges the squad workflow without excluding contributors not using squad labels.
+
+### Architecture Pointer, Not Duplication
+The Architecture Overview section **orients contributors to key files** without duplicating the full system design (which lives in README.md and docs/). This reduces maintenance burden — if architecture changes, contributors read the source of truth, not outdated CONTRIBUTING.md.
+
+### Concise, Scannable Tone
+- Used tables for build commands, checklists for PR submissions
+- Short paragraphs, bullet points, code blocks
+- Developer-focused language (no marketing; no overly long motivational text)
+- Assumes readers understand Git and TypeScript basics
+
+## Rationale
+
+A comprehensive contributing guide **accelerates onboarding** and **reduces support burden**. New contributors can answer their own questions:
+- "How do I set up?" → Getting Started
+- "What branch do I use?" → Branch Strategy
+- "How do I test my change?" → Full Quality Check
+- "What code style?" → Code Style
+
+This guide also **documents implicit team decisions** (e.g., "dev is the default branch, main is for releases") that were previously communicated only in PRs or ad-hoc.
+
+## Impact
+
+- **First-time contributors** have a clear path: fork → branch from dev → full check → PR targeting dev
+- **Code quality** improved: explicit "full check" command reduces accidental breakage
+- **Review efficiency:** contributors come prepared with passing tests and lints
+- **Consistency:** squad members and external contributors now follow the same workflow
+
+---
+
+# Decision: Stable release must publish the built .vsix, not re-build
+
+**Date:** 2026-03-05
+**Author:** Palmer (DevOps)
+**Scope:** `.github/workflows/release.yml`
+
+## Decision
+
+The stable release workflow's marketplace publish step must use `--packagePath` to publish the exact `.vsix` artifact that was already built, tested, and attached to the GitHub Release. It must NOT call bare `vsce publish` which re-builds from source.
+
+## Rationale
+
+- **Build once, publish everywhere:** Re-building from source means the GitHub Release `.vsix` and the marketplace `.vsix` could differ (non-deterministic builds, different timestamps, potential dependency drift).
+- **Consistency with insider:** The insider workflow also packages once and uploads to both GitHub Release and marketplace (though it re-packages for marketplace due to version rewriting — stable releases don't need this since package.json version IS the marketplace version).
+
+## Convention
+
+For stable releases: `vsce publish --packagePath {artifact}.vsix`
+For insider releases: re-package is acceptable because marketplace version differs from tag version.
