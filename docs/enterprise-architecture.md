@@ -84,7 +84,7 @@ graph TB
 | **Virtual Network** | Isolated Azure network boundary containing APIM (VNet-injected), Private Endpoints, and Private DNS Zones |
 | **Private DNS Zones** | Resolves `*.openai.azure.com` and `*.azure-api.net` to private IPs, preventing accidental public internet routing |
 | **Azure AI Foundry** | Managed AI service hosting model deployments; receives requests through APIM via Private Endpoint |
-| **Model Deployments** | Individual model instances (GPT-4.1, o-series, GPT-4o, etc.) provisioned in AI Foundry |
+| **Model Deployments** | Individual model instances (GPT-5.2, o-series, etc.) provisioned in AI Foundry |
 | **Azure Monitor** | Central observability hub collecting metrics and logs from APIM and AI Foundry via diagnostic settings |
 | **Log Analytics Workspace** | Long-term storage and KQL query engine for structured logs from APIM diagnostics and AI Foundry diagnostic settings |
 | **Application Insights** | Client-side telemetry for the extension (optional): SDK initialization time, token acquisition latency, error rates |
