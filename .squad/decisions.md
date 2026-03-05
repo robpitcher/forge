@@ -4,6 +4,68 @@
 
 <!-- New decisions are merged here by Scribe from .squad/decisions/inbox/ -->
 
+---
+
+### 2026-03-05: Progress Indicator + Stop Button Architecture & Implementation
+
+**Date:** 2026-03-05  
+**Authors:** MacReady (Architect), Blair (Implementation), Windows (Testing)  
+**Issue:** #122 (Stop Button Robustness)  
+**Status:** Complete
+
+#### Summary
+
+Implemented a 4-state processing phase state machine (`idle` → `thinking` → `generating` → `idle`) with animated progress indicator and stop button cancellation across the extension, webview, and tests.
+
+#### Architecture Decisions
+
+1. **State Machine:** Replaced binary `isProcessing` with 3-phase state machine. Extension posts `processingPhaseUpdate` messages to webview at key points (before credential validation, before `session.send()`, in finally block).
+
+2. **Progress Indicator Placement:** Between `#chatMessages` and `.input-area` in HTML — persists across conversation resets (which clear chatMessages.innerHTML).
+
+3. **UI Components:**
+   - Progress indicator: Animated pulsing dots with dynamic text ("Forge is thinking..." / "Generating response...")
+   - Stop button: Separate from send button, hidden when idle, optimistically disabled on click
+   - Message type: `processingPhaseUpdate` (extension → webview) with phase value, `stopRequest` (webview → extension) for cancellation
+
+4. **Cancellation Flow:** User clicks stop → webview posts `stopRequest` → extension calls `session.abort()` → partial response preserved → phase reset to idle → tokens stop arriving
+
+5. **Test Strategy:** Full sequence verification (ordering bugs caught) using never-resolving `session.send()` mock pattern for mid-stream interaction testing.
+
+#### Implementation Details
+
+**Files Modified:**
+- `src/extension.ts`: Phase state machine, `stopRequest` handler with `session.abort()`, session reference storage (`_currentSession`), HTML template (progress indicator div + stop button)
+- `media/chat.js`: Phase tracking, stop button handler, `processingPhaseUpdate` message handler, indicator/button visibility functions
+- `media/chat.css`: `.progress-indicator` and `.progress-dots` animation, `.hidden` utility class, stop button styles
+
+**New Test Coverage:**
+- Phase transitions (`idle` → `thinking` → `generating` → `idle`) with message verification
+- Stop request handling with mid-stream injection
+- State machine ordering (catches bugs that individual assertions would miss)
+- All 301 tests pass
+
+#### Risk Analysis
+
+| Risk | Severity | Mitigation |
+|------|----------|-----------|
+| `session.abort()` behavior undefined in SDK v0.1.26 | Medium | Wrapped in try-catch; graceful degradation if unavailable |
+| Phase tracking wrong mid-request | Low | Set at specific deterministic points; try-catch for exceptions |
+| Stop button spam | Low | Disabled on first click (optimistic UI); SDK should be idempotent |
+| Progress indicator blocks UX | Low | Inline, non-blocking, hidden when idle |
+
+#### Success Criteria Met
+
+- ✅ Progress feedback visible during all inference phases
+- ✅ Stop button visible and clickable during active requests
+- ✅ Clicking stop cancels in-flight request via `session.abort()`
+- ✅ Partial responses preserved when generation is stopped
+- ✅ Zero regressions (all existing tests pass)
+
+---
+
+# Decisions (Continued)
+
 ### 2026-02-27: PRD Work Decomposition
 **By:** MacReady
 **What:**
