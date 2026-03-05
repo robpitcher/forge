@@ -34,15 +34,15 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Package extension
-        run: npm run package
-
       - name: Read version from package.json
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package extension
+        run: npm run package -- --out forge-${{ steps.version.outputs.version }}.vsix
 
       - name: Check if tag exists
         id: tag_check
@@ -74,4 +74,4 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         env:
           VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
-        run: npx @vscode/vsce publish --pat $VSCE_PAT
+        run: npx @vscode/vsce publish --packagePath forge-${{ steps.version.outputs.version }}.vsix --pat $VSCE_PAT
