@@ -484,4 +484,141 @@ describe("WebviewView chat panel", () => {
       });
     });
   });
+
+  // --- Processing phase updates ---
+  describe("processing phase updates", () => {
+    it("posts processingPhaseUpdate 'thinking' when message starts processing", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "thinking")
+        ).toBe(true);
+      });
+    });
+
+    it("posts processingPhaseUpdate 'generating' when streaming begins", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "token" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+    });
+
+    it("posts processingPhaseUpdate 'idle' when processing completes", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const streamEnds = getPostedMessagesOfType(mockView, "streamEnd");
+        expect(streamEnds.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("posts processingPhaseUpdate 'idle' on error", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.error", {
+          data: { message: "Something went wrong" },
+        });
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("transitions thinking → generating → idle in correct order", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "hi" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const streamEnds = getPostedMessagesOfType(mockView, "streamEnd");
+        expect(streamEnds.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues).toEqual(["thinking", "generating", "idle"]);
+    });
+  });
+
+  // --- Stop request ---
+  describe("stop request", () => {
+    it("stopRequest triggers session abort", async () => {
+      // Make session.send hang so processing stays active
+      mockSession.send.mockImplementation(
+        () => new Promise<string>(() => { /* never resolves */ })
+      );
+
+      simulateUserMessage(mockView, "hello");
+
+      // Wait for processing to reach generating phase (session is set)
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+
+      // Send stop request
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      await vi.waitFor(() => {
+        expect(mockSession.abort).toHaveBeenCalled();
+      });
+
+      // Verify phase returned to idle
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("stopRequest when not processing is a no-op", async () => {
+      // Should not throw or crash
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      // Give time for any potential async error
+      await new Promise((r) => setTimeout(r, 50));
+
+      // No errors posted, no abort called
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBe(0);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+    });
+  });
 });
