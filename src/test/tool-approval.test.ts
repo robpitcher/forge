@@ -392,7 +392,7 @@ describe("Tool approval flow (#25)", () => {
         const messages = getPostedMessages(mockView)
           .filter((m: unknown) => {
             const t = (m as { type: string }).type;
-            return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus";
+            return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "workspaceInfo";
           });
         expect(messages.length).toBeGreaterThanOrEqual(3);
       });
@@ -400,7 +400,7 @@ describe("Tool approval flow (#25)", () => {
       const types = getPostedMessages(mockView)
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus";
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo" && t !== "processingPhaseUpdate";
         })
         .map((m: unknown) => (m as { type: string }).type);
       expect(types[0]).toBe("streamStart");

@@ -4,6 +4,68 @@
 
 <!-- New decisions are merged here by Scribe from .squad/decisions/inbox/ -->
 
+---
+
+### 2026-03-05: Progress Indicator + Stop Button Architecture & Implementation
+
+**Date:** 2026-03-05  
+**Authors:** MacReady (Architect), Blair (Implementation), Windows (Testing)  
+**Issue:** #122 (Stop Button Robustness)  
+**Status:** Complete
+
+#### Summary
+
+Implemented a 4-state processing phase state machine (`idle` → `thinking` → `generating` → `idle`) with animated progress indicator and stop button cancellation across the extension, webview, and tests.
+
+#### Architecture Decisions
+
+1. **State Machine:** Replaced binary `isProcessing` with 3-phase state machine. Extension posts `processingPhaseUpdate` messages to webview at key points (before credential validation, before `session.send()`, in finally block).
+
+2. **Progress Indicator Placement:** Between `#chatMessages` and `.input-area` in HTML — persists across conversation resets (which clear chatMessages.innerHTML).
+
+3. **UI Components:**
+   - Progress indicator: Animated pulsing dots with dynamic text ("Forge is thinking..." / "Generating response...")
+   - Stop button: Separate from send button, hidden when idle, optimistically disabled on click
+   - Message type: `processingPhaseUpdate` (extension → webview) with phase value, `stopRequest` (webview → extension) for cancellation
+
+4. **Cancellation Flow:** User clicks stop → webview posts `stopRequest` → extension calls `session.abort()` → partial response preserved → phase reset to idle → tokens stop arriving
+
+5. **Test Strategy:** Full sequence verification (ordering bugs caught) using never-resolving `session.send()` mock pattern for mid-stream interaction testing.
+
+#### Implementation Details
+
+**Files Modified:**
+- `src/extension.ts`: Phase state machine, `stopRequest` handler with `session.abort()`, session reference storage (`_currentSession`), HTML template (progress indicator div + stop button)
+- `media/chat.js`: Phase tracking, stop button handler, `processingPhaseUpdate` message handler, indicator/button visibility functions
+- `media/chat.css`: `.progress-indicator` and `.progress-dots` animation, `.hidden` utility class, stop button styles
+
+**New Test Coverage:**
+- Phase transitions (`idle` → `thinking` → `generating` → `idle`) with message verification
+- Stop request handling with mid-stream injection
+- State machine ordering (catches bugs that individual assertions would miss)
+- All 301 tests pass
+
+#### Risk Analysis
+
+| Risk | Severity | Mitigation |
+|------|----------|-----------|
+| `session.abort()` behavior undefined in SDK v0.1.26 | Medium | Wrapped in try-catch; graceful degradation if unavailable |
+| Phase tracking wrong mid-request | Low | Set at specific deterministic points; try-catch for exceptions |
+| Stop button spam | Low | Disabled on first click (optimistic UI); SDK should be idempotent |
+| Progress indicator blocks UX | Low | Inline, non-blocking, hidden when idle |
+
+#### Success Criteria Met
+
+- ✅ Progress feedback visible during all inference phases
+- ✅ Stop button visible and clickable during active requests
+- ✅ Clicking stop cancels in-flight request via `session.abort()`
+- ✅ Partial responses preserved when generation is stopped
+- ✅ Zero regressions (all existing tests pass)
+
+---
+
+# Decisions (Continued)
+
 ### 2026-02-27: PRD Work Decomposition
 **By:** MacReady
 **What:**
@@ -3121,3 +3183,156 @@ Add a proactive `az` CLI availability check **before** opening the terminal:
 
 - Blair owns `src/extension.ts` — no cross-domain impact.
 - No test changes required (existing 67+ tests unaffected).
+
+---
+
+### 2026-03-05: Workspace Awareness via workingDirectory
+
+**Author:** MacReady (Architecture & Design)  
+**Date:** 2026-03-05  
+**Status:** Implemented by Blair, tested by Windows  
+
+## Problem
+
+When a user chats with Forge, the AI has no awareness of which workspace folder is open in VS Code. Tool operations (shell, read, write) run in whatever directory the CLI process happens to use — not the user's project folder. The AI can't give workspace-relative answers ("what files are in my project?", "fix the bug in src/app.ts").
+
+## Discovery
+
+The `@github/copilot-sdk` has a `workingDirectory` field on `SessionConfig` (and `ResumeSessionConfig`) with the comment "Tool operations will be relative to this directory." The `buildSessionConfig()` function in `copilotService.ts` constructs the session config but was not setting `workingDirectory`.
+
+## Decision
+
+- Capture the primary workspace folder at session creation time: `vscode.workspace.workspaceFolders?.[0]?.uri.fsPath`
+- Pass `workspaceRoot` as `workingDirectory` in session config (in `buildSessionConfig`, `getOrCreateSession`, `resumeConversation`)
+- Include `workspaceRoot` in the `configHash` so sessions are recreated when the workspace changes
+- Show a passive `📂 folder-name` indicator in the webview context-actions bar
+- Send `workspaceInfo` message to webview on initial load and on `onDidChangeWorkspaceFolders`
+- Multi-root workspaces use first folder only, matching Copilot's behavior
+
+## Rationale
+
+- Uses SDK's native mechanism — avoids prompt injection, uses the platform's intended design
+- No new settings needed — fully automatic based on the open workspace
+- Indicator is passive (not interactive) — just shows user what folder the SDK is aware of
+- Session isolation via configHash prevents cache collisions across workspaces
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `src/copilotService.ts` | Add `workspaceRoot?` param to `buildSessionConfig`, `getOrCreateSession`, `resumeConversation`; add to `configHash`; pass as `workingDirectory` in session config |
+| `src/extension.ts` | Add `_workspaceRoot` getter; add `onDidChangeWorkspaceFolders` listener; add `postWorkspaceInfo()` method; update HTML template |
+| `media/chat.js` | Handle `workspaceInfo` message; show/hide indicator |
+| `media/chat.css` | Style `.workspace-indicator` |
+
+## Impact
+
+- Tool operations execute in the user's project folder context
+- Multi-turn conversations maintain workspace awareness
+- Workspace changes transparently create new session with updated context
+- Feature matches behavior of GitHub Copilot
+
+---
+
+### 2026-03-05: Test Filter Pattern for Workspace Awareness Messages
+
+**Author:** Windows (QA & Testing)  
+**Date:** 2026-03-05  
+**Scope:** Test assertions that filter streaming order messages
+
+## Context
+
+Workspace awareness feature adds `_postWorkspaceInfo()` method that fires during `resolveWebviewView()`. This message arrives as an infrastructure message before any chat interaction.
+
+## Decision
+
+Any test that filters posted webview messages to assert on streaming protocol order (streamStart → streamDelta → streamEnd) must exclude `workspaceInfo` from the filter, alongside existing infrastructure message types: `authStatus`, `modelsUpdated`, `modelSelected`, `configStatus`, `cliStatus`.
+
+## Rationale
+
+Tests that count or order non-infrastructure messages will break if they don't exclude `workspaceInfo`. The message is infrastructure (system state), not domain (chat protocol), so it must be filtered out.
+
+## Pattern
+
+```typescript
+const types = getPostedMessages(mockView)
+  .filter((m: unknown) => {
+    const t = (m as { type: string }).type;
+    return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo";
+  })
+  .map((m: unknown) => (m as { type: string }).type);
+```
+
+Apply this filter to all streaming order assertions and count-based checks in:
+- `copilotService.test.ts`
+- `extension.test.ts`
+- `tool-approval.test.ts`
+
+## Impact
+
+- Ensures test stability across workspace awareness feature
+- Future tests must follow this pattern when asserting on streaming order
+- Removes false test failures from infrastructure noise
+
+# Decision: README Section Reordering and Architecture Diagram Simplification
+
+**Date:** 2026-03-15  
+**Owner:** Fuchs (Technical Writer)  
+**Status:** Decided  
+**Stakeholders:** Rob Pitcher (Product), Nauls (Architecture)
+
+## Scope
+
+Two documentation improvements to README.md:
+
+1. **Reorder sections:** Move Features section before Prerequisites
+2. **Simplify architecture diagram:** Remove private networking qualifiers
+
+## Context
+
+**Problem:** New developers visiting the repo don't immediately see that Forge supports flexible authentication (Entra ID and API Key). The Features section was buried after Prerequisites, making it less discoverable.
+
+**Private Networking Artifact:** The original diagram labeled the Azure node as "Azure AI Foundry (Private Endpoint)" and the connection as "HTTPS (private network)". This suggested a complete private connectivity implementation (ExpressRoute, VPN tunnels), which is not depicted. It overstates the diagram's scope.
+
+## Decision
+
+### 1. Move Features Before Prerequisites
+
+**New section order:**
+1. Heading/description
+2. **Features** ← moved up
+3. Prerequisites
+4. Quick Start
+5. Usage
+6. Architecture
+7. Installation
+8. Configuration
+9. Development
+10. License
+
+**Rationale:**
+- Visitors see authentication options and code actions immediately — key differentiators for air-gapped environments
+- Quick Start naturally follows Features and Prerequisites
+- Better narrative flow: "Here's what Forge offers → here's what you need → let's get started"
+
+### 2. Simplify Architecture Diagram
+
+**Changes:**
+- Remove "(Private Endpoint)" from Azure AI Foundry node label
+- Change CLI→Azure connection label from "HTTPS (private network)" to just "HTTPS"
+
+**Rationale:**
+- Diagram now accurately represents a **minimal viable deployment** without implying full private networking
+- Prevents misunderstanding that the architecture alone provides air-gap compliance (it doesn't — that comes from network topology)
+- Nauls will create a separate enterprise architecture doc showing private connectivity patterns
+
+## Outcomes
+
+✅ README.md updated (commit fc5e30b)  
+✅ Features section now visible to new visitors  
+✅ Architecture diagram honest about scope  
+✅ Team knows to refer advanced networking questions to enterprise arch doc  
+
+## Related Issues
+
+- N/A (documentation improvement)

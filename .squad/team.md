@@ -21,6 +21,7 @@
 | Norris | Security Specialist | `.squad/agents/norris/charter.md` | ✅ Active |
 | Copper | Code Reviewer | `.squad/agents/copper/charter.md` | ✅ Active |
 | Nauls | Diagram Artist | `.squad/agents/nauls/charter.md` | ✅ Active |
+| Bennings | Azure Cloud Architect | `.squad/agents/bennings/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 

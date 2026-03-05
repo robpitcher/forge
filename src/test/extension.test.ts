@@ -168,7 +168,7 @@ describe("WebviewView chat panel", () => {
       const types = messages
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus";
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo" && t !== "processingPhaseUpdate";
         })
         .map((m: unknown) => (m as { type: string }).type);
 
@@ -482,6 +482,297 @@ describe("WebviewView chat panel", () => {
           "forge.copilot.apiKey"
         );
       });
+    });
+  });
+
+  // --- Processing phase updates ---
+  describe("processing phase updates", () => {
+    it("posts processingPhaseUpdate 'thinking' when message starts processing", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "thinking")
+        ).toBe(true);
+      });
+    });
+
+    it("posts processingPhaseUpdate 'generating' when streaming begins", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "token" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+    });
+
+    it("posts processingPhaseUpdate 'idle' when processing completes", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const streamEnds = getPostedMessagesOfType(mockView, "streamEnd");
+        expect(streamEnds.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("posts processingPhaseUpdate 'idle' on error", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("session.error", {
+          data: { message: "Something went wrong" },
+        });
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("transitions thinking → generating → idle in correct order", async () => {
+      mockSession.send.mockImplementation(async () => {
+        mockSession._emit("assistant.message_delta", {
+          data: { deltaContent: "hi" },
+        });
+        mockSession._emit("session.idle");
+      });
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const streamEnds = getPostedMessagesOfType(mockView, "streamEnd");
+        expect(streamEnds.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues).toEqual(["thinking", "generating", "idle"]);
+    });
+  });
+
+  // --- Stop request ---
+  describe("stop request", () => {
+    it("stopRequest triggers session abort", async () => {
+      // Make session.send hang so processing stays active
+      mockSession.send.mockImplementation(
+        () => new Promise<string>(() => { /* never resolves */ })
+      );
+
+      simulateUserMessage(mockView, "hello");
+
+      // Wait for processing to reach generating phase (session is set)
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+
+      // Send stop request
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      await vi.waitFor(() => {
+        expect(mockSession.abort).toHaveBeenCalled();
+      });
+
+      // Verify phase returned to idle
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("stopRequest when not processing is a no-op", async () => {
+      // Should not throw or crash
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      // Give time for any potential async error
+      await new Promise((r) => setTimeout(r, 50));
+
+      // No errors posted, no abort called
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBe(0);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+    });
+
+    it("cancel during thinking phase aborts before send", async () => {
+      // Delay session creation to keep processing in thinking phase
+      let resolveCreateSession!: (session: unknown) => void;
+      mockClient.createSession.mockImplementation(
+        () => new Promise((resolve) => { resolveCreateSession = resolve; })
+      );
+
+      simulateUserMessage(mockView, "hello");
+
+      // Wait for createSession to be called (handler progressed through
+      // config/auth steps but is paused at session creation)
+      await vi.waitFor(() => {
+        expect(mockClient.createSession).toHaveBeenCalled();
+      });
+
+      // Verify we're still in thinking phase (no _currentSession yet)
+      const phasesBeforeStop = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      expect(
+        phasesBeforeStop.some((p: unknown) => (p as { phase: string }).phase === "thinking")
+      ).toBe(true);
+
+      // Stop during thinking — no _currentSession exists yet
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      // stopRequest posts idle immediately (thinking path, no session)
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+        expect(phaseValues).toContain("idle");
+      });
+
+      // Let session creation resolve — code checks _cancelRequested and bails out
+      resolveCreateSession(mockSession);
+      await new Promise((r) => setTimeout(r, 50));
+
+      // session.send should NOT have been called
+      expect(mockSession.send).not.toHaveBeenCalled();
+
+      // Final phase is idle
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+    });
+
+    it("session.abort() rejection is caught and phase returns to idle", async () => {
+      // Make send hang so we reach generating phase
+      mockSession.send.mockImplementation(
+        () => new Promise<string>(() => { /* never resolves */ })
+      );
+      // Make abort reject
+      mockSession.abort.mockRejectedValue(new Error("abort failed"));
+
+      simulateUserMessage(mockView, "hello");
+
+      // Wait for generating phase
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+
+      // Send stop request — abort will reject but error should be caught
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      // Phase should still return to idle despite abort error
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+        expect(phaseValues[phaseValues.length - 1]).toBe("idle");
+      });
+    });
+  });
+
+  // --- Request lifecycle ---
+  describe("request lifecycle", () => {
+    it("stale finally block does not reset phase when a newer request is active", async () => {
+      // Request A: session.send returns a controlled promise we can reject later
+      let rejectSendA!: (err: Error) => void;
+      mockSession.send.mockImplementationOnce(
+        () => new Promise<string>((_, reject) => { rejectSendA = reject; })
+      );
+
+      simulateUserMessage(mockView, "request A");
+
+      // Wait for A to reach generating phase
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+
+      // Stop request A → clears _currentSession, phase goes to idle
+      simulateWebviewCommand(mockView, { command: "stopRequest" });
+
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+        expect(phaseValues.filter((p) => p === "idle").length).toBeGreaterThanOrEqual(1);
+      });
+
+      // Request B: session.send hangs indefinitely
+      mockSession.send.mockImplementation(
+        () => new Promise<string>(() => { /* never resolves */ })
+      );
+
+      simulateUserMessage(mockView, "request B");
+
+      // Wait for B to reach generating phase
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+        expect(phaseValues.filter((p) => p === "generating").length).toBeGreaterThanOrEqual(2);
+      });
+
+      // Reject A's send (simulates abort completing) — triggers A's catch/finally
+      rejectSendA(new Error("aborted"));
+      await new Promise((r) => setTimeout(r, 50));
+
+      // B should still be generating — A's stale finally skipped due to requestId mismatch
+      const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+      const phaseValues = phases.map((p: unknown) => (p as { phase: string }).phase);
+      expect(phaseValues[phaseValues.length - 1]).toBe("generating");
+    });
+
+    it("sendMessage is ignored when processing is already in progress", async () => {
+      // Make send hang to keep processing active
+      mockSession.send.mockImplementation(
+        () => new Promise<string>(() => { /* never resolves */ })
+      );
+
+      simulateUserMessage(mockView, "first");
+
+      // Wait for generating phase
+      await vi.waitFor(() => {
+        const phases = getPostedMessagesOfType(mockView, "processingPhaseUpdate");
+        expect(
+          phases.some((p: unknown) => (p as { phase: string }).phase === "generating")
+        ).toBe(true);
+      });
+
+      // Try to send another message while generating — should be silently ignored
+      simulateUserMessage(mockView, "second");
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Only one streamStart posted (the duplicate was rejected)
+      const streamStarts = getPostedMessagesOfType(mockView, "streamStart");
+      expect(streamStarts.length).toBe(1);
+
+      // session.send called only once (for the first message)
+      expect(mockSession.send).toHaveBeenCalledTimes(1);
     });
   });
 });
