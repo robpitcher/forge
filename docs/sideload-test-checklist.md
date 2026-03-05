@@ -9,7 +9,7 @@
 ## Prerequisites
 
 - Clean VS Code installation (no prior Forge installation)
-- Access to Azure AI Foundry endpoint (URL, API key, model name)
+- Access to Azure AI Foundry endpoint (URL, API key or Entra ID auth, deployment name)
 - Node.js 20.19.0+ and npm installed (for building the `.vsix`)
 
 ---
@@ -34,10 +34,10 @@
    ```
 
 4. **Verify .vsix file:**
-   - Check that `forge-0.1.0.vsix` exists in the project root
+   - Check that `forge-<version>.vsix` exists in the project root
    - Verify file size is under 10 MB (should be ~40 KB)
    ```bash
-   ls -lh forge-0.1.0.vsix
+   ls -lh forge-*.vsix
    ```
 
 ---
@@ -47,7 +47,7 @@
 1. **Install the extension:**
    - In VS Code, open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
    - Run: `Extensions: Install from VSIX...`
-   - Select `forge-0.1.0.vsix`
+   - Select the `.vsix` file (e.g., `forge-0.2.0.vsix`)
    - Wait for installation to complete
 
 2. **Verify installation:**
@@ -58,16 +58,16 @@
    - Open Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Search for "Forge"
    - ✅ Extension appears with name "Forge"
-   - ✅ Version shows `0.1.0`
+   - ✅ Version matches the `.vsix` package (e.g., `0.2.0`)
 
 ---
 
 ## Activation Test
 
 1. **Open the Forge panel:**
-   - Look for the Forge icon in the VS Code bottom panel (next to Terminal and Output)
+   - Look for the Forge icon in the VS Code **activity bar** (sidebar)
    - Click the icon
-   - ✅ "AI Chat" panel opens in the panel area
+   - ✅ "AI Chat" view opens in the sidebar
    - ✅ Extension activates (check in Output > Log (Extension Host) if needed)
 
 2. **Verify UI:**
@@ -91,9 +91,9 @@
    - Search for "Forge"
    - Set the following:
      - `Forge: Copilot Endpoint` — Your Azure AI Foundry endpoint URL
-     - `Forge: Copilot Model` — Your model deployment name (e.g., `gpt-4.1`)
+     - `Forge: Copilot Models` — Your deployment names as an array (e.g., `["gpt-4.1"]`)
      - `Forge: Copilot Wire Api` — `completions` (default)
-   - Set your API key via the ⚙️ gear icon in the Forge chat toolbar: "Set API Key (secure)"
+   - Authenticate: use `az login` for Entra ID (default), or set your API key via the ⚙️ gear icon → "Set API Key (secure)"
    - ✅ All settings save without errors
 
 ---
@@ -150,7 +150,7 @@
 
 2. **Verify cleanup:**
    - ✅ Extension is removed from Extensions list
-   - ✅ Bottom panel icon is removed
+   - ✅ Sidebar icon is removed
    - ✅ No errors appear in the console
 
 ---
@@ -182,6 +182,6 @@
 ## Notes
 
 - **vsix Size:** The packaged extension should be under 10 MB (NFR8). Current size is ~40 KB.
-- **No Internet Required:** All tests should work in an air-gapped environment (except for communication with the configured Azure AI Foundry endpoint).
+- **No Internet Required:** All tests should work in restricted or disconnected environments (except for communication with the configured Azure AI Foundry endpoint).
 - **No GitHub Auth:** The extension does not require GitHub authentication.
 - **Activation Event:** The extension activates when the Forge sidebar is opened (`onView:forge.chatView`).

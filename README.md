@@ -1,253 +1,105 @@
 # Forge
+<p align="center"><img src="https://raw.githubusercontent.com/robpitcher/forge/dev/resources/repoheader.png" alt="Forge" width="500"></p>
 
-A VS Code chat extension for air-gapped environments using Azure AI Foundry via Copilot SDK BYOK (Bring Your Own Key) mode. Provides a sidebar chat interface without internet connectivity or GitHub authentication.
 
-The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK mode to route all model inference to a private **Azure AI Foundry** endpoint.
+A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. All inference stays within your Azure tenant. Authenticate with Entra ID or API key. No GitHub authentication required. Works in air-gapped and compliance-driven environments.
 
-> 📄 See [specs/PRD-airgapped-copilot-vscode-extension.md](specs/PRD-airgapped-copilot-vscode-extension.md) for the full Product Requirements Document.
+The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint within your Azure tenant.
 
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                      VS Code                              │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │         Forge Sidebar (WebviewView)                 │  │
-│  │   User types prompt → sees streamed markdown reply  │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │                                    │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Extension Host (our extension)              │  │
-│  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to sidebar    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │ JSON-RPC (stdio)                   │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Copilot CLI (server mode, local process)    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-└───────────────────────┼──────────────────────────────────┘
-                        │ HTTPS (private network)
-                        ▼
-┌──────────────────────────────────────────────────────────┐
-│           Azure AI Foundry (Private Endpoint)             │
-└──────────────────────────────────────────────────────────┘
-```
-
----
+📖 **[Features & Usage](docs/features-and-usage.md)** — Authentication methods, code actions, model selector, and usage guide.
 
 ## Prerequisites
 
 - **VS Code** 1.93 or later
-- **Node.js** 20.19.0+ (for development/build)
-- **Copilot CLI** v0.0.418+ ([installation guide](https://github.com/github/copilot-cli) or air-gapped distribution)
-- **Azure AI Foundry** endpoint (OpenAI-compatible API)
-
----
-
-## Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/robpitcher/forge.git
-   cd enclave
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Build the extension:**
-   ```bash
-   npm run build
-   ```
-
-4. **Package as `.vsix` (for sideloading):**
-   ```bash
-   npm run package
-   ```
-
-5. **Sideload into VS Code:**
-   - Open VS Code Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-   - Click "..." menu → "Install from VSIX"
-   - Select `forge-0.1.0.vsix`
-
----
-
-## Configuration
-
-Configure the following settings in VS Code (`Ctrl+,` / `Cmd+,`):
-
-| Setting | Required | Default | Description |
-|---------|----------|---------|-------------|
-| `forge.copilot.endpoint` | ✓ | — | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/openai/v1/`) |
-| `forge.copilot.model` | ✗ | `gpt-4.1` | Model deployment name |
-| `forge.copilot.wireApi` | ✗ | `completions` | API format: `completions` or `responses` |
-| `forge.copilot.cliPath` | ✗ | — | Path to Copilot CLI binary (if not on `$PATH`) |
-
-**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
-
-### Example Configuration
-
-```json
-{
-  "forge.copilot.endpoint": "https://myresource.openai.azure.com/openai/v1/",
-  "forge.copilot.model": "gpt-4.1",
-  "forge.copilot.wireApi": "completions"
-}
-```
-
-**API Key Setup:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)" to enter your API key via a masked password input. The key is stored securely in VS Code SecretStorage and never appears in settings.json.
-
----
+- **[GitHub Copilot CLI](https://github.com/github/copilot-cli)**
+- **[Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)** (`az`) — Required for Entra ID authentication (recommended for most environments)
+- **Azure AI Foundry** endpoint and model deployment(s)
 
 ## Quick Start
 
-1. **Install the Copilot CLI** on your machine (transfer the binary via approved media for air-gapped environments).
+Ensure you've installed the [prerequisites](#prerequisites) before starting.
+
+1. **Install the Forge extension** — Search for "forge-ai" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge-ai). If your environment doesn't have Marketplace access, see [Sideload Installation](#sideload-installation) for the sideload option.
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
    | Setting | Description |
    |---------|-------------|
-   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL |
-   | `forge.copilot.model` | Model deployment name (default: `gpt-4.1`) |
+   | `forge.copilot.endpoint` | Your Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+   | `forge.copilot.authMethod` | Auth method: `"entraId"` (default) or `"apiKey"` |
+   | `forge.copilot.models` | Deployment names from your Azure AI Foundry (e.g., `["gpt-4.1", "gpt-4o"]`) |
 
-   **API Key:** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
+   **API Key (if using `apiKey` auth):** Click the ⚙️ gear icon in the Forge chat toolbar and select "Set API Key (secure)".
 
-3. **Open Forge:** Click the Forge icon in the VS Code bottom panel (next to Terminal and Output)
+3. **Open Forge:** Click the Forge icon in the VS Code sidebar
 
-4. **Send a message:** Type a message in the input field, then click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS)
+4. **Send a message:** Type a message in the input field, then press **Enter** to send (Shift+Enter for newline)
 
 5. **Multi-turn conversations:** The chat maintains session context within the same session
 
----
-
-## Usage
-
-### Start a chat
-
-1. Click the Forge icon in the VS Code bottom panel (next to Terminal and Output) to open the Forge chat
-2. Type your message in the input field
-3. Click **Send** or press **Ctrl+Enter** (or **Cmd+Enter** on macOS) to submit
-
-### Example prompts
-
-- `Explain how this function works`
-- `Write a unit test for this code`
-- `What are the performance implications?`
-
-### Stop generation
-
-Click the stop button (⏹) in the sidebar to cancel in-flight requests.
-
----
-
-## Development
-
-### Build
-
-```bash
-npm run build
-```
-
-Bundles the extension and SDK into `dist/extension.js`.
-
-### Watch mode
-
-```bash
-npm run watch
-```
-
-Rebuilds on file changes.
-
-### Linting
-
-```bash
-npm run lint
-```
-
-Type-checks code with TypeScript.
-
-### Testing
-
-```bash
-npm run test
-```
-
-Runs automated tests with Vitest.
-
-### Package for distribution
-
-```bash
-npm run package
-```
-
-Creates `forge-0.1.0.vsix` for sideloading or distribution.
-
----
-
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                      VS Code                              │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │         Forge Sidebar (WebviewView)               │  │
-│  │   User types prompt → sees streamed markdown reply  │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │                                    │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Extension Host (our extension)              │  │
-│  │   Reads config → Creates CopilotClient (BYOK mode)  │  │
-│  │   Creates session → Streams deltas to sidebar    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-│                       │ JSON-RPC (stdio)                   │
-│  ┌────────────────────▼────────────────────────────────┐  │
-│  │         Copilot CLI (server mode, local process)    │  │
-│  └────────────────────┬────────────────────────────────┘  │
-└───────────────────────┼──────────────────────────────────┘
-                        │ HTTPS (private network)
-                        ▼
-┌──────────────────────────────────────────────────────────┐
-│           Azure AI Foundry (Private Endpoint)             │
-└──────────────────────────────────────────────────────────┘
+### Basic
+
+```mermaid
+graph TD
+    subgraph vscode["VS Code"]
+        sidebar["Forge Sidebar<br/>(WebviewView)"]
+        exthost["Extension Host<br/>Config · CopilotClient"]
+        creds["Credential Provider<br/>Entra ID / API Key"]
+        cli["Copilot CLI<br/>(local subprocess)"]
+    end
+
+    azure["Azure AI Foundry"]
+
+    sidebar <-->|"postMessage"| exthost
+    exthost -.->|"getToken()"| creds
+    exthost <-->|"JSON-RPC (stdio)"| cli
+    cli -->|"HTTPS"| azure
 ```
 
-### Source files
+> For a full enterprise topology with Azure API Management, private networking, observability, and Entra ID auth flows, see the example [Enterprise Architecture](docs/enterprise-architecture.md) reference.
 
-- **`src/extension.ts`** — VS Code extension activation, chat participant registration, request handler, streaming response logic, and user cancellation
-- **`src/copilotService.ts`** — CopilotClient lifecycle management, BYOK session creation with Azure AI Foundry configuration, session reuse map
-- **`src/configuration.ts`** — VS Code settings reader and validation for required fields
-- **`src/types.ts`** — TypeScript type definitions for SDK interfaces
+## Sideload Installation
 
----
+### From GitHub Releases (for restricted or air-gapped networks)
 
-## Configuration Reference
+1. Download the latest `.vsix` file from [GitHub Releases](https://github.com/robpitcher/forge/releases)
+2. In VS Code, open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+3. Click `...` → **Install from VSIX...**
+4. Select the downloaded `.vsix` file
+
+## Configuration
+
+For a quick overview of required and optional settings, see the table below. For detailed explanations, Azure setup instructions, and troubleshooting, see the **[Configuration Reference](docs/configuration-reference.md)**.
+
+### Core Settings
 
 | Setting | Type | Required | Default | Description |
 |---------|------|----------|---------|-------------|
-| `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL |
-| `forge.copilot.model` | `string` | Yes | `"gpt-4.1"` | Model deployment name |
+| `forge.copilot.endpoint` | `string` | Yes | `""` | Azure AI Foundry endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+| `forge.copilot.models` | `string[]` | No | `[]` | Azure AI Foundry deployment names for the model selector. Must match the deployment name in Foundry, not the underlying model name. First entry is the default. |
 | `forge.copilot.wireApi` | `string` | No | `"completions"` | API format: `"completions"` or `"responses"` |
 | `forge.copilot.cliPath` | `string` | No | `""` | Path to Copilot CLI binary (if not on PATH) |
+| `forge.copilot.authMethod` | `string` | No | `"entraId"` | Auth method: `"entraId"` (DefaultAzureCredential) or `"apiKey"` |
+| `forge.copilot.systemMessage` | `string` | No | `""` | Custom system message appended to the default Copilot system prompt |
 
-**API Key:** Set via the ⚙️ gear icon in the Forge chat toolbar (stored securely in VS Code SecretStorage, not in settings.json).
+### Example Configuration
 
----
-
-## Building from Source
-
-```sh
-npm install
-npm run build
-npm run package
+```json
+{
+  "forge.copilot.endpoint": "https://myresource.openai.azure.com/",
+  "forge.copilot.authMethod": "entraId",
+  "forge.copilot.models": ["gpt-4.1", "gpt-4o"],
+  "forge.copilot.wireApi": "completions"
+}
 ```
 
-This produces `forge-0.1.0.vsix` in the project root.
+> **Note:** The SDK auto-appends `/openai/v1/` for `.azure.com` endpoints — do not include this path in your endpoint URL.
+
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for development setup, building, testing, and packaging instructions.
 
 ---
 

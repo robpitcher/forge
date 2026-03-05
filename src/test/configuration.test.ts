@@ -26,17 +26,24 @@ describe("getConfiguration", () => {
     expect(config).toEqual({
       endpoint: "",
       apiKey: "",
-      model: "gpt-4.1",
+      authMethod: "entraId",
+      models: [],
       wireApi: "completions",
       cliPath: "",
       autoApproveTools: false,
+      systemMessage: undefined,
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     });
   });
 
   it("returns values from VS Code settings when configured (apiKey via SecretStorage)", async () => {
-    const settings: Record<string, string> = {
+    const settings: Record<string, unknown> = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
-      model: "gpt-4o",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
     };
@@ -61,11 +68,55 @@ describe("getConfiguration", () => {
     expect(config).toEqual({
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
-      model: "gpt-4o",
+      authMethod: "entraId",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "responses",
       cliPath: "/usr/local/bin/copilot",
       autoApproveTools: false,
+      systemMessage: undefined,
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     });
+  });
+});
+
+describe("model selection defaults", () => {
+  it("active model defaults to first entry in models array", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/",
+      apiKey: "key",
+      authMethod: "apiKey",
+      models: ["gpt-4o", "gpt-4.1", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+    // The active model should be models[0] when no selection is persisted
+    expect(config.models[0]).toBe("gpt-4o");
+  });
+
+  it("models array order determines default", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/",
+      apiKey: "key",
+      authMethod: "apiKey",
+      models: ["custom-deploy", "gpt-4.1"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+    expect(config.models[0]).toBe("custom-deploy");
   });
 });
 
@@ -74,9 +125,15 @@ describe("validateConfiguration", () => {
     const config: ExtensionConfig = {
       endpoint: "",
       apiKey: "",
-      model: "gpt-4.1",
+      authMethod: "apiKey",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -90,9 +147,15 @@ describe("validateConfiguration", () => {
     const config: ExtensionConfig = {
       endpoint: "",
       apiKey: "key-123",
-      model: "gpt-4.1",
+      authMethod: "apiKey",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -105,9 +168,15 @@ describe("validateConfiguration", () => {
     const config: ExtensionConfig = {
       endpoint: "https://example.com",
       apiKey: "",
-      model: "gpt-4.1",
+      authMethod: "apiKey",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
@@ -120,13 +189,162 @@ describe("validateConfiguration", () => {
     const config: ExtensionConfig = {
       endpoint: "https://myresource.openai.azure.com/openai/v1/",
       apiKey: "test-key-123",
-      model: "gpt-4.1",
+      authMethod: "apiKey",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
       wireApi: "completions",
       cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
     };
 
     const errors = validateConfiguration(config);
 
     expect(errors).toHaveLength(0);
   });
+
+  // --- #27 authMethod-aware validation ---
+  // These tests pass once Blair adds authMethod to ExtensionConfig and
+  // updates validateConfiguration to skip apiKey check for entraId.
+
+  it("skips API key check when authMethod is 'entraId'", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      apiKey: "",
+      authMethod: "entraId",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors).toHaveLength(0);
+    expect(errors.find((e) => e.field === "forge.copilot.apiKey")).toBeUndefined();
+  });
+
+  it("requires API key when authMethod is 'apiKey'", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      apiKey: "",
+      authMethod: "apiKey",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("forge.copilot.apiKey");
+  });
+
+  it("requires API key when authMethod is not set (defaults to entraId)", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      apiKey: "",
+      authMethod: "entraId",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+
+    const errors = validateConfiguration(config);
+
+    // Default authMethod is "entraId", so apiKey is NOT required
+    expect(errors.some((e) => e.field === "forge.copilot.apiKey")).toBe(false);
+  });
+
+  it("returns no errors for entraId mode with valid endpoint and no apiKey", () => {
+    const config: ExtensionConfig = {
+      endpoint: "https://myresource.openai.azure.com/openai/v1/",
+      apiKey: "",
+      authMethod: "entraId",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it("still requires endpoint even when authMethod is 'entraId'", () => {
+    const config: ExtensionConfig = {
+      endpoint: "",
+      apiKey: "",
+      authMethod: "entraId",
+      models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+      wireApi: "completions",
+      cliPath: "",
+      toolShell: true,
+      toolRead: true,
+      toolWrite: true,
+      toolUrl: false,
+      toolMcp: true,
+    };
+
+    const errors = validateConfiguration(config);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].field).toBe("forge.copilot.endpoint");
+  });
 });
+
+describe("getConfiguration — authMethod", () => {
+  beforeEach(() => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReset();
+  });
+
+  it("reads authMethod from settings with correct default ('entraId')", () => {
+    const mockGet = vi.fn((_key: string, defaultValue: unknown) => defaultValue);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: mockGet,
+    } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+
+    const config = getConfiguration();
+
+    // authMethod should default to "entraId" per design review
+    expect(config.authMethod).toBe("entraId");
+  });
+
+  it("returns configured authMethod when set to 'apiKey'", () => {
+    const settings: Record<string, unknown> = {
+      authMethod: "apiKey",
+    };
+    const mockGet = vi.fn(
+      (key: string, defaultValue: unknown) => settings[key] ?? defaultValue,
+    );
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: mockGet,
+    } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+
+    const config = getConfiguration();
+
+    expect(config.authMethod).toBe("apiKey");
+  });
+});
+

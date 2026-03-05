@@ -27,12 +27,22 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
 const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
-  model: "gpt-4.1",
+  authMethod: "apiKey",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
 describe("multi-turn conversation context (SC4)", () => {
@@ -51,16 +61,16 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("same conversation reuses session", () => {
     it("returns the same session object for the same conversationId", async () => {
-      const session1 = await getOrCreateSession("conv-reuse", validConfig);
-      const session2 = await getOrCreateSession("conv-reuse", validConfig);
+      const session1 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      const session2 = await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
 
       expect(session1).toBe(session2);
     });
 
     it("only calls createSession once for repeated requests", async () => {
-      await getOrCreateSession("conv-reuse", validConfig);
-      await getOrCreateSession("conv-reuse", validConfig);
-      await getOrCreateSession("conv-reuse", validConfig);
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-reuse", validConfig, "test-key-123", "gpt-4.1");
 
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
@@ -74,8 +84,8 @@ describe("multi-turn conversation context (SC4)", () => {
       const mocks = [sessionA, sessionB];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const resultA = await getOrCreateSession("conv-A", validConfig);
-      const resultB = await getOrCreateSession("conv-B", validConfig);
+      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123", "gpt-4.1");
+      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123", "gpt-4.1");
 
       expect(resultA).not.toBe(resultB);
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
@@ -88,8 +98,8 @@ describe("multi-turn conversation context (SC4)", () => {
       const mocks = [sessionA, sessionB];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const resultA = await getOrCreateSession("conv-A", validConfig);
-      const resultB = await getOrCreateSession("conv-B", validConfig);
+      const resultA = await getOrCreateSession("conv-A", validConfig, "test-key-123", "gpt-4.1");
+      const resultB = await getOrCreateSession("conv-B", validConfig, "test-key-123", "gpt-4.1");
 
       await resultA.send({ prompt: "message A" });
       await resultB.send({ prompt: "message B" });
@@ -107,7 +117,7 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("session persists across messages", () => {
     it("accepts multiple sendMessage calls on the same session", async () => {
-      const session = await getOrCreateSession("conv-multi", validConfig);
+      const session = await getOrCreateSession("conv-multi", validConfig, "test-key-123", "gpt-4.1");
 
       await session.send({ prompt: "first message" });
       await session.send({ prompt: "second message" });
@@ -129,10 +139,10 @@ describe("multi-turn conversation context (SC4)", () => {
     });
 
     it("returns the same session after intermediate messages", async () => {
-      const session1 = await getOrCreateSession("conv-persist", validConfig);
+      const session1 = await getOrCreateSession("conv-persist", validConfig, "test-key-123", "gpt-4.1");
       await session1.send({ prompt: "turn 1" });
 
-      const session2 = await getOrCreateSession("conv-persist", validConfig);
+      const session2 = await getOrCreateSession("conv-persist", validConfig, "test-key-123", "gpt-4.1");
       await session2.send({ prompt: "turn 2" });
 
       expect(session1).toBe(session2);
@@ -142,20 +152,20 @@ describe("multi-turn conversation context (SC4)", () => {
 
   describe("session cleanup", () => {
     it("removeSession removes a specific session", async () => {
-      await getOrCreateSession("conv-remove", validConfig);
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
       removeSession("conv-remove");
 
-      await getOrCreateSession("conv-remove", validConfig);
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
 
     it("removeSession leaves other sessions intact", async () => {
-      const sessionKeep = await getOrCreateSession("conv-keep", validConfig);
-      await getOrCreateSession("conv-remove", validConfig);
+      const sessionKeep = await getOrCreateSession("conv-keep", validConfig, "test-key-123", "gpt-4.1");
+      await getOrCreateSession("conv-remove", validConfig, "test-key-123", "gpt-4.1");
 
       removeSession("conv-remove");
 
-      const sessionKeepAgain = await getOrCreateSession("conv-keep", validConfig);
+      const sessionKeepAgain = await getOrCreateSession("conv-keep", validConfig, "test-key-123", "gpt-4.1");
       expect(sessionKeepAgain).toBe(sessionKeep);
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
@@ -177,12 +187,13 @@ describe("multi-turn conversation context (SC4)", () => {
     let mockView: MockWebviewView;
 
     function setupValidSettings() {
-      const settings: Record<string, string> = {
+      const settings: Record<string, unknown> = {
         endpoint: "https://myresource.openai.azure.com/openai/v1/",
         apiKey: "test-key-123",
-        model: "gpt-4.1",
+        authMethod: "apiKey",
         wireApi: "completions",
         cliPath: "",
+        models: ["gpt-4"],
       };
       vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
         get: vi.fn(
@@ -194,9 +205,11 @@ describe("multi-turn conversation context (SC4)", () => {
     beforeEach(() => {
       setupValidSettings();
 
+      const stateStore = new Map<string, unknown>();
       const mockExtCtx = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
         secrets: {
           get: vi.fn().mockImplementation((key: string) =>
             key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
@@ -204,6 +217,11 @@ describe("multi-turn conversation context (SC4)", () => {
           store: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
           onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
+        workspaceState: {
+          get: vi.fn((key: string, defaultValue?: unknown) => stateStore.get(key) ?? defaultValue),
+          update: vi.fn((key: string, value: unknown) => { stateStore.set(key, value); return Promise.resolve(); }),
+          keys: vi.fn(() => [...stateStore.keys()]),
         },
       };
       activate(mockExtCtx as unknown as import("vscode").ExtensionContext);
@@ -343,14 +361,14 @@ describe("multi-turn conversation context (SC4)", () => {
       // Create sessions sequentially to avoid client-creation race
       const sessions = [];
       for (const id of ids) {
-        sessions.push(await getOrCreateSession(id, validConfig));
+        sessions.push(await getOrCreateSession(id, validConfig, "test-key-123", "gpt-4.1"));
       }
 
       expect(mockClient.createSession).toHaveBeenCalledTimes(5);
 
       // Each session is independently reachable and reused
       for (let i = 0; i < ids.length; i++) {
-        const refetched = await getOrCreateSession(ids[i], validConfig);
+        const refetched = await getOrCreateSession(ids[i], validConfig, "test-key-123", "gpt-4.1");
         expect(refetched).toBe(sessions[i]);
       }
 
@@ -361,21 +379,22 @@ describe("multi-turn conversation context (SC4)", () => {
       const s1 = createMockSession();
       const s2 = createMockSession();
       const s3 = createMockSession();
+      const s4 = createMockSession();
 
       let idx = 0;
-      const mocks = [s1, s2, s3];
+      const mocks = [s1, s2, s3, s4];
       mockClient.createSession.mockImplementation(async () => mocks[idx++]);
 
-      const session1 = await getOrCreateSession("c1", validConfig);
-      const session2 = await getOrCreateSession("c2", validConfig);
-      const session3 = await getOrCreateSession("c3", validConfig);
+      const session1 = await getOrCreateSession("c1", validConfig, "test-key-123", "gpt-4.1");
+      const session2 = await getOrCreateSession("c2", validConfig, "test-key-123", "gpt-4.1");
+      const session3 = await getOrCreateSession("c3", validConfig, "test-key-123", "gpt-4.1");
 
       removeSession("c2");
 
-      expect(await getOrCreateSession("c1", validConfig)).toBe(session1);
-      expect(await getOrCreateSession("c3", validConfig)).toBe(session3);
+      expect(await getOrCreateSession("c1", validConfig, "test-key-123", "gpt-4.1")).toBe(session1);
+      expect(await getOrCreateSession("c3", validConfig, "test-key-123", "gpt-4.1")).toBe(session3);
 
-      const session2New = await getOrCreateSession("c2", validConfig);
+      const session2New = await getOrCreateSession("c2", validConfig, "test-key-123", "gpt-4.1");
       expect(session2New).not.toBe(session2);
       expect(mockClient.createSession).toHaveBeenCalledTimes(4);
     });

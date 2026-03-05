@@ -1,30 +1,186 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { getConfigurationAsync, validateConfiguration } from "./configuration.js";
+import { execFileSync } from "child_process";
+import { platform } from "os";
+import { getConfiguration, getConfigurationAsync, validateConfiguration, type ExtensionConfig } from "./configuration.js";
+import { createCredentialProvider } from "./auth/credentialProvider.js";
 import {
   getOrCreateSession,
   destroySession,
   stopClient,
   CopilotCliNotFoundError,
+  CopilotCliNeedsInstallError,
+  listConversations,
+  resumeConversation,
+  deleteConversation,
+  discoverAndValidateCli,
+  type CopilotCliValidationResult,
 } from "./copilotService.js";
+import { checkAuthStatus, type AuthStatus } from "./auth/authStatusProvider.js";
+import { ForgeCodeActionProvider } from "./codeActionProvider.js";
+import { installCopilotCli, type CliInstallResult } from "./cliInstaller.js";
 import type {
   ICopilotSession,
   MessageDeltaEvent,
+  AssistantMessageEvent,
   SessionErrorEvent,
   PermissionRequest,
   PermissionRequestResult,
-  ToolExecutionStartEvent,
+  ToolExecutionProgressEvent,
+  ToolExecutionPartialResultEvent,
   ToolExecutionCompleteEvent,
   ContextItem,
 } from "./types.js";
 
+const AUTH_POLL_INTERVAL_MS = 30_000;
+const SIGN_IN_RECHECK_MS = 5000;
+const TOOL_PERMISSION_TIMEOUT_MS = 120_000;
+
+/** Pre-fetched extension state to avoid redundant async calls. */
+type PrefetchedState = { config: Awaited<ReturnType<typeof getConfigurationAsync>>; authStatus: AuthStatus };
+
+const AZ_INSTALL_URL = "https://aka.ms/azure-cli";
+
+/** Check whether the `az` CLI is available on the system PATH. */
+function isAzCliAvailable(): boolean {
+  try {
+    const cmd = platform() === "win32" ? "where.exe" : "which";
+    execFileSync(cmd, ["az"], { stdio: "ignore", windowsHide: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri, context.secrets);
+  const outputChannel = vscode.window.createOutputChannel("Forge");
+  const provider = new ChatViewProvider(
+    context.extensionUri,
+    context.secrets,
+    context.workspaceState,
+    outputChannel,
+    context.globalStorageUri.fsPath
+  );
+
+  // Status bar item for auth status
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+  statusBarItem.show();
+
+  // Wire auth refresh callback so provider methods can trigger status updates
+  const refreshAuth = () => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
+  };
+  provider.setAuthRefreshCallback(refreshAuth);
+
+  // Initial auth status update
+  updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
+    outputChannel.appendLine(`Initial auth status check failed: ${err}`);
+  });
+
+  // Preflight CLI validation
+  performCliPreflight(getConfiguration(), outputChannel, provider, context.globalStorageUri.fsPath).catch((err) => {
+    outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+  });
+
+  // Listen for config changes
+  const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration("forge.copilot")) {
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => {
+        outputChannel.appendLine(`Auth status update on config change failed: ${err}`);
+      });
+      if (e.affectsConfiguration("forge.copilot.cliPath")) {
+        performCliPreflight(getConfiguration(), outputChannel, provider, context.globalStorageUri.fsPath).catch((err) => {
+          outputChannel.appendLine(`CLI preflight check failed: ${err}`);
+        });
+      }
+    }
+  });
+
+  // Poll auth status every 30s (catches `az login` completions that don't trigger config changes)
+  const authPollInterval = setInterval(() => {
+    updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
+  }, AUTH_POLL_INTERVAL_MS);
+  const authPollDisposable = new vscode.Disposable(() => clearInterval(authPollInterval));
+
+  // Re-check auth when the window regains focus
+  const focusListener = vscode.window.onDidChangeWindowState((e) => {
+    if (e.focused) {
+      updateAuthStatus(statusBarItem, provider, context.secrets).catch((err) => { outputChannel.appendLine(`Auth status update failed: ${err}`); });
+    }
+  });
+
+  // Track sign-in timeout so it can be disposed on deactivation
+  let signInTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("forge.chatView", provider),
+    outputChannel,
+    statusBarItem,
+    configListener,
+    authPollDisposable,
+    focusListener,
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      provider.postWorkspaceInfo();
+    }),
+    new vscode.Disposable(() => {
+      if (signInTimeoutHandle !== undefined) {
+        clearTimeout(signInTimeoutHandle);
+        signInTimeoutHandle = undefined;
+      }
+    }),
+    vscode.window.registerWebviewViewProvider("forge.chatView", provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand("forge.openSettings", () =>
       provider.openSettings()
     ),
+    vscode.commands.registerCommand("forge.showHistory", () =>
+      provider.toggleHistory()
+    ),
+    vscode.commands.registerCommand("forge.signIn", async () => {
+      const config = await getConfigurationAsync(context.secrets);
+      if (config.authMethod === "entraId") {
+        if (!isAzCliAvailable()) {
+          const action = await vscode.window.showErrorMessage(
+            `Azure CLI is required for Entra ID sign-in. Install it from ${AZ_INSTALL_URL}`,
+            "Install Azure CLI"
+          );
+          if (action === "Install Azure CLI") {
+            await vscode.env.openExternal(vscode.Uri.parse(AZ_INSTALL_URL));
+          }
+          return;
+        }
+        const terminal = vscode.window.createTerminal("Azure Sign In");
+        terminal.sendText("az login");
+        terminal.show();
+        // Poll auth status every 5s for up to 60s to catch az login completion
+        if (signInTimeoutHandle !== undefined) {
+          clearTimeout(signInTimeoutHandle);
+        }
+        let signInChecksRemaining = 12; // 12 × 5s = 60s
+        const scheduleSignInRecheck = () => {
+          if (signInChecksRemaining <= 0) {
+            signInTimeoutHandle = undefined;
+            return;
+          }
+          signInChecksRemaining--;
+          signInTimeoutHandle = setTimeout(async () => {
+            try {
+              const status = await updateAuthStatus(statusBarItem, provider, context.secrets);
+              if (status.state === "authenticated") {
+                signInTimeoutHandle = undefined;
+                return;
+              }
+            } catch (err) {
+              outputChannel.appendLine(`Auth status update failed: ${err}`);
+            }
+            scheduleSignInRecheck();
+          }, SIGN_IN_RECHECK_MS);
+        };
+        scheduleSignInRecheck();
+      } else {
+        await provider.openSettings();
+      }
+    }),
     vscode.commands.registerCommand("forge.attachSelection", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
@@ -58,8 +214,8 @@ export function activate(context: vscode.ExtensionContext): void {
       const uri = uris[0];
       const raw = await vscode.workspace.fs.readFile(uri);
       let content = new TextDecoder("utf-8").decode(raw);
-      if (content.length > 8000) {
-        content = content.slice(0, 8000) + "\n...[truncated]";
+      if (content.length > ChatViewProvider.CONTEXT_CHAR_BUDGET) {
+        content = content.slice(0, ChatViewProvider.CONTEXT_CHAR_BUDGET) + "\n...[truncated]";
       }
       const filePath = vscode.workspace.asRelativePath(uri);
       // Derive languageId from file extension — no document open required
@@ -73,7 +229,170 @@ export function activate(context: vscode.ExtensionContext): void {
       const ctx: ContextItem = { type: "file", filePath, languageId, content };
       provider.postContextAttached(ctx);
     }),
+    vscode.languages.registerCodeActionsProvider(
+      [{ scheme: "file" }, { scheme: "untitled" }],
+      new ForgeCodeActionProvider(),
+      { providedCodeActionKinds: ForgeCodeActionProvider.providedCodeActionKinds },
+    ),
+    vscode.commands.registerCommand("forge.explain", () =>
+      sendFromEditor("Explain the following code in detail.", provider)
+    ),
+    vscode.commands.registerCommand("forge.fix", () =>
+      sendFromEditor("Find and fix any bugs or issues in the following code.", provider)
+    ),
+    vscode.commands.registerCommand("forge.tests", () =>
+      sendFromEditor("Write unit tests for the following code.", provider)
+    ),
   );
+}
+
+/**
+ * Grabs the active editor selection, reveals the Forge panel, and sends
+ * a prompt with the selected code as context.
+ */
+async function sendFromEditor(instruction: string, provider: ChatViewProvider): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) { return; }
+  const selection = editor.selection;
+  const content = editor.document.getText(selection);
+  if (!content) { return; }
+
+  const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+  const startLine = selection.start.line + 1;
+  let endLine = selection.end.line + 1;
+  if (selection.end.character === 0 && selection.end.line > selection.start.line) {
+    endLine = selection.end.line;
+  }
+
+  const ctx: ContextItem = {
+    type: "selection",
+    filePath,
+    languageId: editor.document.languageId,
+    content,
+    startLine,
+    endLine,
+  };
+
+  // Reveal the Forge panel so the user sees the response
+  await vscode.commands.executeCommand("forge.chatView.focus");
+
+  provider.sendMessageWithContext(instruction, [ctx]);
+}
+
+async function updateAuthStatus(
+  statusBarItem: vscode.StatusBarItem,
+  provider: ChatViewProvider,
+  secrets: vscode.SecretStorage
+): Promise<AuthStatus> {
+  const config = await getConfigurationAsync(secrets);
+  const status = await checkAuthStatus(config, secrets);
+
+  switch (status.state) {
+    case "authenticated":
+      statusBarItem.text = "$(pass) Forge: Authenticated";
+      if (status.method === "entraId" && status.account) {
+        statusBarItem.tooltip = `Signed in as ${status.account} (Entra ID)`;
+      } else {
+        statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
+      }
+      statusBarItem.command = undefined;
+      break;
+    case "notAuthenticated":
+      statusBarItem.command = "forge.signIn";
+      if (config.authMethod === "entraId") {
+        statusBarItem.text = "$(sign-in) Forge: Sign In";
+        statusBarItem.tooltip = "Click to sign in with Azure CLI";
+      } else {
+        statusBarItem.text = "$(key) Forge: Set API Key";
+        statusBarItem.tooltip = "Click to set your API key";
+      }
+      break;
+    case "error": {
+      statusBarItem.command = "forge.signIn";
+      statusBarItem.text = "$(warning) Forge: Auth Issue";
+      const msg = status.message ?? "Unknown error";
+      statusBarItem.tooltip = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
+      break;
+    }
+  }
+
+  provider.postAuthStatus(status, !!config.endpoint);
+  provider.refreshWebviewState({ config, authStatus: status });
+  return status;
+}
+
+/**
+ * Perform CLI preflight check: discover and validate the Copilot CLI.
+ * Shows actionable notifications and webview banner when validation fails.
+ * Never throws — fire-and-forget.
+ */
+async function performCliPreflight(
+  config: ExtensionConfig,
+  outputChannel: vscode.OutputChannel,
+  provider: ChatViewProvider,
+  globalStoragePath?: string
+): Promise<void> {
+  try {
+    const result = await discoverAndValidateCli(config.cliPath, globalStoragePath);
+
+    if (result.valid) {
+      outputChannel.appendLine(`[forge] Copilot CLI validated: ${result.version} at ${result.path}`);
+      provider.postCliStatus(result);
+      return;
+    }
+
+    // CLI validation failed — show actionable notifications
+    provider.postCliStatus(result);
+
+    if (result.reason === "not_found") {
+      const hasConfiguredCliPath = config.cliPath.trim() !== "";
+      if (!hasConfiguredCliPath) {
+        await provider.promptCliAutoInstall(result.details ?? "Copilot CLI not found");
+      } else {
+        vscode.window.showWarningMessage(
+          "Forge: Copilot CLI not found at the configured path. Set forge.copilot.cliPath to a valid GitHub Copilot CLI executable.",
+          "Open Settings"
+        ).then(choice => {
+          if (choice === "Open Settings") {
+            vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+          }
+        });
+      }
+    } else if (result.reason === "wrong_binary") {
+      vscode.window.showWarningMessage(
+        "Forge: Copilot CLI validation failed. Set forge.copilot.cliPath to the GitHub Copilot CLI executable.",
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    } else if (result.reason === "version_check_failed") {
+      vscode.window.showWarningMessage(
+        "Forge: Could not verify the Copilot CLI. It may need to be updated. Details: " + (result.details ?? "Unknown error"),
+        "Open Settings"
+      ).then(choice => {
+        if (choice === "Open Settings") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.cliPath");
+        }
+      });
+    }
+  } catch (err) {
+    outputChannel.appendLine(`CLI preflight check error: ${err}`);
+  }
+}
+
+/**
+ * Wraps a promise with a timeout. If the promise doesn't resolve within the
+ * specified time, rejects with a timeout error.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+    ),
+  ]);
 }
 
 export async function deactivate(): Promise<void> {
@@ -83,18 +402,95 @@ export async function deactivate(): Promise<void> {
 class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _conversationId: string = `conv-${crypto.randomUUID()}`;
-  private _isProcessing = false;
+  private _processingPhase: "idle" | "thinking" | "generating" = "idle";
+  private _isInstallingCli = false;
+  private _currentSession?: ICopilotSession;
+  private _cancelRequested = false;
+  private _requestId = 0;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
-  private _toolNames = new Map<string, string>();
+  private _conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  private _refreshAuthStatus?: () => void;
+  private _lastAuthStatus?: string;
+  private _selectedModel?: string;
+  private _lastCliValidation?: CopilotCliValidationResult;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _secrets: vscode.SecretStorage
-  ) {}
+    private readonly _secrets: vscode.SecretStorage,
+    private readonly _workspaceState: vscode.Memento,
+    private readonly _outputChannel: vscode.OutputChannel,
+    private readonly _globalStoragePath: string
+  ) {
+    // Restore persisted model selection
+    this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
+  }
+
+  private get _workspaceRoot(): string | undefined {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  /** Set by activate() to trigger auth status refresh from within the provider. */
+  public setAuthRefreshCallback(callback: () => void): void {
+    this._refreshAuthStatus = callback;
+  }
+
+  /** Returns the active model: persisted selection, or first entry from models array. */
+  private _getActiveModel(models: string[]): string {
+    if (this._selectedModel && models.includes(this._selectedModel)) {
+      return this._selectedModel;
+    }
+    return models[0] ?? "";
+  }
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
+  }
+
+  public postWorkspaceInfo(): void {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    this._view?.webview.postMessage({
+      type: "workspaceInfo",
+      name: folder?.name,
+      path: folder?.uri.fsPath,
+    });
+  }
+
+  public toggleHistory(): void {
+    this._view?.webview.postMessage({ type: "toggleHistory" });
+  }
+
+  /** Programmatically send a message with context (used by code action commands). */
+  public sendMessageWithContext(prompt: string, context: ContextItem[]): void {
+    this._handleChatMessage(prompt, context).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    });
+  }
+
+  public postAuthStatus(status: AuthStatus, hasEndpoint?: boolean): void {
+    // Deduplicate authStatus messages to prevent banner flashing every 30s
+    const statusKey = JSON.stringify({ status, hasEndpoint: !!hasEndpoint });
+    if (this._lastAuthStatus === statusKey) {
+      return; // Status unchanged, skip posting to webview
+    }
+    this._lastAuthStatus = statusKey;
+    this._view?.webview.postMessage({ type: "authStatus", status, hasEndpoint: !!hasEndpoint });
+  }
+
+  public postCliStatus(result: CopilotCliValidationResult): void {
+    this._lastCliValidation = result;
+    this._view?.webview.postMessage({ type: "cliStatus", result });
+  }
+
+  public async promptCliAutoInstall(errorMessage: string): Promise<void> {
+    await this._handleCliAutoInstall(errorMessage);
+  }
+
+  /** Re-sends all webview state (auth, models, config status). Accepts pre-fetched data to avoid redundant calls. */
+  public refreshWebviewState(prefetched?: PrefetchedState): void {
+    this._sendConfigStatus(prefetched);
   }
 
   public resolveWebviewView(
@@ -117,26 +513,53 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messageListener?.dispose();
       this._messageListener = undefined;
     });
+
+    // Reset dedup state so initial status always goes through
+    this._lastAuthStatus = undefined;
+
+    // Send initial config status (also re-sent on webviewReady to handle race condition)
+    this._sendConfigStatus();
+
+    // Send workspace folder info
+    this.postWorkspaceInfo();
   }
 
   public async openSettings(): Promise<void> {
     const choice = await vscode.window.showQuickPick(
-      ["Open Settings", "Set API Key (secure)"],
+      ["Open Settings", "Set API Key (secure)", "Clear API Key"],
       { placeHolder: "Forge Configuration" }
     );
     if (choice === "Open Settings") {
       await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot");
     } else if (choice === "Set API Key (secure)") {
-      const value = await vscode.window.showInputBox({
-        prompt: "Enter your API key",
-        password: true,
-        placeHolder: "Paste your Azure AI Foundry API key",
-      });
-      if (value !== undefined) {
-        await this._secrets.store("forge.copilot.apiKey", value);
-        await vscode.window.showInformationMessage("API key stored securely.");
-      }
+      await this._promptAndStoreApiKey();
+    } else if (choice === "Clear API Key") {
+      await this._clearApiKey();
     }
+  }
+
+  /** Shared helper: prompt for API key, store in SecretStorage, refresh auth status. */
+  private async _promptAndStoreApiKey(): Promise<void> {
+    const value = await vscode.window.showInputBox({
+      prompt: "Enter your API key",
+      password: true,
+      placeHolder: "Paste your Azure AI Foundry API key",
+    });
+    if (value !== undefined) {
+      await this._secrets.store("forge.copilot.apiKey", value);
+      // Switch auth method to apiKey so checkAuthStatus looks in the right place
+      await vscode.workspace.getConfiguration("forge.copilot").update("authMethod", "apiKey", vscode.ConfigurationTarget.Global);
+      await vscode.window.showInformationMessage("API key stored securely.");
+      this._refreshAuthStatus?.();
+    }
+  }
+
+  private async _clearApiKey(): Promise<void> {
+    await this._secrets.delete("forge.copilot.apiKey");
+    // Revert to Entra ID since there's no API key anymore
+    await vscode.workspace.getConfiguration("forge.copilot").update("authMethod", "entraId", vscode.ConfigurationTarget.Global);
+    await vscode.window.showInformationMessage("API key cleared.");
+    this._refreshAuthStatus?.();
   }
 
   private async _handleMessage(message: { command: string; [key: string]: unknown }): Promise<void> {
@@ -156,19 +579,59 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await vscode.commands.executeCommand("forge.attachSelection");
     } else if (message.command === "attachFile") {
       await vscode.commands.executeCommand("forge.attachFile");
+    } else if (message.command === "webviewReady") {
+      this._sendConfigStatus();
+      if (this._lastCliValidation) {
+        this._view?.webview.postMessage({ type: "cliStatus", result: this._lastCliValidation });
+      }
     } else if (message.command === "openSettings") {
       await this.openSettings();
+    } else if (message.command === "openEndpointSettings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.endpoint");
+    } else if (message.command === "openModelSettings") {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "forge.copilot.models");
+    } else if (message.command === "signIn") {
+      await vscode.commands.executeCommand("forge.signIn");
+    } else if (message.command === "setApiKey") {
+      await this._promptAndStoreApiKey();
+    } else if (message.command === "clearApiKey") {
+      await this._clearApiKey();
     } else if (message.command === "newConversation") {
       this._rejectPendingPermissions();
       await destroySession(this._conversationId);
       this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
       this._view?.webview.postMessage({ type: "conversationReset" });
+    } else if (message.command === "modelChanged") {
+      const newModel = message.model as string;
+      if (!newModel) { return; }
+      const confirm = await vscode.window.showWarningMessage(
+        "Changing models will reset the current conversation. Continue?",
+        { modal: true },
+        "Continue"
+      );
+      if (confirm !== "Continue") {
+        const currentConfig = await getConfigurationAsync(this._secrets);
+        this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(currentConfig.models) });
+        return;
+      }
+      this._selectedModel = newModel;
+      await this._workspaceState.update("forge.selectedModel", newModel);
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+      this._conversationId = `conv-${crypto.randomUUID()}`;
+      this._conversationMessages = [];
+      this._view?.webview.postMessage({ type: "conversationReset" });
+      this._view?.webview.postMessage({ type: "modelSelected", model: newModel });
     } else if (message.command === "chatFocused") {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
       const selection = editor.selection;
-      const content = editor.document.getText(selection);
+      let content = editor.document.getText(selection);
       if (!content) { return; }
+      if (content.length > ChatViewProvider.CONTEXT_CHAR_BUDGET) {
+        content = content.slice(0, ChatViewProvider.CONTEXT_CHAR_BUDGET) + "\n...[truncated]";
+      }
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
       const startLine = selection.start.line + 1;
       let endLine = selection.end.line + 1;
@@ -206,17 +669,156 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       resolver(approved === true);
+    } else if (message.command === "listConversations") {
+      await this._handleListConversations();
+    } else if (message.command === "resumeConversation") {
+      await this._handleResumeConversation(message.sessionId as string);
+    } else if (message.command === "deleteConversation") {
+      await this._handleDeleteConversation(message.sessionId as string);
+    } else if (message.command === "checkConfig") {
+      this._sendConfigStatus(undefined, true);
+    } else if (message.command === "openDocs") {
+      await vscode.env.openExternal(vscode.Uri.parse("https://github.com/robpitcher/forge?tab=readme-ov-file#forge"));
+    } else if (message.command === "openUrl") {
+      const url = typeof message.url === "string" ? message.url : "";
+      if (url.startsWith("https://")) {
+        await vscode.env.openExternal(vscode.Uri.parse(url));
+      }
+    } else if (message.command === "installCli") {
+      await this._handleCliAutoInstall("User requested install from banner");
+    } else if (message.command === "stopRequest") {
+      if (this._processingPhase === "idle") { return; }
+
+      // Flag cancellation so thinking-phase code can bail out early
+      this._cancelRequested = true;
+
+      if (this._currentSession) {
+        const session = this._currentSession;
+        this._currentSession = undefined;
+        try {
+          await session.abort();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this._outputChannel.appendLine(`[stopRequest] session.abort() failed: ${msg}`);
+        } finally {
+          this._postProcessingPhase("idle");
+        }
+      } else {
+        // During thinking phase — no session yet; cancellation flag will
+        // be checked before session.send(). Post idle so the UI resets.
+        this._postProcessingPhase("idle");
+      }
     }
   }
 
+  private _sendConfigStatus(prefetched?: PrefetchedState, isCheckRequest = false): void {
+    this._outputChannel.appendLine(`[_sendConfigStatus] Starting config status update (isCheckRequest: ${isCheckRequest})`);
+
+    const doWork = async () => {
+      // Step 1: Get config synchronously (or use prefetched) and send models/endpoint info IMMEDIATELY
+      const syncConfig = prefetched?.config ?? getConfiguration();
+      const hasModels = syncConfig.models.length > 0;
+      const hasEndpoint = !!syncConfig.endpoint;
+
+      this._outputChannel.appendLine(`[_sendConfigStatus] Config read: endpoint=${hasEndpoint ? 'present' : 'missing'}, models=${hasModels ? syncConfig.models.length : 0}`);
+
+      // Send models and model selection immediately
+      this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
+      this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(syncConfig.models) });
+
+      // Send preliminary configStatus with hasAuth=false (will update after auth check)
+      this._view?.webview.postMessage({
+        type: "configStatus",
+        hasEndpoint,
+        hasAuth: false,
+        hasModels,
+      });
+
+      // Step 2: Now do the async auth check with timeout
+      let config: ExtensionConfig;
+      let status: AuthStatus;
+
+      try {
+        // Get full config with API key
+        config = prefetched?.config ?? await getConfigurationAsync(this._secrets);
+
+        // Check auth with 15-second timeout
+        if (prefetched?.authStatus) {
+          status = prefetched.authStatus;
+          this._outputChannel.appendLine(`[_sendConfigStatus] Using prefetched auth status: ${status.state}`);
+        } else {
+          this._outputChannel.appendLine(`[_sendConfigStatus] Starting auth check...`);
+          status = await withTimeout(
+            checkAuthStatus(config, this._secrets),
+            15000,
+            "Authentication check timed out"
+          );
+          this._outputChannel.appendLine(`[_sendConfigStatus] Auth check complete: ${status.state}`);
+        }
+      } catch (error) {
+        // Timeout or other error — treat as not authenticated
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this._outputChannel.appendLine(`[_sendConfigStatus] Auth check failed: ${errorMsg}`);
+
+        config = prefetched?.config ?? getConfiguration();
+        status = {
+          state: "notAuthenticated",
+          reason: errorMsg.includes("timed out")
+            ? "Authentication check timed out — try running 'az login' again"
+            : "Authentication check failed",
+        };
+      }
+
+      // Step 3: Send the updated auth status to webview
+      this.postAuthStatus(status, !!config.endpoint);
+
+      const hasAuth = status.state === "authenticated";
+      this._view?.webview.postMessage({
+        type: "configStatus",
+        hasEndpoint: !!config.endpoint,
+        hasAuth,
+        hasModels: config.models.length > 0,
+      });
+
+      // Step 4: Handle checkConfig request
+      if (isCheckRequest) {
+        const missing: string[] = [];
+        if (!config.endpoint) { missing.push("Azure endpoint URL"); }
+        if (!config.models || config.models.length === 0) { missing.push("Model configuration"); }
+        if (!hasAuth) { missing.push("Authentication"); }
+        this._view?.webview.postMessage({
+          type: "configCheckResult",
+          missing,
+          allGood: missing.length === 0,
+        });
+      }
+
+      this._outputChannel.appendLine(`[_sendConfigStatus] Status update complete`);
+    };
+
+    doWork().catch((error) => {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this._outputChannel.appendLine(`[_sendConfigStatus] Unhandled error: ${errorMsg}`);
+    });
+  }
+
+  private _postProcessingPhase(phase: "idle" | "thinking" | "generating"): void {
+    this._processingPhase = phase;
+    this._view?.webview.postMessage({ type: "processingPhaseUpdate", phase });
+  }
+
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {
-    if (this._isProcessing) { return; }
+    if (this._processingPhase !== "idle") { return; }
+    this._cancelRequested = false;
+    const myRequestId = ++this._requestId;
+    this._postProcessingPhase("thinking");
 
     let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
     try {
       config = await getConfigurationAsync(this._secrets);
     } catch {
       this._postError("Failed to read API key from secure storage. Click the ⚙️ gear icon → 'Set API Key (secure)' to re-enter it.");
+      this._postProcessingPhase("idle");
       return;
     }
     const validationErrors = validateConfiguration(config);
@@ -225,6 +827,41 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       for (const error of validationErrors) {
         this._postError(error.message);
       }
+      this._postProcessingPhase("idle");
+      return;
+    }
+
+    const activeModel = this._getActiveModel(config.models);
+    if (!activeModel) {
+      this._postError("No model deployment configured. Click ⚙️ → Open Model Settings to add at least one model.");
+      this._postProcessingPhase("idle");
+      return;
+    }
+
+    let credentialProvider;
+    try {
+      credentialProvider = await createCredentialProvider(config, this._secrets);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(`Failed to initialize authentication: ${message}. Click ⚙️ to check your auth settings.`);
+      this._postProcessingPhase("idle");
+      return;
+    }
+    let authToken: string;
+    try {
+      authToken = await credentialProvider.getToken();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (config.authMethod === "entraId") {
+        const summary = this._extractEntraIdErrorSummary(message);
+        this._postError(
+          `Entra ID authentication failed. ${summary} ` +
+          "Or switch to API key auth in Settings (forge.copilot.authMethod)."
+        );
+      } else {
+        this._postError(`Authentication failed: ${message}`);
+      }
+      this._postProcessingPhase("idle");
       return;
     }
 
@@ -233,34 +870,66 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       session = await getOrCreateSession(
         this._conversationId,
         config,
+        authToken,
+        activeModel,
+        this._globalStoragePath,
         this._createPermissionHandler(),
+        this._workspaceRoot,
       );
     } catch (err: unknown) {
-      if (err instanceof CopilotCliNotFoundError) {
+      if (err instanceof CopilotCliNeedsInstallError) {
+        // Copilot CLI not found — offer to install it automatically
+        this._postProcessingPhase("idle");
+        await this._handleCliAutoInstall(err.message);
+        return;
+      } else if (err instanceof CopilotCliNotFoundError) {
         this._postError(err.message);
       } else {
         const message = err instanceof Error ? err.message : String(err);
         this._postError(`Failed to start Copilot service: ${message}`);
       }
+      this._postProcessingPhase("idle");
       return;
     }
 
     const enrichedPrompt = this._buildPromptWithContext(prompt, context);
 
-    this._isProcessing = true;
+    // If stop was clicked during the thinking phase, bail out before sending
+    if (this._cancelRequested) {
+      this._cancelRequested = false;
+      this._postProcessingPhase("idle");
+      return;
+    }
+
     try {
+      // Add user message to cache
+      this._conversationMessages.push({ role: "user", content: prompt });
+
+      this._currentSession = session;
+      this._postProcessingPhase("generating");
       await this._streamResponse(enrichedPrompt, session);
+
+      // Cache messages after successful response
+      const cacheKey = `forge.messages.${this._conversationId}`;
+      await this._workspaceState.update(cacheKey, this._conversationMessages);
+
+      // Store as last session
+      await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
       const message = this._rewriteAuthError(raw);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
-      this._isProcessing = false;
+      // Only reset if this is still the active request — a newer request may have started
+      if (this._requestId === myRequestId) {
+        this._currentSession = undefined;
+        this._postProcessingPhase("idle");
+      }
     }
   }
 
-  private static readonly _CONTEXT_CHAR_BUDGET = 8000;
+  public static readonly CONTEXT_CHAR_BUDGET = 8000;
 
   /**
    * Prepend formatted workspace context blocks to the user's prompt.
@@ -274,7 +943,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       return prompt;
     }
 
-    const budget = ChatViewProvider._CONTEXT_CHAR_BUDGET;
+    const budget = ChatViewProvider.CONTEXT_CHAR_BUDGET;
     const truncationNote = "\n...[truncated — context exceeds 8000 char limit]";
     const separator = "\n\n";
     let usedChars = 0;
@@ -324,21 +993,58 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return message;
   }
 
+  private _extractEntraIdErrorSummary(rawMessage: string): string {
+    const lower = rawMessage.toLowerCase();
+
+    // Azure CLI: No subscription found
+    if (lower.includes("no subscription found") || lower.includes("az account set")) {
+      return "Azure CLI: No subscription found. Run 'az account set' to select a subscription, then try again.";
+    }
+
+    // Azure CLI: Not logged in
+    if (lower.includes("az login") || lower.includes("please run 'az login'")) {
+      return "Azure CLI: Not logged in. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Azure AD errors (AADSTS codes)
+    if (lower.includes("aadsts")) {
+      return "Azure CLI: Authentication issue. Run 'az login' and 'az account set', then try again.";
+    }
+
+    // MFA or interactive login required
+    if (lower.includes("multi-factor") || lower.includes("mfa") || lower.includes("interactive")) {
+      return "Azure CLI: Interactive login required. Run 'az login' in your terminal, then try again.";
+    }
+
+    // Generic fallback
+    return "Check your Azure CLI setup. Run 'az login' and 'az account set', then try again.";
+  }
+
   private _streamResponse(prompt: string, session: ICopilotSession): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this._view?.webview.postMessage({ type: "streamStart" });
 
       let settled = false;
+      let accumulatedContent = "";
       const cleanup = () => {
         unsubDelta();
+        unsubMessage();
         unsubIdle();
         unsubError();
-        unsubToolStart();
+        unsubToolProgress();
+        unsubToolPartialResult();
         unsubToolComplete();
       };
 
+      const unsubMessage = session.on("assistant.message", (event: AssistantMessageEvent) => {
+        if (event?.data?.content) {
+          accumulatedContent = event.data.content;
+        }
+      });
+
       const unsubDelta = session.on("assistant.message_delta", (event: MessageDeltaEvent) => {
         if (event?.data?.deltaContent) {
+          accumulatedContent += event.data.deltaContent;
           this._view?.webview.postMessage({
             type: "streamDelta",
             content: event.data.deltaContent,
@@ -346,24 +1052,32 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       });
 
-      const unsubToolStart = session.on("tool.execution_start", (event: ToolExecutionStartEvent) => {
-        if (event?.data?.toolCallId && event?.data?.toolName) {
-          this._toolNames.set(event.data.toolCallId, event.data.toolName);
+      const unsubToolProgress = session.on("tool.execution_progress", (event: ToolExecutionProgressEvent) => {
+        if (event?.data?.toolCallId && event?.data?.progressMessage) {
+          this._view?.webview.postMessage({
+            type: "toolProgress",
+            id: event.data.toolCallId,
+            message: event.data.progressMessage,
+          });
+        }
+      });
+
+      const unsubToolPartialResult = session.on("tool.execution_partial_result", (event: ToolExecutionPartialResultEvent) => {
+        if (event?.data?.toolCallId && event?.data?.partialOutput) {
+          this._view?.webview.postMessage({
+            type: "toolPartialResult",
+            id: event.data.toolCallId,
+            output: event.data.partialOutput,
+          });
         }
       });
 
       const unsubToolComplete = session.on("tool.execution_complete", (event: ToolExecutionCompleteEvent) => {
-        if (event?.data?.toolCallId) {
-          const toolName = this._toolNames.get(event.data.toolCallId) ?? "unknown";
-          this._toolNames.delete(event.data.toolCallId);
-          this._view?.webview.postMessage({
-            type: "toolResult",
-            id: event.data.toolCallId,
-            tool: toolName,
-            status: event.data.success ? "success" : "error",
-            output: event.data.success
-              ? (event.data.result?.content ?? "")
-              : (event.data.error?.message ?? "Tool execution failed"),
+        const toolCallId = event?.data?.toolCallId;
+        if (toolCallId && this._view) {
+          this._view.webview.postMessage({
+            type: "toolComplete",
+            id: toolCallId,
           });
         }
       });
@@ -372,6 +1086,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         if (settled) { return; }
         settled = true;
         cleanup();
+
+        // Add assistant message to cache
+        if (accumulatedContent) {
+          this._conversationMessages.push({ role: "assistant", content: accumulatedContent });
+        }
+
         this._view?.webview.postMessage({ type: "streamEnd" });
         resolve();
       });
@@ -414,14 +1134,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         params: request,
       });
 
-      // Auto-deny after a short timeout to avoid hanging indefinitely
-      const timeoutMs = 120_000; // 2 minutes
+      const timeoutMs = TOOL_PERMISSION_TIMEOUT_MS;
 
       return new Promise<PermissionRequestResult>((resolve) => {
         const timeoutHandle = setTimeout(() => {
           // If still pending when the timeout fires, deny the request
           const resolver = this._pendingPermissions.get(toolCallId);
           if (resolver) {
+            this._view?.webview.postMessage({ type: "toolTimeout", id: toolCallId });
             resolver(false);
           }
         }, timeoutMs);
@@ -446,15 +1166,192 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _rejectPendingPermissions(): void {
-    for (const [, resolver] of this._pendingPermissions) {
+    this._pendingPermissions.forEach((resolver) => {
       resolver(false);
-    }
+    });
     this._pendingPermissions.clear();
-    this._toolNames.clear();
   }
 
   private _postError(message: string): void {
     this._view?.webview.postMessage({ type: "error", message });
+  }
+
+  private async _handleCliAutoInstall(errorMessage: string): Promise<void> {
+    if (this._isInstallingCli) {
+      this._outputChannel.appendLine(`[forge] Copilot CLI install already in progress, skipping duplicate prompt`);
+      return;
+    }
+    this._outputChannel.appendLine(`[forge] Copilot CLI auto-install prompt reason: ${errorMessage}`);
+    // Show ask-first dialog
+    const choice = await vscode.window.showInformationMessage(
+      "Forge needs the GitHub Copilot CLI to work. Install it now?",
+      "Install",
+      "Cancel"
+    );
+
+    if (choice === "Install") {
+      this._isInstallingCli = true;
+      // Run install inside progress, then show result AFTER progress dismisses
+      let installResult: CliInstallResult | undefined;
+      let installError: string | undefined;
+
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Installing Copilot CLI...",
+            cancellable: false,
+          },
+          async () => {
+            try {
+              installResult = await installCopilotCli({
+                globalStoragePath: this._globalStoragePath,
+              });
+            } catch (err: unknown) {
+              installError = err instanceof Error ? err.message : String(err);
+            }
+          }
+        );
+      } finally {
+        this._isInstallingCli = false;
+      }
+
+      if (installError) {
+        const retry = await vscode.window.showErrorMessage(
+          `Failed to install Copilot CLI: ${installError}`,
+          "Open Settings"
+        );
+        if (retry === "Open Settings") {
+          await this.openSettings();
+        }
+      } else if (installResult?.success) {
+        await vscode.window.showInformationMessage(
+          "Copilot CLI installed successfully."
+        );
+      } else {
+        const errorDetail = installResult?.error ?? "Unknown error";
+        const retry = await vscode.window.showErrorMessage(
+          `Failed to install Copilot CLI: ${errorDetail}`,
+          "Open Settings"
+        );
+        if (retry === "Open Settings") {
+          await this.openSettings();
+        }
+      }
+    } else {
+      // User cancelled — show manual install instructions
+      const choice = await vscode.window.showInformationMessage(
+        "To use Forge, install the GitHub Copilot CLI manually (npm, winget, Homebrew, or install script), or configure forge.copilot.cliPath to point to an existing installation.",
+        "Open Settings",
+        "Dismiss"
+      );
+      if (choice === "Open Settings") {
+        await this.openSettings();
+      }
+    }
+  }
+
+  private async _handleListConversations(): Promise<void> {
+    try {
+      const config = await getConfigurationAsync(this._secrets);
+      const conversations = await listConversations(config, this._globalStoragePath);
+      this._view?.webview.postMessage({ type: "conversationList", conversations });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    }
+  }
+
+  private async _handleResumeConversation(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      this._postError("Invalid session ID");
+      return;
+    }
+    if (typeof sessionId !== "string" || sessionId.length > 200) {
+      this._postError("Invalid session ID.");
+      return;
+    }
+
+    try {
+      const config = await getConfigurationAsync(this._secrets);
+      const validationErrors = validateConfiguration(config);
+      if (validationErrors.length > 0) {
+        for (const error of validationErrors) {
+          this._postError(error.message);
+        }
+        return;
+      }
+
+      const credentialProvider = await createCredentialProvider(config, this._secrets);
+      let authToken: string;
+      try {
+        authToken = await credentialProvider.getToken();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (config.authMethod === "entraId") {
+          const summary = this._extractEntraIdErrorSummary(message);
+          this._postError(
+            `Entra ID authentication failed. ${summary} ` +
+            "Or switch to API key auth in Settings (forge.copilot.authMethod)."
+          );
+        } else {
+          this._postError(`Authentication failed: ${message}`);
+        }
+        return;
+      }
+
+      // Destroy current session
+      this._rejectPendingPermissions();
+      await destroySession(this._conversationId);
+
+      // Resume the selected conversation
+      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._globalStoragePath, this._createPermissionHandler(), this._workspaceRoot);
+      this._conversationId = sessionId;
+
+      // Restore cached messages from workspaceState
+      const cacheKey = `forge.messages.${sessionId}`;
+      const cachedMessages = this._workspaceState.get<Array<{ role: "user" | "assistant"; content: string }>>(cacheKey, []);
+      this._conversationMessages = cachedMessages;
+
+      // Store as last session
+      await this._workspaceState.update("forge.lastSessionId", sessionId);
+
+      // Send to webview
+      this._view?.webview.postMessage({
+        type: "conversationResumed",
+        sessionId,
+        messages: cachedMessages,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    }
+  }
+
+  private async _handleDeleteConversation(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      this._postError("Invalid session ID");
+      return;
+    }
+    if (typeof sessionId !== "string" || sessionId.length > 200) {
+      this._postError("Invalid session ID.");
+      return;
+    }
+
+    try {
+      const config = await getConfigurationAsync(this._secrets);
+      await deleteConversation(sessionId, config, this._globalStoragePath);
+
+      // Remove cached messages
+      const cacheKey = `forge.messages.${sessionId}`;
+      await this._workspaceState.update(cacheKey, undefined);
+
+      // Send updated conversation list
+      await this._handleListConversations();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._postError(message);
+    }
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -462,7 +1359,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, "media", "chat.css")
     );
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media", "chat.js")
+      vscode.Uri.joinPath(this._extensionUri, "dist", "chat.js")
+    );
+    const iconUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "resources", "icon.png")
     );
 
     const nonce = crypto.randomUUID();
@@ -472,23 +1372,35 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
     <link href="${styleUri}" rel="stylesheet">
     <title>Forge Chat</title>
 </head>
 <body>
     <div class="container">
+        <div id="conversationList" class="conversation-list hidden"></div>
+        <div id="welcomeScreen" class="welcome-screen hidden" data-icon-uri="${iconUri}">
+          <!-- Populated by JS when configuration is incomplete -->
+        </div>
         <div id="chatMessages"></div>
+        <div id="progressIndicator" class="progress-indicator hidden">
+          <div class="progress-text">Forge is thinking...</div>
+          <div class="progress-dots">
+            <span>.</span><span>.</span><span>.</span>
+          </div>
+        </div>
         <div class="input-area">
             <div class="context-actions">
                 <button class="context-btn" id="attachSelection">📎 Selection</button>
                 <button class="context-btn" id="attachFile">📄 File</button>
+                <span id="workspaceIndicator" class="workspace-indicator hidden"></span>
             </div>
             <div id="contextChips"></div>
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
             <div class="button-row">
                 <button id="sendBtn">Send</button>
                 <button id="newConvBtn">New Conversation</button>
+                <select id="modelSelector" title="Select model deployment"></select>
             </div>
         </div>
     </div>

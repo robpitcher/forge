@@ -1,7 +1,13 @@
 import * as esbuild from "esbuild";
+import { readFileSync } from "fs";
 
 const watch = process.argv.includes("--watch");
 const production = process.argv.includes("--production");
+
+// Resolve the @github/copilot CLI version from the SDK's package.json at build time
+// so the installer knows which CLI to fetch without hardcoding a version.
+const sdkPkg = JSON.parse(readFileSync("node_modules/@github/copilot-sdk/package.json", "utf8"));
+const copilotCliVersion = sdkPkg.dependencies["@github/copilot"].replace(/^[~^]/, "");
 
 // Shim for import.meta.resolve which is ESM-only. esbuild's CJS conversion
 // replaces import.meta with a plain object, dropping the resolve() method.
@@ -42,14 +48,34 @@ const buildOptions = {
   minify: production,
   sourcemap: !production,
   banner: { js: importMetaResolveShim },
-  define: { "import.meta.resolve": "__importMetaResolve" },
+  define: {
+    "import.meta.resolve": "__importMetaResolve",
+    "__COPILOT_CLI_VERSION__": JSON.stringify(copilotCliVersion),
+  },
+};
+
+// Webview bundle — bundles media/chat.js with marked for markdown rendering
+const webviewBuildOptions = {
+  entryPoints: ["media/chat.js"],
+  bundle: true,
+  outfile: "dist/chat.js",
+  platform: "browser",
+  format: "iife",
+  minify: production,
+  sourcemap: !production,
 };
 
 if (watch) {
-  const ctx = await esbuild.context(buildOptions);
-  await ctx.watch();
+  const [ctx, webCtx] = await Promise.all([
+    esbuild.context(buildOptions),
+    esbuild.context(webviewBuildOptions),
+  ]);
+  await Promise.all([ctx.watch(), webCtx.watch()]);
   console.log("Watching for changes...");
 } else {
-  await esbuild.build(buildOptions);
+  await Promise.all([
+    esbuild.build(buildOptions),
+    esbuild.build(webviewBuildOptions),
+  ]);
   console.log("Build complete.");
 }

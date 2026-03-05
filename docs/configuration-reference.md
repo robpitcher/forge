@@ -30,15 +30,20 @@ To use Forge, you must configure one setting in VS Code:
 |---------|------|----------|---------|
 | `forge.copilot.endpoint` | `string` | **Yes** | Azure AI Foundry endpoint URL |
 
-You must also set your API key via the Forge chat toolbar (see [API Key Retrieval](#api-key-storage-via-secretstorage) below).
+For **Entra ID** auth (default): authenticate via `az login` or managed identity — no further credential configuration needed.
+
+For **API Key** auth: set your API key via the Forge chat toolbar ⚙️ gear icon → "Set API Key (secure)" (see [API Key Retrieval](#api-key-retrieval) below).
 
 ### Optional Settings
 
 | Setting | Type | Default | Purpose |
 |---------|------|---------|---------|
-| `forge.copilot.model` | `string` | `gpt-4.1` | Model deployment name |
+| `forge.copilot.models` | `string[]` | `[]` | Deployment names for the model selector (first entry is default) |
 | `forge.copilot.wireApi` | `string` | `completions` | API format (`completions` or `responses`) |
 | `forge.copilot.cliPath` | `string` | (empty) | Path to Copilot CLI (if not on `$PATH`) |
+| `forge.copilot.authMethod` | `string` | `entraId` | Auth method: `entraId` or `apiKey` |
+| `forge.copilot.systemMessage` | `string` | (empty) | Custom system message appended to the default Copilot system prompt |
+| `forge.copilot.autoApproveTools` | `boolean` | `false` | Auto-approve tool executions without confirmation |
 
 ---
 
@@ -54,41 +59,42 @@ The Azure AI Foundry endpoint URL where the extension sends all model inference 
 
 **Format:**
 ```
-https://{resource-name}.openai.azure.com/openai/v1/
+https://{resource-name}.openai.azure.com/
 ```
 
 **Example:**
 ```json
 {
-  "forge.copilot.endpoint": "https://my-ai-resource.openai.azure.com/openai/v1/"
+  "forge.copilot.endpoint": "https://my-ai-resource.openai.azure.com/"
 }
 ```
 
 **Important:**
-- Must include the trailing slash (`/`)
-- Must include the `/openai/v1/` path segment (Azure AI Foundry's OpenAI-compatible endpoint)
+- Do **not** include the `/openai/v1/` path — the SDK auto-appends this for `.azure.com` endpoints
 - Verify the URL is reachable from your machine (check network connectivity and firewall rules)
 
 ---
 
-### forge.copilot.model
+### forge.copilot.models
 
-**Type:** `string`  
+**Type:** `string[]`  
 **Required:** No  
-**Default:** `gpt-4.1`
+**Default:** `[]`
 
-The **deployment name** of the model you want to use. This refers to the specific model deployment you created in Azure AI Foundry.
+An array of **deployment names** from your Azure AI Foundry resource. These populate the model selector dropdown in the chat UI. The first entry is the default active model.
+
+Values must match the **deployment name** in Azure AI Foundry, not the underlying model name.
 
 **Examples:**
 ```json
 {
-  "forge.copilot.model": "gpt-4.1"
+  "forge.copilot.models": ["gpt-4.1", "gpt-4o"]
 }
 ```
 
 ```json
 {
-  "forge.copilot.model": "gpt-5"
+  "forge.copilot.models": ["my-company-gpt5-prod"]
 }
 ```
 
@@ -184,7 +190,7 @@ Windows:
 ```
 
 **When to use this:**
-- You downloaded the Copilot CLI to a custom location (see [Installation Guide](installation-guide.md))
+- You downloaded the Copilot CLI to a custom location (see [Copilot CLI repository](https://github.com/github/copilot-cli))
 - You do not have permission to install the CLI globally on your machine
 - You want to use a specific version of the CLI
 
@@ -222,7 +228,7 @@ If you need to set up a new resource:
 Azure AI Foundry endpoints follow this URL pattern:
 
 ```
-https://{resource-name}.openai.azure.com/openai/v1/
+https://{resource-name}.openai.azure.com/
 ```
 
 ### Components
@@ -231,18 +237,19 @@ https://{resource-name}.openai.azure.com/openai/v1/
 |-----------|-------------|---------|
 | `{resource-name}` | The name of your Azure AI resource | `my-company-ai`, `research-gpt-prod` |
 | `.openai.azure.com` | Azure's OpenAI-compatible endpoint domain (fixed) | `.openai.azure.com` |
-| `/openai/v1/` | The API version path (fixed for OpenAI compatibility) | `/openai/v1/` |
+
+> **Note:** Do **not** include `/openai/v1/` in your endpoint URL — the SDK auto-appends this path for `.azure.com` endpoints.
 
 ### Examples
 
 **Example 1: Simple resource name**
 ```
-https://acme-ai-prod.openai.azure.com/openai/v1/
+https://acme-ai-prod.openai.azure.com/
 ```
 
 **Example 2: Regional resource name**
 ```
-https://research-gpt-eastus.openai.azure.com/openai/v1/
+https://research-gpt-eastus.openai.azure.com/
 ```
 
 ### Verifying Your Endpoint URL
@@ -256,7 +263,7 @@ To verify your endpoint URL is correct:
 
 2. Test connectivity from your machine:
    ```bash
-   curl -I https://your-endpoint-url/openai/v1/models \
+   curl -I "https://your-endpoint-url/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
    
@@ -289,14 +296,14 @@ Key 1: ********************************
 Key 2: ********************************
 
 Endpoint
-https://my-ai-resource.openai.azure.com/openai/v1/
+https://my-ai-resource.openai.azure.com/
 ```
 
 ### Step 4: Set Your API Key in Forge
 
 The API key is stored securely and **not** in settings.json:
 
-1. Open the Forge chat panel in VS Code (click the Forge icon in the bottom panel)
+1. Open the Forge chat panel in VS Code (click the Forge icon in the sidebar)
 2. Click the ⚙️ **gear icon** in the chat toolbar
 3. Select **"Set API Key (secure)"**
 4. Enter your Azure AI Foundry API key in the masked password input
@@ -326,7 +333,7 @@ The **name you give** to your specific deployment of that model in Azure.
 
 ### The Configuration Setting
 
-In Forge, the `forge.copilot.model` setting should contain the **deployment name**, not the model name.
+In Forge, the `forge.copilot.models` setting should contain **deployment names**, not model names.
 
 ### Example
 
@@ -334,7 +341,7 @@ In Forge, the `forge.copilot.model` setting should contain the **deployment name
 |------|-------|
 | **Underlying Model** | GPT-4.1 (from OpenAI) |
 | **Your Deployment Name** | `my-company-gpt4-prod` |
-| **Forge Setting** | `"forge.copilot.model": "my-company-gpt4-prod"` |
+| **Forge Setting** | `"forge.copilot.models": ["my-company-gpt4-prod"]` |
 
 ### How to Find Your Deployment Name
 
@@ -435,58 +442,53 @@ An alternative OpenAI-compatible format that some deployments may require.
 
 ```json
 {
-  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/"
 }
 ```
 
-Then use the gear icon to set your API key securely.
+With Entra ID auth (default), no further credential setup is needed — just `az login`.
 
-### Example 2: With Custom Model Deployment
+### Example 2: With Custom Model Deployments
 
 ```json
 {
-  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.model": "my-company-gpt5-prod"
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/",
+  "forge.copilot.models": ["my-company-gpt5-prod", "gpt-4o"]
 }
 ```
-
-Then use the gear icon to set your API key securely.
 
 ### Example 3: With Custom CLI Path
 
 ```json
 {
-  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/",
   "forge.copilot.cliPath": "/home/user/copilot-cli/copilot-linux-amd64"
 }
 ```
-
-Then use the gear icon to set your API key securely.
 
 ### Example 4: Using Alternative Wire Format
 
 ```json
 {
-  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/openai/v1/",
-  "forge.copilot.model": "my-deployment",
+  "forge.copilot.endpoint": "https://my-resource.openai.azure.com/",
+  "forge.copilot.models": ["my-deployment"],
   "forge.copilot.wireApi": "responses"
 }
 ```
 
-Then use the gear icon to set your API key securely.
-
-### Example 5: Windows with Full Configuration
+### Example 5: API Key Auth with Full Configuration
 
 ```json
 {
-  "forge.copilot.endpoint": "https://research-gpt.openai.azure.com/openai/v1/",
-  "forge.copilot.model": "research-gpt4-v2",
+  "forge.copilot.endpoint": "https://research-gpt.openai.azure.com/",
+  "forge.copilot.authMethod": "apiKey",
+  "forge.copilot.models": ["research-gpt4-v2"],
   "forge.copilot.wireApi": "completions",
   "forge.copilot.cliPath": "C:\\Users\\researcher\\tools\\copilot-windows-amd64.exe"
 }
 ```
 
-Then use the gear icon to set your API key securely.
+Then use the ⚙️ gear icon to set your API key securely.
 
 ---
 
@@ -496,7 +498,7 @@ Then use the gear icon to set your API key securely.
 
 | Problem | Solution |
 |---------|----------|
-| **"Connection refused"** | Verify your endpoint URL is correct. Test with: `curl https://your-endpoint/openai/v1/models -H "api-key: your-key"` |
+| **"Connection refused"** | Verify your endpoint URL is correct and does not include `/openai/v1/` (the SDK appends this automatically). Test with: `curl "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" -H "api-key: your-key"` |
 | **"Timeout"** | Check network connectivity to Azure. Verify firewall rules allow outbound HTTPS. Check if your VPN/proxy requires special configuration. |
 | **"403 Forbidden"** | Your API key may be expired or incorrect. Verify in Azure Portal and regenerate if needed. |
 
@@ -524,13 +526,13 @@ Then use the gear icon to set your API key securely.
 
 1. Verify connectivity:
    ```bash
-   curl -I https://your-endpoint/openai/v1/models \
+   curl -I "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
 
 2. Verify deployment exists:
    ```bash
-   curl https://your-endpoint/openai/v1/models \
+   curl "https://your-endpoint.services.ai.azure.com/openai/deployments?api-version=2024-10-21" \
      -H "api-key: your-api-key"
    ```
 
@@ -549,10 +551,10 @@ Then use the gear icon to set your API key securely.
 
 ## Summary
 
-1. **Configure required settings** in VS Code: `endpoint` and `apiKey`
-2. **Retrieve credentials** from Azure Portal → your AI resource → "Keys and endpoint"
-3. **Use deployment name** (not model name) in the `model` setting
+1. **Configure the required setting** in VS Code: `endpoint`
+2. **Authenticate**: Use Entra ID (default, via `az login`) or set an API key via the ⚙️ gear icon
+3. **Use deployment names** (not model names) in the `models` setting
 4. **Test connectivity** by opening a chat in VS Code and typing a message
-5. **For air-gapped environments**, follow the [Installation Guide](installation-guide.md) for the Copilot CLI
+5. **For restricted networks**, see the [Copilot CLI repository](https://github.com/github/copilot-cli) for Copilot CLI installation instructions
 
 For additional help, consult your platform/DevOps team or Azure documentation.
