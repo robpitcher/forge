@@ -24,14 +24,11 @@ graph TB
         VNet["Virtual Network"]
         APIMSubnet["APIM Subnet<br/>(VNet-injected)"]
         APIM["Azure API<br/>Management<br/>(Premium)"]
-        PEAPIM["Private Endpoint<br/>(APIM)"]
         PEAI["Private Endpoint<br/>(AI Foundry)"]
         PrivateDNS["Private<br/>DNS Zones"]
         VPN --> VNet
         VNet --> APIMSubnet
         APIMSubnet --> APIM
-        VNet --> PEAPIM
-        PEAPIM --> APIM
         APIM --> PEAI
         VNet --> PrivateDNS
     end
@@ -67,7 +64,7 @@ graph TB
 
     class VSCode,ForgeExt,CopilotCLI client
     class EntraID,KeyVault identity
-    class VPN,VNet,APIMSubnet,APIM,PEAPIM,PEAI,PrivateDNS network
+    class VPN,VNet,APIMSubnet,APIM,PEAI,PrivateDNS network
     class AIFoundry,Models ai
     class Monitor,LogAnalytics,AppInsights observability
 ```
@@ -82,7 +79,6 @@ graph TB
 | **Microsoft Entra ID** | Identity provider; issues OAuth 2.0 bearer tokens for authenticated requests. The extension host calls `DefaultAzureCredential.getToken()` with the `https://cognitiveservices.azure.com/.default` scope |
 | **Azure Key Vault** | Stores API keys, TLS certificates, and APIM policy secrets. Referenced by APIM named values and by the API Key auth path |
 | **Azure API Management (Premium)** | Enterprise gateway in front of AI Foundry; handles JWT validation, rate limiting, policy enforcement, request routing, and telemetry. **Premium tier required** for VNet injection |
-| **Private Endpoint (APIM)** | Exposes APIM's private IP to the VNet; allows on-premises clients to reach APIM without internet transit |
 | **Private Endpoint (AI Foundry)** | Ensures traffic from APIM to AI Foundry stays within the VNet backbone — no public endpoint exposure |
 | **VPN Gateway / ExpressRoute** | Connects the corporate network (developer workstations) to the Azure VNet. Required for true air-gap connectivity |
 | **Virtual Network** | Isolated Azure network boundary containing APIM (VNet-injected), Private Endpoints, and Private DNS Zones |
@@ -120,12 +116,11 @@ Developer Workstation
 ### Key Controls
 
 - **VPN Gateway or ExpressRoute:** Connects the corporate network to the Azure VNet. Developer workstations resolve APIM's hostname to the private IP via corporate DNS forwarding to Azure Private DNS Zones.
-- **APIM VNet Injection (Internal Mode):** APIM is deployed inside a dedicated subnet with no public IP. Only clients on the VNet (or connected via VPN/ExpressRoute) can reach it. **Requires APIM Premium tier** (or API Management v2 Premium).
-- **Private Endpoint (APIM):** For organizations that cannot use VNet injection, a Private Endpoint exposes APIM on a private IP within the VNet.
+- **APIM VNet Injection (Internal Mode):** APIM is deployed inside a dedicated subnet with no public IP. Only clients on the VNet (or connected via VPN/ExpressRoute) can reach it. **Requires APIM Premium tier** (or API Management v2 Premium). This is the recommended approach for air-gap architectures because it provides both inbound and outbound security within the VNet boundary.
 - **Private Endpoint (AI Foundry):** Ensures APIM-to-backend traffic never leaves the Azure backbone. AI Foundry's public network access should be **disabled** once the Private Endpoint is active.
 - **Private DNS Zones:** Two zones are required:
   - `privatelink.openai.azure.com` → resolves AI Foundry to private IP
-  - `privatelink.azure-api.net` → resolves APIM to private IP (if using PE instead of VNet injection)
+  - `*.azure-api.net` → resolves APIM to private IP (via internal subnet when VNet-injected)
 - **NSGs:** Network Security Groups on the APIM subnet restrict inbound traffic to the VPN/ExpressRoute gateway prefix and block all internet-originating traffic.
 - **Encryption in Transit:** All connections use TLS 1.2+ (HTTPS). APIM can enforce minimum TLS version via policy.
 - **Encryption at Rest:** Azure AI Foundry and Log Analytics encrypt data at rest using Microsoft-managed keys by default; customer-managed keys (CMK) via Key Vault are supported for regulated workloads.
