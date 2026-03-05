@@ -735,18 +735,18 @@ button:active {
   30% { opacity: 1; }
 }
 
-/* ── Stop Button ── */
-.stop-btn {
+/* ── Send/Stop Toggle ── */
+#sendBtn.stop-mode {
   background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
   color: var(--vscode-errorForeground, #f48771);
   border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
 }
 
-.stop-btn:hover {
+#sendBtn.stop-mode:hover {
   opacity: 0.9;
 }
 
-.stop-btn:disabled {
+#sendBtn.stop-mode:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -755,7 +755,7 @@ button:active {
 .workspace-indicator {
   font-size: 11px;
   opacity: 0.7;
-  margin-right: auto;
+  margin-left: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
