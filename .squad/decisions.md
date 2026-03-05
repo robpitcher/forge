@@ -3579,3 +3579,30 @@ The stable release workflow's marketplace publish step must use `--packagePath` 
 
 For stable releases: `vsce publish --packagePath {artifact}.vsix`
 For insider releases: re-package is acceptable because marketplace version differs from tag version.
+
+---
+
+### 2026-03-05T17:47:08Z: Slidev Isolation Directive
+
+**By:** Rob Pitcher (via Copilot)  
+**What:** Keep any references to Slidev (sli.dev) out of the main README and documentation. Slidev content lives in its own isolated `slides/` directory only.  
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-03-05T17:47:08Z: Slidev Skill File Created
+
+**Author:** Fuchs (Technical Writer)  
+**Date:** 2026-03-05  
+**Status:** Informational  
+
+**Context:** Rob requested a team skill file for Slidev (sli.dev) so anyone building presentations knows the patterns.
+
+**Decision:** Created `.squad/skills/slidev/SKILL.md` with comprehensive patterns extracted from sli.dev official documentation.
+
+**Key Points:**
+1. **Isolation rule:** Slidev projects live in `slides/` with their own `package.json` — completely separate from the VS Code extension root.
+2. **Confidence: low** — the team hasn't used Slidev yet, so patterns may evolve with real usage.
+3. **No slides/ directory created** — the skill documents *how* to set up Slidev when needed, but doesn't scaffold anything yet.
+
+**Impact:** Any team member building a presentation can reference this skill for setup, syntax, and export patterns. The isolation rule prevents accidental dependency pollution of the main extension.
