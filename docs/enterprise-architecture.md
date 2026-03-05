@@ -5,7 +5,7 @@
 ## Architecture Diagram
 
 ```mermaid
-graph LR
+graph TB
     subgraph Client["🖥️ Developer Workstation"]
         VSCode["VS Code"]
         ForgeExt["Forge Extension<br/>(Extension Host)"]
