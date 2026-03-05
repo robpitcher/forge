@@ -138,6 +138,20 @@
   function stopRequest() {
     sendBtn.disabled = true;
     vscode.postMessage({ command: "stopRequest" });
+
+    // Safety timeout: if no phase update arrives within 3s, force-reset to idle
+    const safetyTimer = setTimeout(() => {
+      if (processingPhase !== "idle") {
+        processingPhase = "idle";
+        updateProgressIndicator();
+        updateSendButtonMode();
+      }
+    }, 3000);
+
+    // Clear the safety timer once a phase update arrives
+    const origHandler = window._stopSafetyCleanup;
+    if (origHandler) { clearTimeout(origHandler); }
+    window._stopSafetyCleanup = safetyTimer;
   }
 
   function updateProgressIndicator() {
@@ -170,7 +184,7 @@
 
   function sendMessage() {
     const text = userInput.value.trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || processingPhase !== "idle") return;
 
     const sentContext = [...pendingContext];
     appendMessage("user", text, sentContext);
@@ -582,6 +596,11 @@
 
       case "processingPhaseUpdate":
         processingPhase = message.phase;
+        // Clear any pending stop-button safety timer
+        if (window._stopSafetyCleanup) {
+          clearTimeout(window._stopSafetyCleanup);
+          window._stopSafetyCleanup = null;
+        }
         updateProgressIndicator();
         updateSendButtonMode();
         break;

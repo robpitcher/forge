@@ -405,6 +405,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _processingPhase: "idle" | "thinking" | "generating" = "idle";
   private _isInstallingCli = false;
   private _currentSession?: ICopilotSession;
+  private _cancelRequested = false;
+  private _requestId = 0;
   private _messageListener?: vscode.Disposable;
   private _pendingPermissions = new Map<string, (approved: boolean) => void>();
   private _conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
@@ -685,9 +687,25 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     } else if (message.command === "installCli") {
       await this._handleCliAutoInstall("User requested install from banner");
     } else if (message.command === "stopRequest") {
-      if (this._currentSession && this._processingPhase !== "idle") {
-        this._currentSession.abort().catch(() => {});
+      if (this._processingPhase === "idle") { return; }
+
+      // Flag cancellation so thinking-phase code can bail out early
+      this._cancelRequested = true;
+
+      if (this._currentSession) {
+        const session = this._currentSession;
         this._currentSession = undefined;
+        try {
+          await session.abort();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this._outputChannel.appendLine(`[stopRequest] session.abort() failed: ${msg}`);
+        } finally {
+          this._postProcessingPhase("idle");
+        }
+      } else {
+        // During thinking phase — no session yet; cancellation flag will
+        // be checked before session.send(). Post idle so the UI resets.
         this._postProcessingPhase("idle");
       }
     }
@@ -791,6 +809,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleChatMessage(prompt: string, context?: ContextItem[]): Promise<void> {
     if (this._processingPhase !== "idle") { return; }
+    this._cancelRequested = false;
+    const myRequestId = ++this._requestId;
     this._postProcessingPhase("thinking");
 
     let config: Awaited<ReturnType<typeof getConfigurationAsync>>;
@@ -874,6 +894,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const enrichedPrompt = this._buildPromptWithContext(prompt, context);
 
+    // If stop was clicked during the thinking phase, bail out before sending
+    if (this._cancelRequested) {
+      this._cancelRequested = false;
+      this._postProcessingPhase("idle");
+      return;
+    }
+
     try {
       // Add user message to cache
       this._conversationMessages.push({ role: "user", content: prompt });
@@ -894,8 +921,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
-      this._currentSession = undefined;
-      this._postProcessingPhase("idle");
+      // Only reset if this is still the active request — a newer request may have started
+      if (this._requestId === myRequestId) {
+        this._currentSession = undefined;
+        this._postProcessingPhase("idle");
+      }
     }
   }
 
