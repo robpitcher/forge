@@ -25,20 +25,20 @@ graph TB
         APIMSubnet["APIM Subnet<br/>(VNet-injected)"]
         APIM["Azure API<br/>Management<br/>(Premium)"]
         PEAPIM["Private Endpoint<br/>(APIM)"]
+        PEAI["Private Endpoint<br/>(AI Foundry)"]
         PrivateDNS["Private<br/>DNS Zones"]
         VPN --> VNet
         VNet --> APIMSubnet
         APIMSubnet --> APIM
         VNet --> PEAPIM
         PEAPIM --> APIM
+        APIM --> PEAI
         VNet --> PrivateDNS
     end
 
     subgraph AzureAI["🤖 Azure AI"]
-        PEAI["Private Endpoint<br/>(AI Foundry)"]
         AIFoundry["Azure AI<br/>Foundry"]
         Models["Model<br/>Deployments<br/>(GPT-4.1, o-series, etc.)"]
-        APIM --> PEAI
         PEAI --> AIFoundry
         AIFoundry --> Models
     end
@@ -67,8 +67,8 @@ graph TB
 
     class VSCode,ForgeExt,CopilotCLI client
     class EntraID,KeyVault identity
-    class VPN,VNet,APIMSubnet,APIM,PEAPIM,PrivateDNS network
-    class AIFoundry,Models,PEAI ai
+    class VPN,VNet,APIMSubnet,APIM,PEAPIM,PEAI,PrivateDNS network
+    class AIFoundry,Models ai
     class Monitor,LogAnalytics,AppInsights observability
 ```
 
