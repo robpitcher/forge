@@ -19,3 +19,15 @@
 
 📌 Team update (2026-03-05): Workspace Awareness testing complete — added 9 tests covering all scenarios (webview indicator, session recreation, no-folder case, resume). All 300 tests green. Feature ready for merge to dev.
 
+📌 Team update: Progress indicator + stop button tests added (issue #122). 7 new tests in extension.test.ts covering:
+- Processing phase state machine (thinking → generating → idle transitions)
+- Phase posted on completion and on error
+- stopRequest triggers session.abort()
+- stopRequest when idle is a safe no-op
+All 301 tests green. Blair's implementation was in the working tree (uncommitted on squad/122-progress-stop-button).
+
+## Learnings
+
+- Blair's `_processingPhase` state machine replaces the binary `_isProcessing` flag. Phase transitions: idle → thinking (message start) → generating (before _streamResponse) → idle (finally block). Tests must check the full sequence, not just individual phases.
+- `_currentSession` is set just before `_streamResponse` and cleared in the finally block. Stop requests can only work during the generating phase — testing requires `session.send` to hang (never-resolving promise) so the test can inject a stopRequest mid-stream.
+- The `stopRequest` handler is a no-op when `_currentSession` is null or phase is "idle". The no-op test confirms no crash and no abort call — important edge case for button spam.
