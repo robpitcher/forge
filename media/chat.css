@@ -708,11 +708,54 @@ button:active {
   display: none !important;
 }
 
+/* ── Progress Indicator ── */
+.progress-indicator {
+  padding: 8px 12px;
+  font-style: italic;
+  color: var(--vscode-descriptionForeground, #999);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px;
+}
+
+.progress-dots span {
+  animation: progressPulse 1.2s infinite;
+  opacity: 0.3;
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.progress-dots span:nth-child(1) { animation-delay: 0s; }
+.progress-dots span:nth-child(2) { animation-delay: 0.2s; }
+.progress-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes progressPulse {
+  0%, 60%, 100% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+/* ── Send/Stop Toggle ── */
+#sendBtn.stop-mode {
+  background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  color: var(--vscode-errorForeground, #f48771);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+#sendBtn.stop-mode:hover {
+  opacity: 0.9;
+}
+
+#sendBtn.stop-mode:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Workspace Indicator */
 .workspace-indicator {
   font-size: 11px;
   opacity: 0.7;
-  margin-right: auto;
+  margin-left: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

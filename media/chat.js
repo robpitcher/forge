@@ -54,10 +54,12 @@
   const contextChipsContainer = document.getElementById("contextChips");
   const conversationList = document.getElementById("conversationList");
   const modelSelector = document.getElementById("modelSelector");
+  const progressIndicator = document.getElementById("progressIndicator");
 
   let currentAssistantMessage = null;
   let currentAssistantRawText = "";
   let isStreaming = false;
+  let processingPhase = "idle";
   let pendingContext = [];
   let lastAutoAttachedContent = null;
   let messages = [];
@@ -65,7 +67,7 @@
   let configIsComplete = false;
   let _lastWelcomeFlags = null;
 
-  sendBtn.addEventListener("click", sendMessage);
+  sendBtn.addEventListener("click", handleSendClick);
   newConvBtn.addEventListener("click", newConversation);
   modelSelector.addEventListener("change", () => {
     vscode.postMessage({ command: "modelChanged", model: modelSelector.value });
@@ -101,12 +103,18 @@
   }
 
   function setInputEnabled(enabled) {
-    sendBtn.disabled = !enabled;
     userInput.disabled = !enabled;
+    if (enabled) {
+      sendBtn.disabled = false;
+    } else if (processingPhase === "idle") {
+      sendBtn.disabled = true;
+    }
+    // When processing (!enabled && phase !== idle), keep sendBtn enabled as stop button
   }
 
   function resetUIState() {
     isStreaming = false;
+    processingPhase = "idle";
     currentAssistantRawText = "";
     currentAssistantMessage = null;
     pendingContext = [];
@@ -115,11 +123,68 @@
     autoAttachedChipElement = null;
     autoAttachedCtx = null;
     setInputEnabled(true);
+    updateProgressIndicator();
+    updateSendButtonMode();
+  }
+
+  function handleSendClick() {
+    if (processingPhase !== "idle") {
+      stopRequest();
+    } else {
+      sendMessage();
+    }
+  }
+
+  function stopRequest() {
+    sendBtn.disabled = true;
+    vscode.postMessage({ command: "stopRequest" });
+
+    // Safety timeout: if no phase update arrives within 3s, force-reset to idle
+    const safetyTimer = setTimeout(() => {
+      if (processingPhase !== "idle") {
+        processingPhase = "idle";
+        updateProgressIndicator();
+        updateSendButtonMode();
+      }
+    }, 3000);
+
+    // Clear the safety timer once a phase update arrives
+    const origHandler = window._stopSafetyCleanup;
+    if (origHandler) { clearTimeout(origHandler); }
+    window._stopSafetyCleanup = safetyTimer;
+  }
+
+  function updateProgressIndicator() {
+    if (!progressIndicator) { return; }
+    const textEl = progressIndicator.querySelector(".progress-text");
+    if (processingPhase === "idle") {
+      progressIndicator.classList.add("hidden");
+    } else if (processingPhase === "thinking") {
+      if (textEl) { textEl.textContent = "Forge is thinking"; }
+      progressIndicator.classList.remove("hidden");
+      progressIndicator.scrollIntoView({ behavior: "smooth", block: "end" });
+    } else if (processingPhase === "generating") {
+      if (textEl) { textEl.textContent = "Generating response"; }
+      progressIndicator.classList.remove("hidden");
+      progressIndicator.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }
+
+  function updateSendButtonMode() {
+    if (processingPhase === "idle" || !configIsComplete) {
+      sendBtn.textContent = "Send";
+      sendBtn.classList.remove("stop-mode");
+      sendBtn.disabled = false;
+    } else {
+      sendBtn.textContent = "⏹ Stop";
+      sendBtn.classList.add("stop-mode");
+      sendBtn.disabled = false;
+    }
   }
 
   function sendMessage() {
     const text = userInput.value.trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || processingPhase !== "idle") return;
 
     const sentContext = [...pendingContext];
     appendMessage("user", text, sentContext);
@@ -527,6 +592,17 @@
       
       case "cliStatus":
         updateCliBanner(message.result);
+        break;
+
+      case "processingPhaseUpdate":
+        processingPhase = message.phase;
+        // Clear any pending stop-button safety timer
+        if (window._stopSafetyCleanup) {
+          clearTimeout(window._stopSafetyCleanup);
+          window._stopSafetyCleanup = null;
+        }
+        updateProgressIndicator();
+        updateSendButtonMode();
         break;
 
       case "streamStart":
