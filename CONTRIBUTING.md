@@ -245,12 +245,6 @@ npm run build && npx tsc --noEmit && npm test
 
 ---
 
-## License
-
-By contributing to Forge, you agree that your contributions are licensed under the [MIT License](LICENSE). All contributors retain copyright to their work; the MIT license only grants usage rights.
-
----
-
 ## Questions?
 
 - Check the [README](README.md) for project overview
