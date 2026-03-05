@@ -2,7 +2,7 @@
 <p align="center"><img src="https://raw.githubusercontent.com/robpitcher/forge/dev/resources/repoheader.png" alt="Forge" width="500"></p>
 
 
-A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. All inference stays within your Azure tenant. No GitHub authentication required. Works in air-gapped and compliance-driven environments.
+A VS Code chat extension that routes AI chat through your own Azure AI Foundry endpoint — giving your organization full control over model inference. All inference stays within your Azure tenant. Authenticate with Entra ID or API key. No GitHub authentication required. Works in air-gapped and compliance-driven environments.
 
 The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring Your Own Key) mode to route all model inference to a private **Azure AI Foundry** endpoint within your Azure tenant.
 
