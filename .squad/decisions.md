@@ -3212,3 +3212,65 @@ Apply this filter to all streaming order assertions and count-based checks in:
 - Future tests must follow this pattern when asserting on streaming order
 - Removes false test failures from infrastructure noise
 
+# Decision: README Section Reordering and Architecture Diagram Simplification
+
+**Date:** 2026-03-15  
+**Owner:** Fuchs (Technical Writer)  
+**Status:** Decided  
+**Stakeholders:** Rob Pitcher (Product), Nauls (Architecture)
+
+## Scope
+
+Two documentation improvements to README.md:
+
+1. **Reorder sections:** Move Features section before Prerequisites
+2. **Simplify architecture diagram:** Remove private networking qualifiers
+
+## Context
+
+**Problem:** New developers visiting the repo don't immediately see that Forge supports flexible authentication (Entra ID and API Key). The Features section was buried after Prerequisites, making it less discoverable.
+
+**Private Networking Artifact:** The original diagram labeled the Azure node as "Azure AI Foundry (Private Endpoint)" and the connection as "HTTPS (private network)". This suggested a complete private connectivity implementation (ExpressRoute, VPN tunnels), which is not depicted. It overstates the diagram's scope.
+
+## Decision
+
+### 1. Move Features Before Prerequisites
+
+**New section order:**
+1. Heading/description
+2. **Features** ← moved up
+3. Prerequisites
+4. Quick Start
+5. Usage
+6. Architecture
+7. Installation
+8. Configuration
+9. Development
+10. License
+
+**Rationale:**
+- Visitors see authentication options and code actions immediately — key differentiators for air-gapped environments
+- Quick Start naturally follows Features and Prerequisites
+- Better narrative flow: "Here's what Forge offers → here's what you need → let's get started"
+
+### 2. Simplify Architecture Diagram
+
+**Changes:**
+- Remove "(Private Endpoint)" from Azure AI Foundry node label
+- Change CLI→Azure connection label from "HTTPS (private network)" to just "HTTPS"
+
+**Rationale:**
+- Diagram now accurately represents a **minimal viable deployment** without implying full private networking
+- Prevents misunderstanding that the architecture alone provides air-gap compliance (it doesn't — that comes from network topology)
+- Nauls will create a separate enterprise architecture doc showing private connectivity patterns
+
+## Outcomes
+
+✅ README.md updated (commit fc5e30b)  
+✅ Features section now visible to new visitors  
+✅ Architecture diagram honest about scope  
+✅ Team knows to refer advanced networking questions to enterprise arch doc  
+
+## Related Issues
+
+- N/A (documentation improvement)
