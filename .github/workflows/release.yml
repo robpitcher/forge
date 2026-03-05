@@ -69,3 +69,9 @@ jobs:
           name: Forge ${{ steps.version.outputs.tag }}
           generate_release_notes: true
           files: forge-${{ steps.version.outputs.version }}.vsix
+
+      - name: Publish to VS Code Marketplace
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
+        run: npx @vscode/vsce publish --pat $VSCE_PAT
