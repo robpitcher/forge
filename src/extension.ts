@@ -118,6 +118,9 @@ export function activate(context: vscode.ExtensionContext): void {
     configListener,
     authPollDisposable,
     focusListener,
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      provider.postWorkspaceInfo();
+    }),
     new vscode.Disposable(() => {
       if (signInTimeoutHandle !== undefined) {
         clearTimeout(signInTimeoutHandle);
@@ -421,6 +424,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._selectedModel = this._workspaceState.get<string>("forge.selectedModel");
   }
 
+  private get _workspaceRoot(): string | undefined {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
   /** Set by activate() to trigger auth status refresh from within the provider. */
   public setAuthRefreshCallback(callback: () => void): void {
     this._refreshAuthStatus = callback;
@@ -436,6 +443,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public postContextAttached(context: ContextItem): void {
     this._view?.webview.postMessage({ type: "contextAttached", context });
+  }
+
+  public postWorkspaceInfo(): void {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    this._view?.webview.postMessage({
+      type: "workspaceInfo",
+      name: folder?.name,
+      path: folder?.uri.fsPath,
+    });
   }
 
   public toggleHistory(): void {
@@ -500,6 +516,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // Send initial config status (also re-sent on webviewReady to handle race condition)
     this._sendConfigStatus();
+
+    // Send workspace folder info
+    this.postWorkspaceInfo();
   }
 
   public async openSettings(): Promise<void> {
@@ -823,6 +842,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         activeModel,
         this._globalStoragePath,
         this._createPermissionHandler(),
+        this._workspaceRoot,
       );
     } catch (err: unknown) {
       if (err instanceof CopilotCliNeedsInstallError) {
@@ -1240,7 +1260,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await destroySession(this._conversationId);
 
       // Resume the selected conversation
-      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._globalStoragePath, this._createPermissionHandler());
+      await resumeConversation(sessionId, config, authToken, this._getActiveModel(config.models), this._globalStoragePath, this._createPermissionHandler(), this._workspaceRoot);
       this._conversationId = sessionId;
 
       // Restore cached messages from workspaceState
@@ -1320,6 +1340,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         <div id="chatMessages"></div>
         <div class="input-area">
             <div class="context-actions">
+                <span id="workspaceIndicator" class="workspace-indicator hidden"></span>
                 <button class="context-btn" id="attachSelection">📎 Selection</button>
                 <button class="context-btn" id="attachFile">📄 File</button>
             </div>

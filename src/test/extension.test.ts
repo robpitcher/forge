@@ -168,7 +168,7 @@ describe("WebviewView chat panel", () => {
       const types = messages
         .filter((m: unknown) => {
           const t = (m as { type: string }).type;
-          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus";
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo";
         })
         .map((m: unknown) => (m as { type: string }).type);
 
