@@ -19,7 +19,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring
 
 Ensure you've installed the [prerequisites](#prerequisites) before starting.
 
-1. **Install the Forge extension** — Search for "forge-ai" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge-ai). If your environment doesn't have Marketplace access, see [Installation](#installation) for the sideload option.
+1. **Install the Forge extension** — Search for "forge-ai" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge-ai). If your environment doesn't have Marketplace access, see [Sideload Installation](#sideload-installation) for the sideload option.
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
