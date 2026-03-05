@@ -278,10 +278,7 @@ async function installViaHttpTarball(
   const platform = process.platform;
   const arch = process.arch;
   const platformPackage = `@github/copilot-${platform}-${arch}`;
-  const platformTarballUrl = `https://registry.npmjs.org/${platformPackage.replace(
-    "/",
-    "/"
-  )}/-/copilot-${platform}-${arch}-${version}.tgz`;
+  const platformTarballUrl = `https://registry.npmjs.org/${platformPackage}/-/copilot-${platform}-${arch}-${version}.tgz`;
   const platformTarballPath = join(installDir, "copilot-platform.tgz");
   const platformExtractDir = join(installDir, "platform-extracted");
 
