@@ -1361,15 +1361,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         </div>
         <div class="input-area">
             <div class="context-actions">
-                <span id="workspaceIndicator" class="workspace-indicator hidden"></span>
                 <button class="context-btn" id="attachSelection">📎 Selection</button>
                 <button class="context-btn" id="attachFile">📄 File</button>
+                <span id="workspaceIndicator" class="workspace-indicator hidden"></span>
             </div>
             <div id="contextChips"></div>
             <textarea id="userInput" placeholder="Ask a question..." rows="3"></textarea>
             <div class="button-row">
                 <button id="sendBtn">Send</button>
-                <button id="stopBtn" class="stop-btn hidden">Stop</button>
                 <button id="newConvBtn">New Conversation</button>
                 <select id="modelSelector" title="Select model deployment"></select>
             </div>
