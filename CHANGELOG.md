@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-05
+
+### Changed
+
+- **Marketplace Publishing** — Added VS Code Marketplace publish step to stable release workflow
+
+### Fixed
+
+- **Code Quality** — Removed no-op string replacement in CLI installer URL construction
+
 ## [0.3.0] - 2026-03-05
 
 ### Added
@@ -75,5 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Version Links
 
-- [Unreleased changes](https://github.com/robpitcher/forge/compare/v0.2.0...dev)
+- [Unreleased changes](https://github.com/robpitcher/forge/compare/v0.3.1...dev)
+- [0.3.1 Release](https://github.com/robpitcher/forge/releases/tag/v0.3.1)
+- [0.3.0 Release](https://github.com/robpitcher/forge/releases/tag/v0.3.0)
 - [0.2.0 Release](https://github.com/robpitcher/forge/releases/tag/v0.2.0)
