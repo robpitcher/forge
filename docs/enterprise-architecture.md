@@ -50,11 +50,11 @@ graph LR
     AIFoundry -->|"Metrics &<br/>Logs"| LogAnalytics
     AIFoundry -->|"Traces &<br/>Errors"| AppInsights
 
-    classDef client fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    classDef identity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef network fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef ai fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    classDef observability fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef client fill:#e1f5ff,stroke:#01579b,stroke-width:2px,color:#0d1117
+    classDef identity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#0d1117
+    classDef network fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#0d1117
+    classDef ai fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#0d1117
+    classDef observability fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#0d1117
 
     class VSCode,ForgeExt,CopilotCLI client
     class EntraID,TokenEndpoint identity
