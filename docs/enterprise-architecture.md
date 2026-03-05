@@ -6,49 +6,58 @@
 
 ```mermaid
 graph LR
-    subgraph Client["🖥️ Client"]
+    subgraph Client["🖥️ Developer Workstation"]
         VSCode["VS Code"]
-        ForgeExt["Forge Extension"]
+        ForgeExt["Forge Extension<br/>(Extension Host)"]
         CopilotCLI["Copilot CLI<br/>(subprocess)"]
         VSCode --> ForgeExt
         ForgeExt --> CopilotCLI
     end
 
-    subgraph Identity["🔐 Identity"]
+    subgraph Identity["🔐 Identity & Secrets"]
         EntraID["Microsoft<br/>Entra ID"]
-        TokenEndpoint["Token<br/>Endpoint"]
-        EntraID --> TokenEndpoint
+        KeyVault["Azure<br/>Key Vault"]
     end
 
     subgraph AzureNetwork["☁️ Azure Network"]
-        VNet["Virtual<br/>Network"]
-        PrivateEndpoint["Private<br/>Endpoint"]
-        APIM["Azure API<br/>Management"]
-        VNet --> PrivateEndpoint
-        PrivateEndpoint --> APIM
+        VPN["VPN Gateway /<br/>ExpressRoute"]
+        VNet["Virtual Network"]
+        APIMSubnet["APIM Subnet<br/>(VNet-injected)"]
+        APIM["Azure API<br/>Management<br/>(Premium)"]
+        PEAPIM["Private Endpoint<br/>(APIM)"]
+        PEAI["Private Endpoint<br/>(AI Foundry)"]
+        PrivateDNS["Private<br/>DNS Zones"]
+        VPN --> VNet
+        VNet --> APIMSubnet
+        APIMSubnet --> APIM
+        VNet --> PEAPIM
+        PEAPIM --> APIM
+        APIM --> PEAI
+        VNet --> PrivateDNS
     end
 
     subgraph AzureAI["🤖 Azure AI"]
         AIFoundry["Azure AI<br/>Foundry"]
-        Models["Model<br/>Deployments<br/>(GPT-4.1, 4o, etc.)"]
-        APIM --> AIFoundry
+        Models["Model<br/>Deployments<br/>(GPT-4.1, o-series, etc.)"]
+        PEAI --> AIFoundry
         AIFoundry --> Models
     end
 
     subgraph Observability["📊 Observability"]
         Monitor["Azure<br/>Monitor"]
-        LogAnalytics["Log<br/>Analytics"]
+        LogAnalytics["Log<br/>Analytics<br/>Workspace"]
         AppInsights["Application<br/>Insights"]
         Monitor --> LogAnalytics
         Monitor --> AppInsights
     end
 
-    CopilotCLI -->|"HTTPS<br/>Private Network"| APIM
-    TokenEndpoint -->|"Bearer Token"| CopilotCLI
-    CopilotCLI -->|"Auth Request"| EntraID
-    APIM -->|"Telemetry"| Monitor
-    AIFoundry -->|"Metrics &<br/>Logs"| LogAnalytics
-    AIFoundry -->|"Traces &<br/>Errors"| AppInsights
+    ForgeExt -->|"1. getToken()<br/>(DefaultAzureCredential)"| EntraID
+    EntraID -->|"2. Bearer Token"| ForgeExt
+    CopilotCLI -->|"3. HTTPS + Bearer Token"| VPN
+    APIM -->|"4. Managed Identity"| AIFoundry
+    APIM -.->|"JWT validate"| EntraID
+    APIM -->|"Diagnostics"| Monitor
+    AIFoundry -->|"Diagnostic<br/>Settings"| LogAnalytics
 
     classDef client fill:#e1f5ff,stroke:#01579b,stroke-width:2px,color:#0d1117
     classDef identity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#0d1117
@@ -57,8 +66,8 @@ graph LR
     classDef observability fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#0d1117
 
     class VSCode,ForgeExt,CopilotCLI client
-    class EntraID,TokenEndpoint identity
-    class VNet,PrivateEndpoint,APIM network
+    class EntraID,KeyVault identity
+    class VPN,VNet,APIMSubnet,APIM,PEAPIM,PEAI,PrivateDNS network
     class AIFoundry,Models ai
     class Monitor,LogAnalytics,AppInsights observability
 ```
@@ -67,55 +76,117 @@ graph LR
 
 | Component | Role |
 |-----------|------|
-| **VS Code** | User workstation running the Forge chat extension |
-| **Forge Extension** | VS Code extension providing the chat UI (WebviewView) and orchestrating message handling |
-| **Copilot CLI** | Local subprocess spawned by the extension; handles SDK lifecycle and session management (BYOK mode) |
-| **Microsoft Entra ID** | Identity provider; issues bearer tokens for authenticated requests to APIM and AI Foundry |
-| **Azure API Management** | Enterprise gateway sitting in front of AI Foundry; handles rate limiting, policy enforcement, request routing, and telemetry collection |
-| **Private Endpoint** | Network boundary control; ensures traffic to APIM stays within the VNet (no internet transit) |
-| **Virtual Network** | Isolated Azure network boundary containing APIM and AI Foundry; enforces private connectivity |
-| **Azure AI Foundry** | Managed AI service hosting the model deployments; receives requests through APIM |
-| **Model Deployments** | Individual model instances (GPT-4.1, GPT-4o, etc.) provisioned in AI Foundry |
-| **Azure Monitor** | Central observability hub collecting metrics, logs, and traces from all Azure services |
-| **Log Analytics** | Long-term storage and query engine for structured logs from APIM and AI Foundry |
-| **Application Insights** | Application-level monitoring for errors, traces, and request telemetry |
+| **VS Code** | Developer workstation running the Forge chat extension |
+| **Forge Extension (Extension Host)** | VS Code extension providing the chat UI (WebviewView), orchestrating message handling, and **acquiring Entra ID tokens** via `DefaultAzureCredential` |
+| **Copilot CLI** | Local subprocess spawned by the extension; handles SDK lifecycle and session management (BYOK mode). Receives the bearer token from the extension — does NOT authenticate directly |
+| **Microsoft Entra ID** | Identity provider; issues OAuth 2.0 bearer tokens for authenticated requests. The extension host calls `DefaultAzureCredential.getToken()` with the `https://cognitiveservices.azure.com/.default` scope |
+| **Azure Key Vault** | Stores API keys, TLS certificates, and APIM policy secrets. Referenced by APIM named values and by the API Key auth path |
+| **Azure API Management (Premium)** | Enterprise gateway in front of AI Foundry; handles JWT validation, rate limiting, policy enforcement, request routing, and telemetry. **Premium tier required** for VNet injection |
+| **Private Endpoint (APIM)** | Exposes APIM's private IP to the VNet; allows on-premises clients to reach APIM without internet transit |
+| **Private Endpoint (AI Foundry)** | Ensures traffic from APIM to AI Foundry stays within the VNet backbone — no public endpoint exposure |
+| **VPN Gateway / ExpressRoute** | Connects the corporate network (developer workstations) to the Azure VNet. Required for true air-gap connectivity |
+| **Virtual Network** | Isolated Azure network boundary containing APIM (VNet-injected), Private Endpoints, and Private DNS Zones |
+| **Private DNS Zones** | Resolves `*.openai.azure.com` and `*.azure-api.net` to private IPs, preventing accidental public internet routing |
+| **Azure AI Foundry** | Managed AI service hosting model deployments; receives requests through APIM via Private Endpoint |
+| **Model Deployments** | Individual model instances (GPT-4.1, o-series, GPT-4o, etc.) provisioned in AI Foundry |
+| **Azure Monitor** | Central observability hub collecting metrics and logs from APIM and AI Foundry via diagnostic settings |
+| **Log Analytics Workspace** | Long-term storage and KQL query engine for structured logs from APIM diagnostics and AI Foundry diagnostic settings |
+| **Application Insights** | Client-side telemetry for the extension (optional): SDK initialization time, token acquisition latency, error rates |
 
 ## Authentication & Authorization Flow
 
-1. **Token Acquisition:** Copilot CLI calls `DefaultAzureCredential` (or retrieves cached token) to authenticate with Entra ID via the Token Endpoint
-2. **Bearer Token:** Token is attached as `Authorization: Bearer <token>` in HTTPS requests from CLI to APIM
-3. **APIM Validation:** APIM validates the token and applies policies (rate limiting, caching, request/response transformation)
-4. **AI Foundry Access:** Once policies pass, APIM routes the request to the appropriate model deployment in AI Foundry
+1. **Token Acquisition (Extension Host):** The Forge extension calls `DefaultAzureCredential.getToken("https://cognitiveservices.azure.com/.default")` to authenticate with Entra ID. This happens in the extension host process, **not** in the Copilot CLI subprocess. The credential chain tries managed identity, Azure CLI, environment variables, and other sources in order.
+2. **Token Passthrough:** The extension passes the bearer token as a static string in the BYOK `provider.bearerToken` field when creating a Copilot SDK session. The CLI subprocess uses this token for all HTTPS requests to APIM.
+3. **APIM JWT Validation:** APIM's `validate-jwt` inbound policy verifies the token against the Entra ID tenant's JWKS endpoint (`https://login.microsoftonline.com/{tenant}/.well-known/openid-configuration`). It checks audience, issuer, and optionally app roles or group claims.
+4. **APIM → AI Foundry (Managed Identity):** APIM authenticates to AI Foundry using its own system-assigned managed identity — no keys to rotate. The managed identity is granted `Cognitive Services User` RBAC on the AI Foundry resource.
+5. **Token Lifetime:** Entra ID tokens expire after ~1 hour. Because Forge creates sessions per-conversation, a fresh token is acquired at session creation time. Long-running sessions may require rotation (tracked in issue #27).
+
+> **API Key mode:** When `authMethod` is `apiKey`, the extension reads the key from VS Code `SecretStorage` and passes it as `provider.apiKey`. In this mode, APIM validates the subscription key (via `Ocp-Apim-Subscription-Key` header) instead of JWT. Keys should be sourced from Azure Key Vault at deployment time — never embedded in code.
 
 ## Private Networking & Security
 
-- **Private Endpoint:** Ensures traffic from client to APIM never traverses the public internet — all data flows through the VNet
-- **Network Policies:** APIM is deployed within the VNet with firewall rules restricting inbound access to authorized clients only
-- **Encryption in Transit:** All connections use TLS 1.2+ (HTTPS)
-- **Encryption at Rest:** Azure AI Foundry and Log Analytics automatically encrypt data at rest using Microsoft-managed or customer-managed keys
+### Network Topology
+
+For true air-gap compliance, all traffic must stay on private networks:
+
+```
+Developer Workstation
+  → VPN Gateway / ExpressRoute
+    → Azure VNet
+      → Private Endpoint (APIM) → APIM (VNet-injected, internal mode)
+        → Private Endpoint (AI Foundry) → Azure AI Foundry
+```
+
+### Key Controls
+
+- **VPN Gateway or ExpressRoute:** Connects the corporate network to the Azure VNet. Developer workstations resolve APIM's hostname to the private IP via corporate DNS forwarding to Azure Private DNS Zones.
+- **APIM VNet Injection (Internal Mode):** APIM is deployed inside a dedicated subnet with no public IP. Only clients on the VNet (or connected via VPN/ExpressRoute) can reach it. **Requires APIM Premium tier** (or API Management v2 Premium).
+- **Private Endpoint (APIM):** For organizations that cannot use VNet injection, a Private Endpoint exposes APIM on a private IP within the VNet.
+- **Private Endpoint (AI Foundry):** Ensures APIM-to-backend traffic never leaves the Azure backbone. AI Foundry's public network access should be **disabled** once the Private Endpoint is active.
+- **Private DNS Zones:** Two zones are required:
+  - `privatelink.openai.azure.com` → resolves AI Foundry to private IP
+  - `privatelink.azure-api.net` → resolves APIM to private IP (if using PE instead of VNet injection)
+- **NSGs:** Network Security Groups on the APIM subnet restrict inbound traffic to the VPN/ExpressRoute gateway prefix and block all internet-originating traffic.
+- **Encryption in Transit:** All connections use TLS 1.2+ (HTTPS). APIM can enforce minimum TLS version via policy.
+- **Encryption at Rest:** Azure AI Foundry and Log Analytics encrypt data at rest using Microsoft-managed keys by default; customer-managed keys (CMK) via Key Vault are supported for regulated workloads.
 
 ## Observability & Monitoring
 
-- **APIM Telemetry:** Tracks all incoming requests (latency, errors, client info) → forwarded to Azure Monitor
-- **AI Foundry Metrics:** Model deployment health, token usage, errors, inference latency → Log Analytics
-- **Application Insights:** Copilot CLI can emit structured traces (e.g., token acquisition time, SDK initialization duration) → Application Insights
-- **Log Analytics Queries:** Central dashboard for searching logs, setting alerts, and analyzing trends across APIM and AI Foundry
+- **APIM Diagnostics:** Enable diagnostic settings on APIM to stream `GatewayLogs` and `AllMetrics` to the Log Analytics Workspace. Tracks request latency, HTTP status codes, client IP, policy execution time, and backend response time.
+- **AI Foundry Diagnostics:** Enable diagnostic settings on the Azure AI Foundry resource to stream `RequestResponse` logs and `AllMetrics` to the same Log Analytics Workspace. Captures token usage, model latency, content filter triggers, and HTTP errors.
+- **Application Insights (Optional):** For client-side telemetry, the extension or CLI could emit custom traces (token acquisition time, SDK initialization, error counts) to an Application Insights instance. This is **not** currently implemented in Forge but is a recommended addition for production deployments.
+- **KQL Dashboards:** Build Azure Workbooks or Grafana dashboards over the Log Analytics Workspace to visualize APIM throughput, model token consumption, P95 latency, error rates, and per-user usage patterns.
+- **Alerting:** Configure Azure Monitor alert rules for: APIM 5xx spike, AI Foundry quota exhaustion, token acquisition failures, and abnormal latency. Route alerts to Action Groups (email, Teams, PagerDuty).
 
 ## Deployment Considerations
 
-- **Multi-tenant:** Deploy one set of Azure services per organization or business unit; Entra ID tenant isolation enforces access control
-- **Scaling:** APIM auto-scales based on request volume; AI Foundry scales model deployments independently
-- **Compliance:** Private networking and Entra ID integration support air-gap and regulatory requirements (e.g., no internet egress)
-- **Cost Optimization:** Use APIM caching policies to reduce redundant calls to AI Foundry; monitor token usage via Log Analytics to optimize quota
+### APIM Tier Selection
+
+| Tier | VNet Support | Cost | Use Case |
+|------|-------------|------|----------|
+| **Developer** | None | ~$50/mo | Local development, testing |
+| **Standard v2** | VNet injection (preview) | ~$300/mo | Small teams, non-regulated |
+| **Premium** | Full VNet injection + PE | ~$2,800/mo | Enterprise, air-gap, compliance |
+| **Premium v2** | Full VNet injection + PE | ~$700/mo | Enterprise (newer regions) |
+
+> **For air-gapped deployments, Premium (classic or v2) is the minimum tier.** Developer and Basic tiers do not support VNet integration.
+
+### Scaling
+
+- **APIM:** Scale by adding units within the tier. Premium supports multi-region deployment. Use APIM caching policies (`cache-lookup` / `cache-store`) to reduce redundant calls to AI Foundry for identical prompts.
+- **AI Foundry:** Scale model deployments independently — adjust TPM (tokens per minute) quota per deployment. Use provisioned throughput units (PTU) for predictable latency at scale.
+- **Capacity Planning:** Monitor token consumption via Log Analytics. Set APIM rate-limit policies (`rate-limit-by-key`) per user or department to prevent noisy-neighbor issues.
+
+### Multi-Tenant Isolation
+
+- Deploy one APIM + AI Foundry stack per business unit or sensitivity tier.
+- Use Entra ID app registrations with distinct `appId` values per tenant; APIM `validate-jwt` policies check the `aud` claim to enforce tenant isolation.
+- For shared infrastructure, use APIM products and subscriptions to segment access.
+
+### Cost Optimization
+
+- **APIM Response Caching:** Cache common completions to reduce AI Foundry token spend.
+- **PTU vs. Pay-As-You-Go:** Use PTU for steady-state workloads (predictable cost); PAYG for bursty usage.
+- **Reserved Capacity:** APIM Premium supports 1-year reservations for ~30% savings.
+- **Token Budget Alerts:** Set Azure Monitor alerts when daily token consumption exceeds thresholds.
+
+### Compliance
+
+- Private networking (VPN/ExpressRoute + Private Endpoints) ensures **zero internet egress** for inference traffic.
+- Entra ID provides auditable authentication with sign-in logs in Azure AD.
+- AI Foundry content filters are enabled by default; configure severity thresholds per deployment.
+- Enable APIM request/response logging to Log Analytics for audit trails.
 
 ## Notes
 
-- This diagram assumes **Entra ID as the identity provider**. For API Key authentication, replace Entra ID with a secure key vault (Azure Key Vault) and retrieve keys at deployment time — never embed in extension code.
+- This diagram assumes **Entra ID as the identity provider**. For API Key authentication, store keys in Azure Key Vault and retrieve them via APIM named values or at deployment time — never embed in extension code.
 - **APIM Policies** typically include:
-  - JWT validation (Entra ID token)
-  - Rate limiting (per-user or per-organization)
-  - Request/response caching
-  - Header transformation (adding deployment name, API version)
-  - Conditional routing (route to different models based on request parameters)
-- **Private Endpoint DNS:** Configure Azure Private DNS Zone to resolve the AI Foundry endpoint to the private IP, preventing accidental routing to the public internet
-- **Diagnostics:** Enable APIM request logging to Log Analytics to debug authentication failures, policy violations, or backend errors
+  - `validate-jwt` — verify Entra ID token (audience, issuer, tenant)
+  - `rate-limit-by-key` — per-user or per-organization throttling
+  - `cache-lookup` / `cache-store` — response caching for identical prompts
+  - `set-header` — inject `api-version`, deployment name, managed identity token for backend
+  - `choose` / `set-backend-service` — route to different model deployments based on request body
+  - `authentication-managed-identity` — acquire a token for AI Foundry using APIM's managed identity
+- **Private DNS Zones** must be linked to the VNet and, if using VPN/ExpressRoute, to the on-premises DNS via conditional forwarders so that developer workstations resolve `*.azure-api.net` and `*.openai.azure.com` to private IPs.
+- **Diagnostics:** Enable APIM diagnostic settings with `GatewayLogs` at "verbose" level to debug authentication failures, policy violations, or backend errors. Reduce to "error" in production for cost control.
+- **Token Refresh Limitation:** The Copilot SDK's `bearerToken` field accepts only a static string — there is no refresh callback. Forge acquires a fresh token at session creation time. For sessions longer than ~1 hour, the token may expire mid-conversation. See issue #27 for planned improvements.
