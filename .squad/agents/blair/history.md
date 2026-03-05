@@ -48,3 +48,13 @@
 - Stop button uses VS Code error-themed variables (`--vscode-inputValidation-errorBackground`, `--vscode-errorForeground`) for visual distinction
 - Progress indicator placed between `#chatMessages` and `.input-area` in HTML template, not inside chatMessages, so it persists across message clears
 - `_currentSession` is set just before `_streamResponse()` and cleared in `finally` — ensures stop handler never references a stale session
+
+📌 Stop/Cancel Lifecycle Fixes (PR #155 review) — Addressed 4 PR review comments about stop button edge cases:
+1. **Thinking-phase stop**: Added `_cancelRequested` flag so stop works even before `_currentSession` exists. The flag is checked right before `session.send()` — if set, we skip sending and return to idle.
+2. **Race condition prevention**: Added `_requestId` counter incremented per `_handleChatMessage` call. The `finally` block only resets `_currentSession` and posts idle if its captured request ID still matches, preventing a stale finally from clobbering a newer request.
+3. **Abort error handling**: Replaced fire-and-forget `.catch(() => {})` on `session.abort()` with proper `try/catch/finally` that logs failures to `_outputChannel` and always posts idle in `finally`.
+4. **Safety timeout in webview**: `stopRequest()` in chat.js sets a 3-second safety timer — if no `processingPhaseUpdate` arrives, it force-resets to idle locally. Timer is cleared when the real phase update arrives.
+5. **Duplicate send guard**: `sendMessage()` now also checks `processingPhase !== "idle"` alongside `isStreaming`, preventing orphaned messages during thinking phase.
+- Key pattern: request-scoped cancellation flags + request IDs are the right way to handle async lifecycle gaps between "user intent" (stop clicked) and "system state" (session not yet created)
+- Always `await` SDK abort calls — fire-and-forget masks errors that can surface as confusing messages later
+- Webview safety timeouts are belt-and-suspenders — the extension should always send phase updates, but the webview must be resilient to message drops
