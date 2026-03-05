@@ -72,6 +72,8 @@ Ensure you've installed the [prerequisites](#prerequisites) before starting.
 
 ## Architecture
 
+### Basic
+
 ```mermaid
 graph TD
     subgraph vscode["VS Code"]
@@ -88,6 +90,8 @@ graph TD
     exthost <-->|"JSON-RPC (stdio)"| cli
     cli -->|"HTTPS"| azure
 ```
+
+> For a full enterprise topology with Azure API Management, private networking, observability, and Entra ID auth flows, see the [Enterprise Architecture](docs/enterprise-architecture.md) reference.
 
 ## Installation
 
