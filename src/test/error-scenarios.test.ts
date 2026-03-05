@@ -26,12 +26,30 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
+vi.mock("../copilotService.js", async () => {
+  const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
+  return {
+    ...actual,
+    discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
+  };
+});
+
 const validConfig: ExtensionConfig = {
   endpoint: "https://myresource.openai.azure.com/openai/v1/",
   apiKey: "test-key-123",
-  model: "gpt-4.1",
+  authMethod: "apiKey",
+  models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
   wireApi: "completions",
   cliPath: "",
+  toolShell: true,
+  toolRead: true,
+  toolWrite: true,
+  toolUrl: false,
+  toolMcp: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -102,7 +120,7 @@ describe("Error: WebviewView error paths", () => {
   };
   let mockView: MockWebviewView;
 
-  function setupProvider(settings: Record<string, string>, secretApiKey?: string) {
+  function setupProvider(settings: Record<string, unknown>, secretApiKey?: string) {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn(
         (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
@@ -112,6 +130,7 @@ describe("Error: WebviewView error paths", () => {
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
@@ -119,6 +138,11 @@ describe("Error: WebviewView error paths", () => {
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
         onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+      workspaceState: {
+        get: vi.fn().mockReturnValue(undefined),
+        update: vi.fn().mockResolvedValue(undefined),
+        keys: vi.fn().mockReturnValue([]),
       },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
@@ -149,8 +173,8 @@ describe("Error: WebviewView error paths", () => {
   it("posts error when endpoint is missing", async () => {
     setupProvider({
       endpoint: "",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     }, "key-123");
@@ -173,8 +197,8 @@ describe("Error: WebviewView error paths", () => {
   it("posts error when API key is missing", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
     });
@@ -197,10 +221,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts CLI-not-found error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("spawn copilot ENOENT"));
@@ -225,10 +250,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts general startup error to webview", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockClient.start.mockRejectedValueOnce(new Error("Permission denied"));
@@ -256,10 +282,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on sendMessage rejection", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockSession.send.mockRejectedValueOnce(
@@ -299,10 +326,11 @@ describe("Error: WebviewView error paths", () => {
   it("posts error and removes session on session.error event", async () => {
     setupProvider({
       endpoint: "https://example.com",
+      authMethod: "apiKey",
       apiKey: "",
-      model: "gpt-4.1",
       wireApi: "completions",
       cliPath: "",
+      models: ["gpt-4"],
     }, "key-123");
 
     mockSession.send.mockImplementation(async () => {
@@ -338,5 +366,161 @@ describe("Error: WebviewView error paths", () => {
     await vi.waitFor(() => {
       expect(mockClient.createSession).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M24 — _rewriteAuthError tests (private method tested via error message output)
+// ---------------------------------------------------------------------------
+describe("Error: auth error rewriting (_rewriteAuthError)", () => {
+  let mockSession: ReturnType<typeof createMockSession>;
+  let mockClient: MockClient;
+  let capturedProvider: {
+    resolveWebviewView: (
+      view: unknown,
+      context: unknown,
+      token: unknown
+    ) => void;
+  };
+  let mockView: MockWebviewView;
+
+  function setupRewriteProvider(settings: Record<string, unknown>, secretApiKey?: string) {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn(
+        (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
+      ),
+    } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+
+    const mockExtContext = {
+      subscriptions: [] as { dispose: () => void }[],
+      extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
+      secrets: {
+        get: vi.fn().mockImplementation((key: string) =>
+          key === "forge.copilot.apiKey" ? Promise.resolve(secretApiKey) : Promise.resolve(undefined)
+        ),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+      workspaceState: {
+        get: vi.fn().mockReturnValue(undefined),
+        update: vi.fn().mockResolvedValue(undefined),
+        keys: vi.fn().mockReturnValue([]),
+      },
+    };
+    activate(mockExtContext as unknown as import("vscode").ExtensionContext);
+
+    const calls = vi.mocked(vscode.window.registerWebviewViewProvider).mock.calls;
+    capturedProvider = calls[calls.length - 1][1] as typeof capturedProvider;
+
+    mockView = createMockWebviewView();
+    capturedProvider.resolveWebviewView(
+      mockView,
+      createMockResolveContext(),
+      createMockCancellationToken()
+    );
+  }
+
+  const providerSettings = {
+    endpoint: "https://example.com",
+    authMethod: "apiKey",
+    apiKey: "",
+    wireApi: "completions",
+    cliPath: "",
+    models: ["gpt-4"],
+  };
+
+  beforeEach(() => {
+    mockSession = createMockSession();
+    mockClient = createMockClient(mockSession);
+    setMockClient(mockClient);
+  });
+
+  afterEach(async () => {
+    await stopClient();
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
+  });
+
+  it("rewrites error containing '401' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Request failed with status 401"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("gear icon"))).toBe(true);
+  });
+
+  it("rewrites error containing 'unauthorized' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Unauthorized access to resource"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+  });
+
+  it("rewrites error containing 'authorization' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Authorization header is missing"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+  });
+
+  it("does not rewrite errors without auth keywords", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Network timeout after 30s"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("Network timeout after 30s"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("API key is missing"))).toBe(false);
+  });
+
+  it("rewrites error containing '/login' to mention settings", async () => {
+    setupRewriteProvider(providerSettings, "key-123");
+    mockSession.send.mockRejectedValueOnce(new Error("Redirect to /login required"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
   });
 });

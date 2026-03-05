@@ -3,14 +3,16 @@
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/git-lfs:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "bierner.markdown-mermaid",
         "GitHub.vscode-pull-request-github",
-        "dbaeumer.vscode-eslint"
+        "dbaeumer.vscode-eslint",
+        "vsls-liveshare.codetour"
       ]
     }
   },

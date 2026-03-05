@@ -18,6 +18,10 @@ export interface MockClient {
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
   createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
+  resumeSession: ReturnType<typeof vi.fn>;
+  getLastSessionId: ReturnType<typeof vi.fn>;
+  deleteSession: ReturnType<typeof vi.fn>;
 }
 
 export function createMockClient(
@@ -27,6 +31,10 @@ export function createMockClient(
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(session),
+    listSessions: vi.fn().mockResolvedValue([]),
+    resumeSession: vi.fn().mockResolvedValue(session),
+    getLastSessionId: vi.fn().mockResolvedValue(undefined),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -42,6 +50,10 @@ export class CopilotClient {
   start: MockClient["start"];
   stop: MockClient["stop"];
   createSession: MockClient["createSession"];
+  listSessions: MockClient["listSessions"];
+  resumeSession: MockClient["resumeSession"];
+  getLastSessionId: MockClient["getLastSessionId"];
+  deleteSession: MockClient["deleteSession"];
 
   constructor(options?: Record<string, unknown>) {
     constructorSpy(options);
@@ -51,5 +63,9 @@ export class CopilotClient {
     this.start = _mockClient.start;
     this.stop = _mockClient.stop;
     this.createSession = _mockClient.createSession;
+    this.listSessions = _mockClient.listSessions;
+    this.resumeSession = _mockClient.resumeSession;
+    this.getLastSessionId = _mockClient.getLastSessionId;
+    this.deleteSession = _mockClient.deleteSession;
   }
 }

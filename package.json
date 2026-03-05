@@ -1,8 +1,8 @@
 {
-  "name": "forge",
-  "displayName": "Forge",
-  "description": "AI-powered chat assistant for air-gapped environments using Azure AI Foundry",
-  "version": "0.1.0",
+  "name": "forge-ai",
+  "displayName": "Forge AI",
+  "description": "AI chat routed through your own Azure AI Foundry endpoint — private, self-managed, all inference in your tenant",
+  "version": "0.3.0",
   "publisher": "robpitcher",
   "repository": {
     "type": "git",
@@ -17,9 +17,8 @@
     "AI",
     "Chat"
   ],
-  "activationEvents": [
-    "onView:forge.chatView"
-  ],
+  "activationEvents": [],
+  "icon": "resources/icon.png",
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -47,18 +46,44 @@
         "icon": "$(gear)"
       },
       {
+        "command": "forge.showHistory",
+        "title": "Conversation History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "forge.signIn",
+        "title": "Forge: Sign In"
+      },
+      {
         "command": "forge.attachSelection",
         "title": "Forge: Attach Selection"
       },
       {
         "command": "forge.attachFile",
         "title": "Forge: Attach File"
+      },
+      {
+        "command": "forge.explain",
+        "title": "Forge: Explain with Forge"
+      },
+      {
+        "command": "forge.fix",
+        "title": "Forge: Fix with Forge"
+      },
+      {
+        "command": "forge.tests",
+        "title": "Forge: Write Tests with Forge"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "forge.openSettings",
+          "when": "view == forge.chatView",
+          "group": "navigation"
+        },
+        {
+          "command": "forge.showHistory",
           "when": "view == forge.chatView",
           "group": "navigation"
         }
@@ -70,12 +95,15 @@
         "forge.copilot.endpoint": {
           "type": "string",
           "default": "",
-          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.openai.azure.com/openai/v1/)"
+          "description": "Azure AI Foundry endpoint URL (e.g., https://myresource.services.ai.azure.com/)"
         },
-        "forge.copilot.model": {
-          "type": "string",
-          "default": "gpt-4.1",
-          "description": "Model deployment name"
+        "forge.copilot.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Available model deployments for the model selector. Values must match your Azure AI Foundry model deployment name (not the model name, as they can differ). The first entry is the default active model."
         },
         "forge.copilot.wireApi": {
           "type": "string",
@@ -91,16 +119,124 @@
           "default": "",
           "description": "Path to Copilot CLI binary (if not on PATH)"
         },
+        "forge.copilot.authMethod": {
+          "type": "string",
+          "enum": [
+            "entraId",
+            "apiKey"
+          ],
+          "default": "entraId",
+          "description": "Authentication method. 'entraId' uses DefaultAzureCredential (recommended). 'apiKey' uses a static API key.",
+          "enumDescriptions": [
+            "Use Azure Entra ID (DefaultAzureCredential) for authentication. Recommended for environments with Azure AD.",
+            "Use a static API key stored in VS Code SecretStorage. Use for environments without Entra ID."
+          ]
+        },
         "forge.copilot.autoApproveTools": {
           "type": "boolean",
           "default": false,
           "description": "Automatically approve tool executions without confirmation. Enable only in trusted environments."
+        },
+        "forge.copilot.systemMessage": {
+          "type": "string",
+          "default": "",
+          "description": "Custom system message to append to the default Copilot system prompt. Leave empty to use the SDK default.",
+          "editPresentation": "multilineText"
+        },
+        "forge.copilot.tools.shell": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Shell tool (execute terminal commands)"
+        },
+        "forge.copilot.tools.read": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Read tool (read file contents)"
+        },
+        "forge.copilot.tools.write": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Write tool (write/edit files)"
+        },
+        "forge.copilot.tools.url": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the URL tool (fetch web content). Disabled by default for restricted environments."
+        },
+        "forge.copilot.tools.mcp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable MCP tool support (Model Context Protocol servers)"
+        },
+        "forge.copilot.mcpAllowRemote": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow remote (HTTP/SSE) MCP servers. Enable only for privately networked MCP servers within your network. Disabled by default for network safety."
+        },
+        "forge.copilot.mcpServers": {
+          "type": "object",
+          "default": {},
+          "description": "MCP (Model Context Protocol) server configurations. Each key is a server name. Local servers use { command, args?, env? }. Remote servers use { url, headers? } (requires allowRemoteMcp).",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "Command to start the local MCP server process"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Arguments to pass to the server command"
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Environment variables for the server process"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "URL of the remote MCP server (HTTP/SSE endpoint)"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "HTTP headers to include in requests to the remote server"
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }
   },
   "dependencies": {
-    "@github/copilot-sdk": "0.1.26"
+    "@azure/identity": "^4.13.0",
+    "@github/copilot-sdk": "0.1.26",
+    "dompurify": "^3.3.1",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.3",
+    "marked-highlight": "^2.2.3"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
@@ -116,7 +252,8 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "package": "npm run build -- --production && vsce package",
+    "vscode:prepublish": "npm run build -- --production",
+    "package": "node -e \"const fs=require('fs');if(fs.existsSync('dist')){for(const f of fs.readdirSync('dist')){if(f.endsWith('.map'))fs.rmSync('dist/'+f,{force:true});}}\" && vsce package",
     "lint": "eslint src/",
     "lint:types": "tsc --noEmit",
     "test": "vitest run"

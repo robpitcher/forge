@@ -9,8 +9,7 @@
  *   1. Session created WITHOUT `availableTools: []` (tools enabled)
  *   2. SDK emits permission request → extension forwards to webview as `toolConfirmation`
  *   3. User approves/denies in webview → extension calls SDK confirmation API
- *   4. SDK emits `tool.execution_complete` → extension posts `toolResult` to webview
- *   5. `autoApproveTools` config bypasses the webview prompt
+ *   4. `autoApproveTools` config bypasses the webview prompt
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as vscode from "vscode";
@@ -36,6 +35,18 @@ vi.mock("@github/copilot-sdk", () =>
   import("./__mocks__/copilot-sdk.js")
 );
 
+vi.mock("../auth/authStatusProvider.js", () => ({
+  checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
+}));
+
+vi.mock("../copilotService.js", async () => {
+  const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
+  return {
+    ...actual,
+    discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -44,7 +55,8 @@ function setupConfig(overrides: Record<string, unknown> = {}) {
   const settings: Record<string, unknown> = {
     endpoint: "https://myresource.openai.azure.com/openai/v1/",
     apiKey: "test-key-123",
-    model: "gpt-4.1",
+    authMethod: "apiKey",
+    models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
     wireApi: "completions",
     cliPath: "",
     autoApproveTools: false,
@@ -92,9 +104,11 @@ describe("Tool approval flow (#25)", () => {
     setMockClient(mockClient);
     setupConfig();
 
+    const stateStore = new Map<string, unknown>();
     const mockExtContext = {
       subscriptions: [] as { dispose: () => void }[],
       extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
       secrets: {
         get: vi.fn().mockImplementation((key: string) =>
           key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
@@ -102,6 +116,11 @@ describe("Tool approval flow (#25)", () => {
         store: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
         onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      },
+      workspaceState: {
+        get: vi.fn((key: string, defaultValue?: unknown) => stateStore.get(key) ?? defaultValue),
+        update: vi.fn((key: string, value: unknown) => { stateStore.set(key, value); return Promise.resolve(); }),
+        keys: vi.fn(() => [...stateStore.keys()]),
       },
     };
     activate(mockExtContext as unknown as import("vscode").ExtensionContext);
@@ -209,9 +228,11 @@ describe("Tool approval flow (#25)", () => {
       setupConfig({ autoApproveTools: true });
 
       // Re-activate with new config
+      const stateStore2 = new Map<string, unknown>();
       const mockExtContext = {
         subscriptions: [] as { dispose: () => void }[],
         extensionUri: { toString: () => "mock-ext-uri" },
+      globalStorageUri: { fsPath: "/tmp/mock-global-storage" },
         secrets: {
           get: vi.fn().mockImplementation((key: string) =>
             key === "forge.copilot.apiKey" ? Promise.resolve("test-key-123") : Promise.resolve(undefined)
@@ -219,6 +240,11 @@ describe("Tool approval flow (#25)", () => {
           store: vi.fn().mockResolvedValue(undefined),
           delete: vi.fn().mockResolvedValue(undefined),
           onDidChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+        },
+        workspaceState: {
+          get: vi.fn((key: string, defaultValue?: unknown) => stateStore2.get(key) ?? defaultValue),
+          update: vi.fn((key: string, value: unknown) => { stateStore2.set(key, value); return Promise.resolve(); }),
+          keys: vi.fn(() => [...stateStore2.keys()]),
         },
       };
       activate(mockExtContext as unknown as import("vscode").ExtensionContext);
@@ -335,28 +361,7 @@ describe("Tool approval flow (#25)", () => {
   });
 
   // =========================================================================
-  // 4. Tool result rendering
-  // =========================================================================
-  describe("tool result rendering", () => {
-    it.todo(
-      "posts toolResult with success status after tool.execution_complete with success=true"
-      // Expected: SDK emits tool.execution_complete event with
-      // { data: { toolCallId: "tc-1", success: true, result: { content: "..." } } }
-      // → extension posts { type: "toolResult", toolCallId: "tc-1",
-      // success: true, content: "..." } to webview.
-    );
-
-    it.todo(
-      "posts toolResult with error status after tool.execution_complete with success=false"
-      // Expected: SDK emits tool.execution_complete with
-      // { data: { toolCallId: "tc-1", success: false, error: { message: "denied" } } }
-      // → extension posts { type: "toolResult", toolCallId: "tc-1",
-      // success: false, error: "denied" } to webview.
-    );
-  });
-
-  // =========================================================================
-  // 5. Edge cases
+  // 4. Edge cases
   // =========================================================================
   describe("edge cases", () => {
     it.todo(
@@ -384,13 +389,20 @@ describe("Tool approval flow (#25)", () => {
       simulateUserMessage(mockView, "hello");
 
       await vi.waitFor(() => {
-        const messages = getPostedMessages(mockView);
+        const messages = getPostedMessages(mockView)
+          .filter((m: unknown) => {
+            const t = (m as { type: string }).type;
+            return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "workspaceInfo";
+          });
         expect(messages.length).toBeGreaterThanOrEqual(3);
       });
 
-      const types = getPostedMessages(mockView).map(
-        (m: unknown) => (m as { type: string }).type
-      );
+      const types = getPostedMessages(mockView)
+        .filter((m: unknown) => {
+          const t = (m as { type: string }).type;
+          return t !== "authStatus" && t !== "modelsUpdated" && t !== "modelSelected" && t !== "configStatus" && t !== "cliStatus" && t !== "workspaceInfo" && t !== "processingPhaseUpdate";
+        })
+        .map((m: unknown) => (m as { type: string }).type);
       expect(types[0]).toBe("streamStart");
       expect(types).toContain("streamDelta");
       expect(types[types.length - 1]).toBe("streamEnd");

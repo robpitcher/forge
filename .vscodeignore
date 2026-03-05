@@ -11,9 +11,12 @@ specs/**
 !*.d.ts
 tsconfig.json
 esbuild.config.mjs
+eslint.config.mjs
+vitest.config.mts
 .gitignore
 .gitattributes
 package-lock.json
 custom-instructions/**
 enclave-*.vsix
 dist/**/*.map
+resources/repoheader.png

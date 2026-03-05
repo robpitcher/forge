@@ -1,0 +1,96 @@
+name: Insider Release
+
+on:
+  push:
+    branches: [insider]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build (production)
+        run: npm run build -- --production
+
+      - name: Test
+        run: npm test
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          INSIDER_VERSION="${VERSION}-insider+${SHORT_SHA}"
+          INSIDER_TAG="v${INSIDER_VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "insider_version=$INSIDER_VERSION" >> "$GITHUB_OUTPUT"
+          echo "insider_tag=$INSIDER_TAG" >> "$GITHUB_OUTPUT"
+          echo "📦 Base Version: $VERSION (Short SHA: $SHORT_SHA)"
+          echo "🏷️ Insider Version: $INSIDER_VERSION"
+          echo "🔖 Insider Tag: $INSIDER_TAG"
+
+      - name: Package extension
+        run: npx vsce package --out forge-${{ steps.version.outputs.insider_version }}.vsix
+
+      - name: Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.insider_tag }}" -m "Insider Release ${{ steps.version.outputs.insider_tag }}"
+          git push origin "${{ steps.version.outputs.insider_tag }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.insider_tag }}" \
+            --title "Forge ${{ steps.version.outputs.insider_tag }}" \
+            --notes "Insider/development build of Forge. Download the \`.vsix\` below and install via:\n\`\`\`bash\ncode --install-extension forge-${{ steps.version.outputs.insider_version }}.vsix\n\`\`\`\n\n**Note:** Insider builds may be unstable and are intended for early adopters and testing only." \
+            --prerelease \
+            forge-${{ steps.version.outputs.insider_version }}.vsix
+
+      - name: Verify release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ steps.version.outputs.insider_tag }}"
+          echo "✅ Insider Release ${{ steps.version.outputs.insider_tag }} created and verified."
+
+      - name: Compute marketplace version
+        id: marketplace
+        run: |
+          BASE_VERSION=$(node -e "console.log(require('./package.json').version)")
+          MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          MARKETPLACE_VERSION="${MAJOR}.${MINOR}.${{ github.run_number }}"
+          echo "version=$MARKETPLACE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Marketplace Version: $MARKETPLACE_VERSION"
+
+      - name: Publish to VS Code Marketplace (Pre-Release)
+        env:
+          VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}
+        run: |
+          npm version ${{ steps.marketplace.outputs.version }} --no-git-tag-version
+          npx @vscode/vsce package --pre-release
+          npx @vscode/vsce publish --pre-release --pat $VSCE_PAT
