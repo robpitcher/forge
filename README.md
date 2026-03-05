@@ -19,7 +19,7 @@ The extension uses the GitHub Copilot SDK (`@github/copilot-sdk`) in BYOK (Bring
 
 Ensure you've installed the [prerequisites](#prerequisites) before starting.
 
-1. **Install the Forge extension** — Search for "Forge" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge). If your environment doesn't have Marketplace access, see [Installation](#installation) for the sideload option.
+1. **Install the Forge extension** — Search for "forge-ai" in the VS Code Extensions panel, or install via the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge-ai). If your environment doesn't have Marketplace access, see [Installation](#installation) for the sideload option.
 
 2. **Configure settings** in VS Code (`File > Preferences > Settings`, search for `Forge`):
 
@@ -60,14 +60,7 @@ graph TD
 
 > For a full enterprise topology with Azure API Management, private networking, observability, and Entra ID auth flows, see the example [Enterprise Architecture](docs/enterprise-architecture.md) reference.
 
-## Installation
-
-### From VS Code Marketplace (recommended)
-
-1. Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-2. Search for **"Forge"** or visit the [Forge Marketplace page](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge)
-3. Click **Install**
-4. Forge publishes **pre-release** builds to the marketplace — check the **Pre-Release** tab for development versions
+## Sideload Installation
 
 ### From GitHub Releases (for restricted or air-gapped networks)
 
