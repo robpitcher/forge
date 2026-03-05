@@ -71,6 +71,14 @@
       "created_at": "2026-03-02T14:35:00Z",
       "legacy_named": false,
       "status": "active"
+    },
+    "bennings": {
+      "persistent_name": "Bennings",
+      "universe": "The Thing",
+      "role": "Azure Cloud Architect",
+      "created_at": "2026-03-05T02:48:00Z",
+      "legacy_named": false,
+      "status": "active"
     }
   }
 }

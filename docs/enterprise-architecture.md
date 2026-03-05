@@ -35,7 +35,7 @@ graph TB
 
     subgraph AzureAI["🤖 Azure AI"]
         AIFoundry["Azure AI<br/>Foundry"]
-        Models["Model<br/>Deployments<br/>(GPT-4.1, o-series, etc.)"]
+        Models["Model<br/>Deployments<br/>(GPT-5.2, o-series, etc.)"]
         PEAI --> AIFoundry
         AIFoundry --> Models
     end

@@ -19,6 +19,7 @@ How to decide who handles what.
 | Configuration & settings | Blair | VS Code settings contribution, validation |
 | Documentation, README, guides | Fuchs | User docs, setup guides, API reference, changelogs, inline docs |
 | Mermaid diagrams, visual docs, architecture visuals | Nauls | Flowcharts, sequence diagrams, state diagrams, ER diagrams |
+| Azure architecture, cloud topology, enterprise design | Bennings | APIM, VNet, Private Link, Entra ID, AI Foundry topology, cost optimization |
 | Async issue work (bugs, tests, small features) | @copilot 🤖 | Well-defined tasks matching capability profile |
 | Session logging | Scribe | Automatic — never needs routing |
 
@@ -36,6 +37,7 @@ How to decide who handles what.
 | `squad:norris` | Security review task | Norris |
 | `squad:copper` | Code quality review task | Copper |
 | `squad:nauls` | Diagram / visual documentation task | Nauls |
+| `squad:bennings` | Azure architecture / cloud topology task | Bennings |
 | `squad:copilot` | Assign to @copilot for autonomous work (if enabled) | @copilot 🤖 |
 
 ### How Issue Assignment Works
