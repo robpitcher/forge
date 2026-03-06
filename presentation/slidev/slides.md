@@ -220,7 +220,7 @@ graph LR
 <div class="flex gap-8 text-sm">
 <div class="flex-1">
 
-**1. Install** — Search "forge-ai" in Extensions, or sideload the `.vsix`
+**1. Install** — Search "forge-ai" in Extensions, or sideload the `.vsix`from the GitHub Releases page
 
 **2. Configure your endpoint and models**
 ```json
@@ -239,41 +239,6 @@ graph LR
   <img src="/setup.png" class="rounded-lg shadow-xl max-h-100" />
 </div>
 </div>
-
----
-
-# Enterprise Architecture
-
-<div class="grid grid-cols-2 gap-8 mt-4">
-<div>
-
-**Private networking**
-
-- Azure Private Endpoints
-- ExpressRoute / VPN tunnels
-- No public internet required
-
-</div>
-<div>
-
-**Governance & observability**
-
-- Azure API Management gateway
-- Token usage & audit logging
-- Entra ID conditional access policies
-- Model deployment controls
-
-</div>
-</div>
-
-```mermaid {scale: 0.7}
-graph LR
-    A[Developer Workstation] -->|Private Network| B[Azure APIM]
-    B -->|Managed Identity| C[Azure AI Foundry]
-    C -->|Private Endpoint| D[Model Deployment]
-    style B fill:#0078d4,stroke:#005a9e,color:#fff
-    style C fill:#68217a,stroke:#4b1560,color:#fff
-```
 
 ---
 
