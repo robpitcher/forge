@@ -147,8 +147,8 @@ layout: center
 # The Problem
 
 - Enterprises need **AI-powered developer chat** inside VS Code
-- Public AI endpoints violate **compliance, data sovereignty, and security** requirements
-- Air-gapped and sovereign cloud networks **cannot reach external services**
+- Public AI endpoints may not satisfy **compliance, data sovereignty, and security** requirements
+- Air-gapped and sovereign cloud networks **restrict access to external services**
 - Teams need **full control** over which models are deployed and where inference runs
 
 ---
@@ -158,7 +158,7 @@ layout: center
 A VS Code extension that routes AI chat through **your** Azure AI Foundry endpoint.
 
 - 🔒 **No GitHub auth required** — uses your Entra ID or API key
-- 🏢 **Full tenant control** — all inference stays within your Azure subscription
+- 🏢 **Full control** — all inference stays within your Azure tenant
 - 🔌 **BYOK mode** — Bring Your Own Key via the GitHub Copilot SDK
 - 🌐 **Air-gap ready** — works in disconnected, sovereign, and private networks
 - 💬 **Rich chat experience** — multi-turn, streaming, code context, tool approval
@@ -182,7 +182,7 @@ graph LR
 
 - **Forge Extension** manages chat UI, context attachments, and session lifecycle
 - **Copilot CLI** handles model inference via the SDK's BYOK provider
-- **Azure AI Foundry** runs your deployed models in your tenant — GPT-4.1, GPT-4o, o3, and more
+- **Azure AI Foundry** runs your deployed models in your tenant — OpenAI, Anthropic, and more
 
 ---
 
@@ -191,13 +191,12 @@ graph LR
 <div class="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
 
 - 🔑 **Dual auth** — Entra ID or API key
-- 🤖 **Multi-model support** — switch between deployments
-- ⚡ **Streaming responses** — real-time token delivery
-- 📎 **Context attachments** — send selections, files, or workspace context
-- 🛡️ **Tool approval** — user confirms before tool execution
-- 🧠 **Workspace awareness** — understands your project structure
-- ⏹️ **Stop generation** — cancel in-flight requests
-- 🔄 **Multi-turn chat** — session reuse across conversations
+- 🤖 **Multi-model support**
+- ⚡ **Streaming responses**
+- 📎 **Context attachments**
+- 🔧 **Tool calling**
+- 🧠 **Workspace awareness**
+- 🔄 **Multi-turn chat**
 
 </div>
 
@@ -208,7 +207,7 @@ graph LR
 Four steps to your first chat:
 
 **1. Install the extension**
-> Search "Forge" in the VS Code Extensions panel, or sideload the `.vsix`
+> Search "forge-ai" in the VS Code Extensions panel, or sideload the `.vsix`
 
 **2. Configure your endpoint**
 ```json
@@ -309,7 +308,7 @@ AI chat that stays within your walls.
 
 🏪 **VS Code Marketplace**
 
-Search "Forge" in Extensions
+Search "forge-ai" in Extensions
 
 </div>
 
