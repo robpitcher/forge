@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [dev]
+    paths:
+      - 'presentation/slidev/**'
 
 permissions:
   contents: read
