@@ -15,6 +15,8 @@
 
 ## Recent History (Latest Entries)
 
+📌 Team update (2026-03-06T22:52:49Z): Auth-method-aware error rewriting — Fixed `_rewriteAuthError()` to take `authMethod` parameter. Entra ID users now see RBAC guidance ("Cognitive Services OpenAI User" role); API Key users see existing message. Merged decision: `auth-method-aware-error-rewriting` (#decision-in-.squad/decisions.md). Tests added by Windows: 4 new integration tests + mock fixes. All tests passing.
+
 📌 CLI Preflight Validation (2025-03-03T17:15:00Z) — Added preflight validation that checks if the GitHub Copilot CLI is correctly installed during extension activation. Implemented `performCliPreflight()` in extension.ts that calls `discoverAndValidateCli()` from copilotService. Shows VS Code warning notifications with actionable buttons ("Open Settings", "Open Terminal") based on failure reason (not_found, wrong_binary, version_check_failed). Also posts `cliStatus` message to webview to display an in-chat banner using the same pattern as auth banners. Validation runs fire-and-forget during activation and re-runs when `forge.copilot.cliPath` config changes. Added webview handler `updateCliBanner()` that shows ✅ "CLI ready" (auto-dismisses in 2s) or ⚠️ error message with "Fix" button. Updated test files to mock `discoverAndValidateCli()` and filter `cliStatus` messages. All 246 tests pass, typecheck passes. Pre-existing highlight.js bundling issue on branch is unrelated to this work.
 - Preflight validation should NOT block activation — use async fire-and-forget pattern with `.catch()` logging
 - VS Code warning messages + webview banners together provide belt-and-suspenders UX

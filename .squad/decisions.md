@@ -1829,3 +1829,28 @@ Document the **Cognitive Services OpenAI User** RBAC role requirement across thr
 - Custom instruction § "Error Handling Standards" — actionable error messages
 - Fuchs history § "User-first framing" — prioritize common/accessible paths
 
+---
+
+# Decision: Auth-Method-Aware Error Rewriting
+
+**Author:** Blair (Extension Dev)  
+**Date:** 2025-07-24  
+**Scope:** `src/extension.ts` — `_rewriteAuthError()`  
+**Status:** Implemented
+
+## Context
+
+`_rewriteAuthError()` was unconditionally rewriting SDK auth errors (401, unauthorized, etc.) to tell users to check their API key — even when `authMethod` was `"entraId"`. This produced confusing UX for Entra ID users whose real problem was a missing Azure RBAC role.
+
+## Decision
+
+Made `_rewriteAuthError()` auth-method-aware by adding an `authMethod` parameter. Chose parameter over instance field because `config.authMethod` is already available at the single call site — no need to cache state.
+
+- **`authMethod === "entraId"`**: "Entra ID authentication was rejected by the endpoint. Ensure your account has the 'Cognitive Services OpenAI User' role on the Azure AI resource. Check Access control (IAM) in Azure Portal."
+- **`authMethod === "apiKey"`**: Existing message unchanged.
+
+## Implications
+
+- If a new auth method is added in the future, `_rewriteAuthError` will need a new branch.
+- This is consistent with how `_extractEntraIdErrorSummary` already differentiates token acquisition errors — now runtime auth errors get the same treatment.
+
