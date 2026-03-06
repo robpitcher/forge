@@ -13,6 +13,57 @@ fonts:
   provider: none
 ---
 
+<style>
+#slide-container > .absolute.bottom-0.left-0 {
+  top: auto !important;
+  left: auto !important;
+  right: 1rem !important;
+  bottom: 1rem !important;
+  opacity: 1 !important;
+  padding: 0 !important;
+  z-index: 30;
+}
+
+#slide-container > .absolute.bottom-0.left-0 nav > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.35);
+}
+
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn {
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.12);
+  color: #f8fafc;
+  opacity: 1;
+}
+
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn:hover,
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn:focus-visible {
+  background: rgba(248, 250, 252, 0.2);
+}
+
+#slide-container > .absolute.bottom-0.left-0 .h-40px {
+  color: #f8fafc;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+  margin-left: 0.25rem;
+  padding-left: 0.5rem;
+}
+
+#slide-container > .absolute.bottom-0.left-0 .h-40px .opacity-50 {
+  opacity: 0.8;
+}
+</style>
+
 <div class="flex flex-col items-center justify-center h-full">
   <img src="/repoheader.png" class="w-160 mb-8" alt="Forge" />
   <p class="text-xl text-gray-400 !leading-8">
