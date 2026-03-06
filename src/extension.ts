@@ -917,7 +917,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
-      const message = this._rewriteAuthError(raw);
+      const message = this._rewriteAuthError(raw, config.authMethod);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
@@ -984,10 +984,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return blocks.join(separator) + separator + prompt;
   }
 
-  /** Rewrites SDK auth errors to point users at the settings gear. */
-  private _rewriteAuthError(message: string): string {
+  /** Rewrites SDK auth errors to point users at the correct auth remedy. */
+  private _rewriteAuthError(message: string, authMethod: "entraId" | "apiKey"): string {
     const lower = message.toLowerCase();
     if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
+      if (authMethod === "entraId") {
+        return "Entra ID authentication was rejected by the endpoint. " +
+          "Ensure your account has the 'Cognitive Services OpenAI User' role on the Azure AI resource. " +
+          "Check Access control (IAM) in Azure Portal.";
+      }
       return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
     }
     return message;
