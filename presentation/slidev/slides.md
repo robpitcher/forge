@@ -62,10 +62,76 @@ fonts:
 #slide-container > .absolute.bottom-0.left-0 .h-40px .opacity-50 {
   opacity: 0.8;
 }
+
+/* Gradient-border wrapper — gives the image a luminous ring */
+.hero-image-wrapper {
+  position: relative;
+  display: inline-block;
+  padding: 1.5px;
+  border-radius: 1.125rem;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.55),
+    rgba(124, 58, 237, 0.3),
+    rgba(59, 130, 246, 0.12),
+    rgba(124, 58, 237, 0.3),
+    rgba(59, 130, 246, 0.55)
+  );
+  box-shadow:
+    0 0 30px rgba(59, 130, 246, 0.14),
+    0 0 60px rgba(99, 102, 241, 0.07),
+    0 0 100px rgba(59, 130, 246, 0.03),
+    0 20px 44px rgba(0, 0, 0, 0.32);
+  animation: glow-breathe 5s ease-in-out infinite;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-image-wrapper:hover {
+  transform: scale(1.012);
+  box-shadow:
+    0 0 40px rgba(59, 130, 246, 0.22),
+    0 0 80px rgba(99, 102, 241, 0.11),
+    0 0 120px rgba(59, 130, 246, 0.05),
+    0 24px 48px rgba(0, 0, 0, 0.38);
+}
+
+/* The image itself — sits inside the gradient ring */
+.hero-image {
+  display: block;
+  border-radius: 1rem;
+  border: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: filter 0.5s ease;
+}
+
+.hero-image-wrapper:hover .hero-image {
+  filter: brightness(1.03);
+}
+
+/* Slow glow pulse — subtle enough to feel alive, not distracting */
+@keyframes glow-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 30px rgba(59, 130, 246, 0.14),
+      0 0 60px rgba(99, 102, 241, 0.07),
+      0 0 100px rgba(59, 130, 246, 0.03),
+      0 20px 44px rgba(0, 0, 0, 0.32);
+  }
+  50% {
+    box-shadow:
+      0 0 36px rgba(59, 130, 246, 0.19),
+      0 0 72px rgba(99, 102, 241, 0.09),
+      0 0 110px rgba(59, 130, 246, 0.05),
+      0 20px 44px rgba(0, 0, 0, 0.32);
+  }
+}
 </style>
 
 <div class="flex flex-col items-center justify-center h-full">
-  <img src="repoheader.png" class="w-160 mb-8" alt="Forge" />
+  <div class="hero-image-wrapper mb-8">
+    <img src="https://raw.githubusercontent.com/robpitcher/forge/dev/resources/repoheader.png" class="hero-image w-120" alt="Forge" />
+  </div>
   <p class="text-xl text-gray-400 !leading-8">
     AI Chat for Air-Gapped Environments
   </p>
