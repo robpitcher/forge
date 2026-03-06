@@ -330,6 +330,64 @@ slides/
 
 All directories are optional. Only `slides.md` and `package.json` are required.
 
+## CI/CD — GitHub Pages Deployment
+
+Deploy Slidev to GitHub Pages using `.github/workflows/slides.yml`:
+
+```yaml
+name: Slides
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'slides/**'
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: slides/package-lock.json
+      - run: npm ci
+        working-directory: slides
+      - run: npx slidev build --base /forge/
+        working-directory: slides
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: slides/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+**Key points:**
+- `--base /forge/` is required for GitHub project pages (deploys to `/<repo>/` subpath)
+- `cache-dependency-path` points to the slides lockfile, not root
+- `working-directory: slides` keeps the build isolated from the VS Code extension
+- Two-job pattern: `build` uploads the artifact, `deploy` publishes it
+
 ## Anti-Patterns
 
 - Do NOT install Slidev deps in root `package.json` — keep `slides/` self-contained
