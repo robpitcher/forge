@@ -152,6 +152,8 @@ layout: center
 - Teams need **full control** over which models are deployed and where inference runs
 
 ---
+layout: center
+---
 
 # What is Forge?
 
@@ -163,6 +165,8 @@ A VS Code extension that routes AI chat through **your** Azure AI Foundry endpoi
 - 🌐 **Air-gap ready** — works in disconnected, sovereign, and private networks
 - 💬 **Rich chat experience** — multi-turn, streaming, code context, tool calling
 
+---
+layout: center
 ---
 
 # Architecture
@@ -271,7 +275,7 @@ graph LR
 
 # Built With
 
-<div class="grid grid-cols-2 gap-8 mt-8">
+<div class="grid grid-cols-3 gap-8 mt-8">
 <div>
 
 ### Runtime
@@ -288,6 +292,14 @@ graph LR
 - **esbuild** — fast bundling for extension host
 - **vitest** — unit testing with VS Code mocks
 - **ESLint** — code quality enforcement
+
+</div>
+<div>
+
+### Built With 🤖
+
+- **[Squad](https://github.com/bradygaster/squad)** — AI team framework for project orchestration
+- **GitHub Copilot** — AI pair programming & code generation
 
 </div>
 </div>
@@ -317,7 +329,7 @@ AI chat that stays within your walls.
 
 🏪 **VS Code Marketplace**
 
-Search "forge-ai" in Extensions
+Search ["forge-ai"](https://marketplace.visualstudio.com/items?itemName=robpitcher.forge-ai) in Extensions
 
 </div>
 
