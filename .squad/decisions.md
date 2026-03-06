@@ -1773,3 +1773,59 @@ Documented squad branch convention `squad/{issue}-{slug}` alongside descriptive 
 ### Architecture Pointer, Not Duplication
 The Architecture Overview section **orients contributors to key files** without duplicating the full system design (which lives in README.md and docs/). This reduces maintenance burden — if architecture changes, contributors read the source of truth, not outdated CONTRIBUTING.md.
 
+
+
+---
+
+# Decision: Document Cognitive Services OpenAI User RBAC Role Requirement
+
+**Date:** 2026-03-18  
+**Decided by:** Fuchs (Technical Writer)  
+**Status:** Implemented
+
+## Problem
+
+Users attempting to use Forge with Entra ID authentication were receiving `401 Unauthorized` errors even when they were subscription owners and had the correct endpoint and deployment names configured. This is because Azure separates control-plane permissions (managing resources) from data-plane permissions (calling the API). Subscription owner status only grants control-plane access — users must explicitly have the **Cognitive Services OpenAI User** RBAC role to call the Azure OpenAI endpoint.
+
+This requirement was not documented, leading to user frustration and difficult troubleshooting.
+
+## Decision
+
+Document the **Cognitive Services OpenAI User** RBAC role requirement across three documentation files:
+
+1. **configuration-reference.md** — "Azure AI Foundry Setup → Prerequisites → For Entra ID Authentication"
+   - Clarify that this role is required for Entra ID auth
+   - Explain why subscription owner is insufficient (control-plane vs data-plane)
+   - Provide step-by-step role assignment instructions (Azure Portal UI)
+   - Link to official Azure RBAC documentation
+
+2. **configuration-reference.md** — "Troubleshooting → Authentication Issues"
+   - Update the "Unauthorized (401)" entry to distinguish between API Key and Entra ID causes
+   - Direct Entra ID users to the Prerequisites section for role assignment steps
+
+3. **enterprise-architecture.md** — "Authentication & Authorization Flow"
+   - Add a warning box emphasizing that valid Entra ID tokens alone are insufficient
+   - Clarify that data-plane access requires the specific RBAC role
+   - Align with the enterprise topology context
+
+## Rationale
+
+- **User experience:** Reduces friction during initial setup by catching a common blocker early
+- **Least-privilege:** Highlights the security principle of role-based access control
+- **Azure best practice:** Aligns with Microsoft's documentation on Cognitive Services RBAC
+- **Troubleshooting:** Prevents users from spending hours debugging when the issue is authorization, not authentication
+- **Consistency:** Applied across all setup and reference documentation
+
+## Implementation Details
+
+- **Changes:** Three edits across two files
+- **Impact:** Documentation only — no code changes
+- **Scope:** Entra ID authentication only (API Key auth is unaffected)
+- **Testing:** No testing needed — documentation update
+
+## References
+
+- [Azure RBAC Roles for Cognitive Services (Microsoft Learn)](https://learn.microsoft.com/en-us/azure/ai-services/rbac-ai-services)
+- Custom instruction § "Error Handling Standards" — actionable error messages
+- Fuchs history § "User-first framing" — prioritize common/accessible paths
+

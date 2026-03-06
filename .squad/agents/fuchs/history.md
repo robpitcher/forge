@@ -85,3 +85,10 @@ Fuchs is Forge's Technical Writer. Primary work: documentation (README.md, CONTR
 
 
 📌 Team update (2026-03-06): docs/README.md created as documentation hub with Problem→Solution, Prerequisites, Setup, Deployment, Architecture, RAI sections. Cross-links to configuration-reference.md, features-and-usage.md, enterprise-architecture.md — decided by Fuchs
+
+
+## 2026-03-06T22-12-00Z: Entra ID RBAC Role Documentation
+
+📌 Team update (2026-03-06T22-12-00Z): Entra ID RBAC role requirement (Cognitive Services OpenAI User) documented in configuration-reference.md (Prerequisites + Troubleshooting sections) and enterprise-architecture.md (auth flow warning). Clarified control-plane vs data-plane distinction. Links to Azure RBAC documentation. — Fuchs (Technical Writer)
+
+**Outcome:** Documentation updates merged to dev. Decision merged to team decisions.md.
