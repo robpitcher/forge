@@ -93,6 +93,7 @@ When executing external binaries where the **path comes from user configuration*
 
 Implemented a CLI auto-installer module (`src/cliInstaller.ts`) that manages downloading and installing the `@github/copilot` npm package into the extension's globalStoragePath.
 
+
 ### Key Architectural Decisions
 
 1. **Install location:** `{globalStoragePath}/copilot-cli/` — a mini npm project within VS Code's per-extension global storage
@@ -123,6 +124,7 @@ Implemented a CLI auto-installer module (`src/cliInstaller.ts`) that manages dow
    - Detects wrong binaries (e.g., Kubernetes `copilot` tool) that might pass version check but don't support required flags
    - Returns `{compatible: boolean, error?: string}`
 
+
 ### Public API
 
 ```typescript
@@ -145,6 +147,7 @@ export async function isManagedCliInstalled(globalStoragePath: string): Promise<
 export const CLI_INSTALL_DIR: string; // "copilot-cli"
 ```
 
+
 ### Breaking Changes to copilotService.ts
 
 - `getOrCreateClient(config, globalStoragePath?)` — new optional parameter
@@ -156,11 +159,13 @@ export const CLI_INSTALL_DIR: string; // "copilot-cli"
 
 All changes are backward-compatible (optional parameters).
 
+
 ### Integration Notes for Blair
 
 - Catch `CopilotCliNeedsInstallError` in extension.ts and show install dialog
 - Pass `context.globalStorageUri.fsPath` to all copilotService functions
 - After install succeeds, call `resetClient()` to clear the cached client, then retry the operation
+
 
 ### Why Not Use the SDK's Built-in CLI Resolution?
 
@@ -202,6 +207,7 @@ Blair owns the extension.ts integration and E2E flow.
 
 When the Copilot CLI is not found and a user attempts to send a chat message, Forge uses an **ask-first dialog** pattern rather than automatic installation.
 
+
 ### Flow
 
 1. User sends message → `getOrCreateSession` throws `CopilotCliNeedsInstallError`
@@ -212,6 +218,7 @@ When the Copilot CLI is not found and a user attempts to send a chat message, Fo
    - Failure: Error message with "Open Settings" button
 4. If Cancel → info message with manual install instructions + "Open Settings" option
 
+
 ### Key Decisions
 
 - **No automatic retry** — after successful install, user must re-send the message. This avoids double-send edge cases and makes the flow predictable.
@@ -219,68 +226,6 @@ When the Copilot CLI is not found and a user attempts to send a chat message, Fo
 - **Progress notification** — non-blocking `vscode.window.withProgress` with `ProgressLocation.Notification` so user can continue working during install.
 - **Graceful failure path** — installation errors point user to Settings as fallback (manual install or cliPath configuration).
 
-### Integration Points
-
-- `extension.ts` catches `CopilotCliNeedsInstallError` in `_handleChatMessage` error handler
-- `_globalStoragePath` passed through from `ExtensionContext.globalStorageUri.fsPath` to enable managed CLI install location
-- Reuses existing `openSettings()` command for fallback path
-
-## Rationale
-
-Air-gapped environments often have strict policies about software installation. An automatic install could:
-- Violate corporate security policies
-- Trigger network calls (npm registry, GitHub releases) that fail or leak data
-- Surprise users who expect fully manual control
-
-The ask-first pattern respects user agency while still making installation convenient for most users.
-
-## Alternatives Considered
-
-1. **Automatic install on first message** — rejected: violates user consent, could break air-gap policies
-2. **Preflight auto-install during activation** — rejected: blocks extension startup, no user context for approval
-3. **Silent fallback to manual-only** — rejected: poor UX, hides the problem until user investigates settings
-
-## Impact
-
-- **User-facing:** Clear, predictable installation flow with escape hatches (cancel, settings, manual)
-- **Code:** Minimal — single error catch block + dialog method, no retry logic complexity
-- **Testing:** Covered by existing error handling tests; install dialog is standard VS Code API (no custom mocking needed)
-# Decision: CLI UX Improvements — Install Links and Persistent Banners
-
-**Author:** Blair (Extension Dev)
-**Date:** 2025-07-24
-
-## Context
-
-Users hitting Entra ID auth failures because Azure CLI isn't installed had no way to install it from the error UI. Similarly, once the CLI-missing notification balloon was dismissed, there was no persistent way to trigger CLI installation.
-
-## Decisions
-
-1. **`AuthStatus` type extended** with optional `installUrl` field on `notAuthenticated` and `error` states. This is a backwards-compatible union extension.
-
-2. **Generic `openUrl` command** added to the webview→extension message protocol. Validates `https://` prefix before opening. Reusable for future external links.
-
-3. **`installCli` command** added to webview→extension protocol. Calls existing `_handleCliAutoInstall()` flow (ask-first dialog).
-
-4. **CLI banner uses warning style** (amber) instead of error (red) when CLI is not found and config is complete. This is less alarming and more actionable.
-
-5. **Config gating** — CLI missing banner is hidden during initial setup (before endpoint/auth/models are configured) to avoid overwhelming new users.
-
-## Impact
-
-- `AuthStatus` type in `src/auth/authStatusProvider.ts` — consumers should handle the new optional field
-- New webview commands: `openUrl`, `installCli`
-- New CSS class: `.auth-banner.warning`
-
-# Decision: Marketplace Pre-Release Publishing for Insider Builds
-
-**Date:** 2026-03-03  
-**Decider:** Palmer (DevOps Specialist)  
-**Context:** Rob Pitcher requested marketplace publishing for insider builds using publisher `robpitcher` and PAT stored as `ADO_MARKETPLACE_PAT`.
-
-## Decision
-
-Extend `.github/workflows/insider-release.yml` to publish pre-release builds to the VS Code Marketplace after creating the GitHub Release.
 
 ### Dual-Version Strategy
 
@@ -291,6 +236,7 @@ Extend `.github/workflows/insider-release.yml` to publish pre-release builds to 
 - GitHub releases need semantic, human-readable versions with commit context for traceability.
 - VS Code Marketplace requires unique numeric versions for each publish — run_number provides this.
 - These are separate concerns with different requirements, so separate versioning is appropriate.
+
 
 ### Implementation
 
@@ -303,6 +249,7 @@ Extend `.github/workflows/insider-release.yml` to publish pre-release builds to 
 - Version computation: `npm version {major}.{minor}.{run_number} --no-git-tag-version` — updates package.json in CI only, not committed.
 - Package and publish with `npx @vscode/vsce package --pre-release` and `npx @vscode/vsce publish --pre-release --pat`.
 - Error handling: `continue-on-error: true` — if marketplace publish fails, GitHub Release still succeeds.
+
 
 ### Trade-offs
 
@@ -332,6 +279,7 @@ Extend `.github/workflows/insider-release.yml` to publish pre-release builds to 
 - PAT secret: `ADO_MARKETPLACE_PAT` (stored in repo secrets)
 
 ---
+
 
 ### 2026-03-05: Progress Indicator + Stop Button Architecture & Implementation
 
@@ -391,6 +339,7 @@ Implemented a 4-state processing phase state machine (`idle` → `thinking` → 
 
 ---
 
+
 ### 2026-03-05: Workspace Awareness via workingDirectory
 
 **Author:** MacReady (Architecture & Design)  
@@ -438,6 +387,7 @@ The `@github/copilot-sdk` has a `workingDirectory` field on `SessionConfig` (and
 - Feature matches behavior of GitHub Copilot
 
 ---
+
 
 ### 2026-03-05: Test Filter Pattern for Workspace Awareness Messages
 
@@ -501,6 +451,7 @@ Three README issues identified:
 
 ## Decision
 
+
 ### 1. Move Features Before Prerequisites
 
 **New section order:**
@@ -519,6 +470,7 @@ Three README issues identified:
 - Visitors see authentication options and code actions immediately
 - Better narrative flow: "Here's what Forge offers → here's what you need → let's get started"
 
+
 ### 2. Simplify Architecture Diagram
 
 **Changes:**
@@ -529,6 +481,7 @@ Three README issues identified:
 - Diagram accurately represents a **minimal viable deployment** without implying full private networking
 - Prevents misunderstanding that the architecture alone provides air-gap compliance
 - Enterprise architecture doc (docs/enterprise-architecture.md) covers private connectivity patterns
+
 
 ### 3. Marketplace-First Installation Path
 
@@ -580,6 +533,7 @@ For insider releases: re-package is acceptable because marketplace version diffe
 
 ---
 
+
 ### 2026-03-05T17:47:08Z: Slidev Skill File Created
 
 **Author:** Fuchs (Technical Writer)  
@@ -628,6 +582,7 @@ Rob requested a demo/showcase Slidev deck for the Forge project, to be deployed 
 
 # Decisions (Continued)
 
+
 ### 2026-02-27: PRD Work Decomposition
 **By:** MacReady
 **What:**
@@ -635,6 +590,7 @@ Rob requested a demo/showcase Slidev deck for the Forge project, to be deployed 
 ## Executive Summary
 
 The PRD defines 8 functional requirements (FR1-FR8) and 9 non-functional requirements (NFR1-NFR9) for an MVP Copilot extension in BYOK mode. After reviewing `src/extension.ts`, `src/copilotService.ts`, `src/configuration.ts`, and `package.json`, **the core implementation is DONE**. All critical path items are complete. What remains is polish, testing, packaging validation, and documentation.
+
 
 ### Current State: Core Functionality Complete
 
@@ -648,6 +604,7 @@ The codebase implements:
 - **FR7 (Error Handling)**: ✅ `extension.ts` lines 30-43 display config errors with button to settings, lines 48-58 catch `CopilotCliNotFoundError` with actionable message, lines 60-66 wire cancellation token to `session.abort()`, lines 68-76 catch and display errors in chat stream
 - **FR8 (Packaging)**: ✅ `package.json` lines 77-82 define `build` and `package` scripts, esbuild config exists, SDK is bundled
 
+
 ### Risks Identified
 
 1. **SDK Type Safety**: `copilotService.ts` uses `any` types (lines 4-6, 90) because `@github/copilot-sdk` is Technical Preview and may not export TypeScript types. Acceptable for MVP but should be revisited when SDK stabilizes.
@@ -658,6 +615,7 @@ The codebase implements:
 ---
 
 ## Work Item Table
+
 
 ### Core Functionality
 
@@ -670,6 +628,7 @@ The codebase implements:
 | CF-5 | Session Reuse Within Conversation (FR5) | MacReady | P0 | ✅ Done | CF-3 | `copilotService.ts` Map at line 9, conversation ID from context at `extension.ts` lines 79-85 |
 | CF-6 | Configuration Settings Schema (FR6) | MacReady | P0 | ✅ Done | - | `package.json` lines 36-64 contribute all 5 settings; `configuration.ts` reads/validates |
 
+
 ### Error Handling
 
 | # | Work Item | Owner | Priority | Status | Dependencies | Notes |
@@ -678,6 +637,7 @@ The codebase implements:
 | EH-2 | Copilot CLI Not Found Error (FR7) | MacReady | P0 | ✅ Done | CF-2 | `copilotService.ts` lines 40-48 detect CLI missing; `extension.ts` lines 51-52 display message |
 | EH-3 | Network/Auth Error Display (FR7) | MacReady | P0 | ✅ Done | CF-4 | `extension.ts` lines 111-124 handle `session.error`, lines 68-73 catch exceptions |
 | EH-4 | User Cancellation Support (FR7) | MacReady | P0 | ✅ Done | CF-4 | `extension.ts` lines 60-66 wire VS Code cancellation token to `session.abort()` |
+
 
 ### Testing
 
@@ -689,6 +649,7 @@ The codebase implements:
 | T-4 | Manual Test: Error Scenarios (SC5) | Blair | P0 | ❌ Not started | All EH-* | Test bad endpoint, invalid key, CLI not found, verify chat panel errors |
 | T-5 | Manual Test: Streaming Smoothness (SC7) | Blair | P1 | ❌ Not started | T-1 | Observe token-by-token rendering in chat panel |
 
+
 ### Packaging
 
 | # | Work Item | Owner | Priority | Status | Dependencies | Notes |
@@ -699,6 +660,7 @@ The codebase implements:
 | P-4 | CLI Binary Installation Documentation | Childs | P1 | ❌ Not started | - | Add README section: "Prerequisites — Copilot CLI v0.0.418+ must be on PATH" |
 | P-5 | Configuration Guide | Childs | P1 | ❌ Not started | - | Document how to set `enclave.copilot.*` settings in VS Code |
 | P-6 | Air-Gap Distribution Guide | Childs | P2 | ❌ Not started | P-4, P-5 | Document transferring `.vsix` + CLI binary to air-gapped machine |
+
 
 ### Quality & Hardening
 
@@ -753,19 +715,23 @@ Work is ordered by dependency chain: scaffolding → core → test → package �
 
 ## Rationale
 
+
 ### Right-Sized Issues
 Each issue is scoped for **one squad member, one session**. This avoids:
 - Micro-granularity (e.g., "add import statement")
 - Macro-granularity (e.g., "build the extension")
 - Dependency creep (e.g., one issue blocking 5 others)
 
+
 ### Respect PRD & Non-Goals
 - **Goals G1–G7, FR1–FR8, SC1–SC7** are fully covered as Issues 2–8 (functionality) and 9–16 (validation).
 - **Non-Goals NG1–NG10** are explicitly OUT of scope (no inline completions, no custom tools, no slash commands, etc.).
 - Deferred features (Managed Identity, tools, Phase 2–6 roadmap) are listed as P2 or post-MVP to avoid scope creep.
 
+
 ### No Automated Tests for MVP
 The PRD and existing decisions confirm that manual E2E testing (SC1–SC7) is the validation path. No unit test suite is required for MVP. This is consistent with the PoC nature of the work.
+
 
 ### Dependency Graph
 Issues are ordered so that:
@@ -775,6 +741,7 @@ Issues are ordered so that:
 - Packaging depends on build output
 - Documentation depends on working code and packaging
 
+
 ### Risk Ownership
 Known risks are explicitly listed as issues or documented in decisions:
 - **Conversation ID derivation** (Issue 23, P2): VS Code API uncertainty → defer investigation, but flag for future hardening
@@ -782,6 +749,7 @@ Known risks are explicitly listed as issues or documented in decisions:
 - **Session cleanup** (Issue 22, P2): No immediate risk for PoC, but design should be sound for Phase 2
 - **API key storage** (documented): Plain string is acceptable for MVP; SecretStorage is Phase 3 (Managed Identity support)
 - **CLI bundling** (documented): Deferred to Phase 5; users install manually for MVP
+
 
 ### Squad Routing
 - **Windows**: Build pipeline (Issues 1, 14–16), testing (9–10, 13)
@@ -835,6 +803,7 @@ Known risks are explicitly listed as issues or documented in decisions:
 
 ---
 
+
 ### Rerouted to @copilot (8 issues)
 
 | Issue | Title | Old Label | New Label | Evaluation | Reason |
@@ -847,6 +816,7 @@ Known risks are explicitly listed as issues or documented in decisions:
 | #19 | Write Copilot CLI installation guide for air-gapped environments | squad:childs | squad:copilot | 🟢 Good fit | Documentation, clear requirements |
 | #20 | Write Azure AI Foundry configuration reference | squad:childs | squad:copilot | 🟢 Good fit | Documentation, clear requirements |
 | #22 | Add ESLint configuration | squad:blair | squad:copilot | 🟢 Good fit | Lint/format config, boilerplate |
+
 
 ### Confirmed Current Assignments (15 issues)
 
@@ -870,6 +840,7 @@ Known risks are explicitly listed as issues or documented in decisions:
 
 ---
 
+
 ### @copilot Routing Criteria
 
 Issues routed to @copilot meet these criteria:
@@ -880,6 +851,7 @@ Issues routed to @copilot meet these criteria:
 
 **🟢 Good fit** = High confidence @copilot will deliver without review  
 **🟡 Needs review** = Medium confidence; PR review recommended (e.g., #6 validates existing code)
+
 
 ### Squad Member Routing Criteria
 
@@ -898,6 +870,7 @@ Issues kept with squad members require:
 3. **@copilot context limits** — large issues (e.g., #18 README) may require multiple turns. Monitor for incomplete work.
 
 ---
+
 
 ### Job 1: Dependency Links
 
@@ -928,6 +901,7 @@ All 22 issues with upstream dependencies now have a `**Dependencies:**` section 
 | #23 | #5, #24 |
 | #24 | #5 |
 
+
 ### Job 2: Sprint Assignments
 
 All 28 issues have Sprint field values set on Project #8.
@@ -953,6 +927,7 @@ All 28 issues have Sprint field values set on Project #8.
 
 ---
 
+
 ### 2026-02-27T05:20:00Z: User directive — Branching strategy and main branch protection
 **By:** Rob Pitcher (via Copilot)
 **What:**
@@ -969,6 +944,7 @@ All 28 issues have Sprint field values set on Project #8.
 4. **`.squad/` folder must NOT reach `main`.** It is stripped on the release branch before the PR.
 
 **Why:** User request — captured for team memory. Ensures clean main branch, proper review gates, and keeps squad state out of production.
+
 
 ### 2026-02-27: Release Branch Process Decision
 **By:** Childs (SDK Dev)
@@ -1020,6 +996,7 @@ This is complementary to automated tests: automation prevents mistakes, manual t
 
 ## What Was Built
 
+
 ### docs/installation-guide.md (Issue #19)
 
 **Purpose:** Enable platform/DevOps engineers to download, transfer, and install the Copilot CLI in air-gapped environments.
@@ -1049,6 +1026,7 @@ This is complementary to automated tests: automation prevents mistakes, manual t
 - ✅ Download URL and version requirements documented (v0.0.418+)
 - ✅ Transfer and installation procedure clear (USB, secure systems, approved media)
 - ✅ Verification step included (copilot --version, copilot server, E2E test)
+
 
 ### docs/configuration-reference.md (Issue #20)
 
@@ -1099,11 +1077,13 @@ This is complementary to automated tests: automation prevents mistakes, manual t
 
 ## Design Decisions
 
+
 ### 1. Audience Split
 
 - **Installation guide**: Targets platform/DevOps engineers responsible for CLI distribution in air-gapped networks
 - **Configuration guide**: Targets both engineers (for Azure setup) and developers (for VS Code settings)
 - This split avoids overwhelming either audience with irrelevant details
+
 
 ### 2. Content Sourcing
 
@@ -1115,6 +1095,7 @@ All configuration information is sourced directly from:
 
 This ensures documentation stays in sync with actual code.
 
+
 ### 3. Cross-References
 
 Both docs link to each other:
@@ -1122,6 +1103,7 @@ Both docs link to each other:
 - Configuration guide header links back to installation guide for the CLI
 
 This guides users through the complete setup workflow in order.
+
 
 ### 4. Security Posture
 
@@ -1131,6 +1113,7 @@ Configuration guide includes explicit security notes:
 - "Never commit your API key to version control"
 
 This manages expectations and defers implementation of VS Code SecretStorage to Phase 3 (per PRD).
+
 
 ### 5. Verification Depth
 
@@ -1143,14 +1126,18 @@ This catches problems at three levels: CLI availability, SDK communication, and 
 
 ---
 
+
 ### Why graceful error handling?
 The SDK's `session.abort()` throws if the session has already ended or is in an invalid state. Since cleanup may be triggered from error paths, cancellation, or deactivation, we can't assume session state. Catching and logging prevents cleanup failures from cascading.
+
 
 ### Why concurrent abort in destroyAllSessions()?
 Extension deactivation should be fast — blocking on sequential session cleanup would delay shutdown. `Promise.all()` parallelizes aborts while still ensuring all complete before clearing the Map.
 
+
 ### Why keep removeSession() separate?
 `removeSession()` is a lightweight Map deletion without abort. It's still useful for test teardown or scenarios where the session was already disposed by other means. `destroySession()` is the new default for production cleanup.
+
 
 ### Why the undefined session guard?
 Test discovered edge case: if a session is removed from the Map (via `removeSession()`) while another operation is iterating the Map, the iterator may encounter undefined values. While unlikely in production, the guard makes cleanup robust against race conditions.
@@ -1164,12 +1151,14 @@ Test discovered edge case: if a session is removed from the Map (via `removeSess
 
 ---
 
+
 ### 2026-02-27T15:06:00Z: User directive — Standalone chat UI required
 **By:** Rob Pitcher (via Copilot)
 **What:** Enclave must be a standalone VS Code extension with its own chat UI. Users must NOT be required to sign into GitHub Copilot or have Copilot installed. The Chat Participant API (`vscode.chat.createChatParticipant`) cannot be used because it depends on the Copilot Chat extension. The extension needs a self-contained UI (e.g., Webview panel) that works in air-gapped environments with zero GitHub dependencies.
 **Why:** User request — the entire purpose of Enclave is air-gapped environments. Requiring GitHub Copilot defeats the purpose. This is a critical architectural change.
 
 ---
+
 
 ### 2026-02-27: Architecture Decision — Standalone Chat UI (No GitHub Auth Dependency)
 **By:** MacReady (Lead)
@@ -1187,6 +1176,7 @@ The current extension uses `vscode.chat.createChatParticipant()` which **require
 
 Replace the Chat Participant API with **`vscode.window.registerWebviewViewProvider`** to create a custom sidebar chat panel.
 
+
 ### Why WebviewView Sidebar
 
 1. **✅ Works in air-gapped (no GitHub auth required)**: Completely self-contained; no external dependencies
@@ -1196,6 +1186,7 @@ Replace the Chat Participant API with **`vscode.window.registerWebviewViewProvid
 5. **✅ Bidirectional communication**: `postMessage` API for extension ↔ webview messaging
 
 ## Architecture Options Comparison
+
 
 ### Option 1: WebviewView (Sidebar) — **RECOMMENDED**
 
@@ -1268,13 +1259,16 @@ context.subscriptions.push(
 
 **Complexity:** Moderate — 2-3 days for a skilled developer
 
+
 ### Option 2: Webview Panel (Editor Tab)
 
 **Description:** Open a full webview panel as an editor tab using `vscode.window.createWebviewPanel`.
 
+
 ### Option 3: Native VS Code TreeView + QuickInput
 
 **Description:** Use TreeView for message history, QuickInput for prompt input.
+
 
 ### Option 4: Terminal-based UI
 
@@ -1297,6 +1291,7 @@ The architecture change only affects the **UI layer**. All backend logic remains
 
 ## Implementation Plan
 
+
 ### Phase 1: Minimal Viable Sidebar (P0)
 1. Remove `chatParticipants` contribution from `package.json`
 2. Add `viewsContainers` and `views` for sidebar
@@ -1308,6 +1303,7 @@ The architecture change only affects the **UI layer**. All backend logic remains
 
 **Estimate:** 2-3 days
 
+
 ### Phase 2: UX Polish (P1)
 1. Add markdown rendering in webview (use `marked.js` or similar)
 2. Add syntax highlighting for code blocks (use `highlight.js`)
@@ -1316,6 +1312,7 @@ The architecture change only affects the **UI layer**. All backend logic remains
 5. Add loading indicators, error states
 
 **Estimate:** 1-2 days
+
 
 ### Phase 3: Feature Parity (P2)
 1. Add conversation management (clear, export)
@@ -1327,20 +1324,24 @@ The architecture change only affects the **UI layer**. All backend logic remains
 
 ## Risks & Mitigations
 
+
 ### Risk 1: Webview resource usage
 - **Impact:** Webviews use more memory than native UI
 - **Mitigation:** For MVP, single sidebar panel is acceptable. Monitor performance in testing.
 - **Severity:** Low — not a blocker for PoC
+
 
 ### Risk 2: Custom UI maintenance
 - **Impact:** We own all HTML/CSS/JS for chat interface
 - **Mitigation:** Use well-known libraries (marked.js, highlight.js). Keep UI minimal for MVP.
 - **Severity:** Low — acceptable tradeoff for air-gapped requirement
 
+
 ### Risk 3: Webview UI Toolkit deprecation (Jan 2025)
 - **Impact:** Official toolkit for VS Code-themed webviews is being deprecated
 - **Mitigation:** Use custom CSS with VS Code CSS variables, or plain styling. Toolkit still works for now.
 - **Severity:** Low — we can style manually or use community alternatives
+
 
 ### Risk 4: Learning curve for webview development
 - **Impact:** Team may not be familiar with webview API
@@ -1463,6 +1464,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
 ## Issue #25 — Enable Copilot CLI Built-in Tools (Rescoped)
 
+
 ### Proposed New Issue Body
 
 ---
@@ -1477,10 +1479,12 @@ Currently, `src/copilotService.ts` line 79 passes `availableTools: []` to `copil
 
 ## Architecture
 
+
 ### Current flow (no tools)
 ```
 User prompt → session.send({ prompt }) → LLM responds with text → streamDelta events
 ```
+
 
 ### New flow (with tools)
 ```
@@ -1490,10 +1494,12 @@ User prompt → session.send({ prompt }) → LLM requests tool call →
   Confirm/reject back to SDK → SDK executes tool → LLM continues
 ```
 
+
 ### 1. Enable tools in `copilotService.ts`
 
 - **Remove `availableTools: []`** from the `createSession()` call (line 79). When omitted, the SDK exposes its default built-in tools.
 - Alternatively, pass a curated list if we want to limit which tools are available (e.g., allow file read but not file write initially).
+
 
 ### 2. Handle tool-call events in `extension.ts`
 
@@ -1502,6 +1508,7 @@ User prompt → session.send({ prompt }) → LLM requests tool call →
   - Check the `forge.copilot.autoApproveTools` setting.
   - If auto-approve is **enabled**: confirm immediately, no user interaction.
   - If auto-approve is **disabled** (default): send a `toolConfirmation` message to the webview.
+
 
 ### 3. Tool confirmation UX in webview (`media/chat.js`)
 
@@ -1519,6 +1526,7 @@ User prompt → session.send({ prompt }) → LLM requests tool call →
 - Extension receives the response in `_handleMessage()` and calls the SDK's confirmation/rejection API on the session.
 - If rejected, the LLM receives the rejection and can adjust its approach.
 
+
 ### 4. Auto-approve setting in `package.json`
 
 Add to `contributes.configuration.properties`:
@@ -1530,6 +1538,7 @@ Add to `contributes.configuration.properties`:
   "tags": ["security"]
 }
 ```
+
 
 ### 5. Tool output rendering
 
@@ -1573,6 +1582,7 @@ Add to `contributes.configuration.properties`:
 
 ---
 
+
 ### 2026-03-01: Model Selector UI Pattern
 
 **By:** Blair (Extension Dev)  
@@ -1590,6 +1600,7 @@ Model switching requires a confirmation dialog and full session reset. The `forg
 - Separating `models` (available list) from `model` (active selection) allows the list to be configured once while the active model changes per-conversation
 
 ---
+
 
 ### Model Config Simplification — Single `models[]` Setting
 
@@ -1617,6 +1628,7 @@ Consolidated two model settings (`forge.copilot.model` + `forge.copilot.models`)
 
 ---
 
+
 ### 2026-03-01T23:36Z: User directive
 
 **By:** Rob Pitcher (via Copilot)  
@@ -1624,6 +1636,7 @@ Consolidated two model settings (`forge.copilot.model` + `forge.copilot.models`)
 **Why:** User request — captured for team memory
 
 ---
+
 
 ### 2026-03-10: Update Endpoint Examples to `.services.ai.azure.com` Format
 
@@ -1662,6 +1675,7 @@ Added clarifying note in configuration-reference.md explaining both `.services.a
 The decision will be merged into `.squad/decisions.md` by the Scribe during standard decision processing. No action required.
 
 ---
+
 
 ### 2026-03-05T17:47:08Z: Slidev Isolation Directive
 
@@ -1735,8 +1749,10 @@ Rewrote `CONTRIBUTING.md` as a comprehensive 10-section guide:
 
 ## Key Structural Choices
 
+
 ### Dev Containers as Recommended Path
 Positioned `.devcontainer/devcontainer.json` as the **recommended** onboarding path (Codespaces or VS Code Dev Containers), with manual Node 22 + npm setup as a fallback. This reduces friction for new contributors while respecting developers who prefer local setup.
+
 
 ### Full Quality Check Command
 Made the **pre-commit check explicit:**
@@ -1745,101 +1761,15 @@ npm run build && npx tsc --noEmit && npm test
 ```
 This combines build, type checking, and tests into one memorable command. It now appears in three places: Development Workflow table, Making Changes workflow, and as a bolded reminder in Pull Request Guidelines.
 
+
 ### Unchanged npm Commands
 All existing npm commands remain **exactly as they are** in the original CONTRIBUTING.md. No renaming, no new commands. Simplifies transition for existing contributors.
+
 
 ### Squad Branch Naming Included
 Documented squad branch convention `squad/{issue}-{slug}` alongside descriptive feature names. This acknowledges the squad workflow without excluding contributors not using squad labels.
 
+
 ### Architecture Pointer, Not Duplication
 The Architecture Overview section **orients contributors to key files** without duplicating the full system design (which lives in README.md and docs/). This reduces maintenance burden — if architecture changes, contributors read the source of truth, not outdated CONTRIBUTING.md.
 
-### Concise, Scannable Tone
-- Used tables for build commands, checklists for PR submissions
-- Short paragraphs, bullet points, code blocks
-- Developer-focused language (no marketing; no overly long motivational text)
-- Assumes readers understand Git and TypeScript basics
-
-## Rationale
-
-A comprehensive contributing guide **accelerates onboarding** and **reduces support burden**. New contributors can answer their own questions:
-- "How do I set up?" → Getting Started
-- "What branch do I use?" → Branch Strategy
-- "How do I test my change?" → Full Quality Check
-- "What code style?" → Code Style
-
-This guide also **documents implicit team decisions** (e.g., "dev is the default branch, main is for releases") that were previously communicated only in PRs or ad-hoc.
-
-## Impact
-
-- **First-time contributors** have a clear path: fork → branch from dev → full check → PR targeting dev
-- **Code quality** improved: explicit "full check" command reduces accidental breakage
-- **Review efficiency:** contributors come prepared with passing tests and lints
-- **Consistency:** squad members and external contributors now follow the same workflow
-
----
-
-
-
-# Decision: docs/README.md as Documentation Hub
-
-**Author:** Fuchs (Technical Writer)
-**Date:** 2026
-
-## Decision
-
-Created `docs/README.md` as the central documentation landing page — a self-contained quick-reference that cross-links to specialized docs rather than duplicating them.
-
-## Structure
-
-Six sections in fixed order:
-1. Problem → Solution (2-3 paragraphs)
-2. Prerequisites (table format)
-3. Setup (settings table + example JSON)
-4. Deployment (Marketplace + sideload only — no Azure infra)
-5. Architecture Diagram (basic mermaid diagram, links to enterprise-architecture.md)
-6. Responsible AI (security defaults, data sovereignty, content filtering)
-
-## Key Choices
-
-- **Responsible AI section** is original content, not pulled from existing docs. Covers: Entra ID default auth, disabled MCP servers, explicit tool approval, auto-approval off by default, Azure AI Content Safety link, tenant-scoped inference.
-- **Deployment** covers extension install only. Azure infrastructure belongs in enterprise-architecture.md.
-- **Cross-links** to configuration-reference.md, features-and-usage.md, and enterprise-architecture.md — no content duplication.
-
-## Impact
-
-- Other docs remain unchanged — this is additive only.
-- Future docs should be linked from docs/README.md to keep it current as the entry point.
-
-
-# Decision: Hero image styling on title slide
-
-**Author:** Blair (Extension Dev / UI)
-**Date:** 2025-07-11
-**Scope:** `presentation/slidev/slides.md` — first slide only
-
-## Context
-
-The repo header image on slide 1 had minimal CSS treatment (simple border + box-shadow). It looked flat against the dark background.
-
-## Decision
-
-Replaced the plain image styling with a **gradient-border wrapper** pattern:
-
-- **Wrapper div** (`.hero-image-wrapper`) provides a blue→violet diagonal gradient border (1.5 px) via `padding` + `background: linear-gradient(...)`.
-- **Multi-layer ambient glow** — four box-shadow layers (blue highlight + indigo diffuse + deep blue ambient + dark drop shadow) give it depth without being heavy.
-- **`glow-breathe` animation** — 5-second ease-in-out infinite keyframe that subtly pulses the glow intensity. Imperceptible in a screenshot, adds life during presentation.
-- **Hover interaction** — gentle 1.2% scale-up, intensified glow, and slight brightness boost on the image itself.
-- The image has `border: none` and `display: block` to sit cleanly inside the wrapper ring with matching `border-radius`.
-
-## Why
-
-- Gradient border ring is a standard premium-UI treatment (Apple, Vercel, Linear all use it).
-- Animation is deliberately slow and subtle so it doesn't distract from the speaker.
-- Colors (blue `#3B82F6`, violet `#7C3AED`, indigo `#6366F1`) complement the seriph dark theme and Forge's Azure branding.
-
-## Alternatives Considered
-
-- **Outline + outline-offset** — simpler but can't gradient.
-- **`border-image`** — poor `border-radius` support in some renderers.
-- **No animation** — static looks fine but animation is nearly free and adds polish.

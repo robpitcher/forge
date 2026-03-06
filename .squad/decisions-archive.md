@@ -1895,3 +1895,159 @@ Palmer (DevOps Specialist)
 
 ---
 
+
+
+### Integration Points
+
+- `extension.ts` catches `CopilotCliNeedsInstallError` in `_handleChatMessage` error handler
+- `_globalStoragePath` passed through from `ExtensionContext.globalStorageUri.fsPath` to enable managed CLI install location
+- Reuses existing `openSettings()` command for fallback path
+
+## Rationale
+
+Air-gapped environments often have strict policies about software installation. An automatic install could:
+- Violate corporate security policies
+- Trigger network calls (npm registry, GitHub releases) that fail or leak data
+- Surprise users who expect fully manual control
+
+The ask-first pattern respects user agency while still making installation convenient for most users.
+
+## Alternatives Considered
+
+1. **Automatic install on first message** — rejected: violates user consent, could break air-gap policies
+2. **Preflight auto-install during activation** — rejected: blocks extension startup, no user context for approval
+3. **Silent fallback to manual-only** — rejected: poor UX, hides the problem until user investigates settings
+
+## Impact
+
+- **User-facing:** Clear, predictable installation flow with escape hatches (cancel, settings, manual)
+- **Code:** Minimal — single error catch block + dialog method, no retry logic complexity
+- **Testing:** Covered by existing error handling tests; install dialog is standard VS Code API (no custom mocking needed)
+# Decision: CLI UX Improvements — Install Links and Persistent Banners
+
+**Author:** Blair (Extension Dev)
+**Date:** 2025-07-24
+
+## Context
+
+Users hitting Entra ID auth failures because Azure CLI isn't installed had no way to install it from the error UI. Similarly, once the CLI-missing notification balloon was dismissed, there was no persistent way to trigger CLI installation.
+
+## Decisions
+
+1. **`AuthStatus` type extended** with optional `installUrl` field on `notAuthenticated` and `error` states. This is a backwards-compatible union extension.
+
+2. **Generic `openUrl` command** added to the webview→extension message protocol. Validates `https://` prefix before opening. Reusable for future external links.
+
+3. **`installCli` command** added to webview→extension protocol. Calls existing `_handleCliAutoInstall()` flow (ask-first dialog).
+
+4. **CLI banner uses warning style** (amber) instead of error (red) when CLI is not found and config is complete. This is less alarming and more actionable.
+
+5. **Config gating** — CLI missing banner is hidden during initial setup (before endpoint/auth/models are configured) to avoid overwhelming new users.
+
+## Impact
+
+- `AuthStatus` type in `src/auth/authStatusProvider.ts` — consumers should handle the new optional field
+- New webview commands: `openUrl`, `installCli`
+- New CSS class: `.auth-banner.warning`
+
+# Decision: Marketplace Pre-Release Publishing for Insider Builds
+
+**Date:** 2026-03-03  
+**Decider:** Palmer (DevOps Specialist)  
+**Context:** Rob Pitcher requested marketplace publishing for insider builds using publisher `robpitcher` and PAT stored as `ADO_MARKETPLACE_PAT`.
+
+## Decision
+
+Extend `.github/workflows/insider-release.yml` to publish pre-release builds to the VS Code Marketplace after creating the GitHub Release.
+
+
+### Concise, Scannable Tone
+- Used tables for build commands, checklists for PR submissions
+- Short paragraphs, bullet points, code blocks
+- Developer-focused language (no marketing; no overly long motivational text)
+- Assumes readers understand Git and TypeScript basics
+
+## Rationale
+
+A comprehensive contributing guide **accelerates onboarding** and **reduces support burden**. New contributors can answer their own questions:
+- "How do I set up?" → Getting Started
+- "What branch do I use?" → Branch Strategy
+- "How do I test my change?" → Full Quality Check
+- "What code style?" → Code Style
+
+This guide also **documents implicit team decisions** (e.g., "dev is the default branch, main is for releases") that were previously communicated only in PRs or ad-hoc.
+
+## Impact
+
+- **First-time contributors** have a clear path: fork → branch from dev → full check → PR targeting dev
+- **Code quality** improved: explicit "full check" command reduces accidental breakage
+- **Review efficiency:** contributors come prepared with passing tests and lints
+- **Consistency:** squad members and external contributors now follow the same workflow
+
+---
+
+
+
+# Decision: docs/README.md as Documentation Hub
+
+**Author:** Fuchs (Technical Writer)
+**Date:** 2026
+
+## Decision
+
+Created `docs/README.md` as the central documentation landing page — a self-contained quick-reference that cross-links to specialized docs rather than duplicating them.
+
+## Structure
+
+Six sections in fixed order:
+1. Problem → Solution (2-3 paragraphs)
+2. Prerequisites (table format)
+3. Setup (settings table + example JSON)
+4. Deployment (Marketplace + sideload only — no Azure infra)
+5. Architecture Diagram (basic mermaid diagram, links to enterprise-architecture.md)
+6. Responsible AI (security defaults, data sovereignty, content filtering)
+
+## Key Choices
+
+- **Responsible AI section** is original content, not pulled from existing docs. Covers: Entra ID default auth, disabled MCP servers, explicit tool approval, auto-approval off by default, Azure AI Content Safety link, tenant-scoped inference.
+- **Deployment** covers extension install only. Azure infrastructure belongs in enterprise-architecture.md.
+- **Cross-links** to configuration-reference.md, features-and-usage.md, and enterprise-architecture.md — no content duplication.
+
+## Impact
+
+- Other docs remain unchanged — this is additive only.
+- Future docs should be linked from docs/README.md to keep it current as the entry point.
+
+
+# Decision: Hero image styling on title slide
+
+**Author:** Blair (Extension Dev / UI)
+**Date:** 2025-07-11
+**Scope:** `presentation/slidev/slides.md` — first slide only
+
+## Context
+
+The repo header image on slide 1 had minimal CSS treatment (simple border + box-shadow). It looked flat against the dark background.
+
+## Decision
+
+Replaced the plain image styling with a **gradient-border wrapper** pattern:
+
+- **Wrapper div** (`.hero-image-wrapper`) provides a blue→violet diagonal gradient border (1.5 px) via `padding` + `background: linear-gradient(...)`.
+- **Multi-layer ambient glow** — four box-shadow layers (blue highlight + indigo diffuse + deep blue ambient + dark drop shadow) give it depth without being heavy.
+- **`glow-breathe` animation** — 5-second ease-in-out infinite keyframe that subtly pulses the glow intensity. Imperceptible in a screenshot, adds life during presentation.
+- **Hover interaction** — gentle 1.2% scale-up, intensified glow, and slight brightness boost on the image itself.
+- The image has `border: none` and `display: block` to sit cleanly inside the wrapper ring with matching `border-radius`.
+
+## Why
+
+- Gradient border ring is a standard premium-UI treatment (Apple, Vercel, Linear all use it).
+- Animation is deliberately slow and subtle so it doesn't distract from the speaker.
+- Colors (blue `#3B82F6`, violet `#7C3AED`, indigo `#6366F1`) complement the seriph dark theme and Forge's Azure branding.
+
+## Alternatives Considered
+
+- **Outline + outline-offset** — simpler but can't gradient.
+- **`border-image`** — poor `border-radius` support in some renderers.
+- **No animation** — static looks fine but animation is nearly free and adds polish.
+
