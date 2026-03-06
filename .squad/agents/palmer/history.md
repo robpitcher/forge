@@ -95,3 +95,20 @@
   3. Changed publish step to `vsce publish --packagePath forge-$VERSION.vsix` — publishes the exact `.vsix` that was tested and attached to GitHub Release
 - **Key principle:** Build once, publish everywhere. The same `.vsix` flows through: build → test → GitHub Release → Marketplace.
 - **Commit:** 6fe3e19 on copilot/update-release-workflow-for-vscode-marketplace
+
+### Slidev GitHub Pages Deployment Workflow (2026-03-06)
+- **Goal:** Deploy the Slidev presentation deck from `slides/` to GitHub Pages automatically.
+- **Workflow:** `.github/workflows/slides.yml` — triggers on push to `dev` when `slides/**` changes, plus `workflow_dispatch`.
+- **Pattern:** Two-job pipeline: `build` (checkout → setup-node → npm ci → slidev build --base /forge/) → `deploy` (actions/deploy-pages).
+- **Base path:** `--base /forge/` is required because the site deploys to `https://robpitcher.github.io/forge/`, not the root.
+- **Node version:** 20 (per task requirements — separate from the extension CI which uses Node 22).
+- **Cache:** Uses `cache-dependency-path: slides/package-lock.json` since the slides project has its own `package.json` independent of the root.
+- **Permissions:** `pages: write` + `id-token: write` for GitHub Pages deployment token.
+- **Concurrency:** `group: pages` with `cancel-in-progress: true` to avoid overlapping deployments.
+- **Key files:** `.github/workflows/slides.yml`, `slides/` (Slidev project, independent of VS Code extension).
+
+## 2026-03-06T00-05-00Z: GitHub Pages Workflow for Slidev Deployment
+
+📌 Team update (2026-03-06): GitHub Pages deployment workflow created in `.github/workflows/slides.yml` with two-job pipeline (build in `slides/` with Node 20, deploy with GitHub Pages actions). Triggers on `dev` push with `slides/**` path filter. Isolated from extension CI. — Palmer (DevOps Specialist)
+
+**Outcome:** Slidev deck can be deployed to GitHub Pages at https://robpitcher.github.io/forge/. Decision merged to team decisions.md.
