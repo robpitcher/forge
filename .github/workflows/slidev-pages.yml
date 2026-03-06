@@ -27,23 +27,21 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Enable corepack (pnpm)
-        run: corepack enable
+      - name: Setup @antfu/ni
+        run: npm i -g @antfu/ni
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: presentation/slidev
+        run: nci
 
       - name: Build
-        run: pnpm run build -- --base /${{github.event.repository.name}}/
-        working-directory: presentation/slidev
+        run: nr build --base /${{github.event.repository.name}}/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: presentation/slidev/dist
+          path: dist
 
   deploy:
     environment:
