@@ -19,6 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: presentation/slidev
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +44,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: presentation/slidev/dist
 
   deploy:
     environment:
