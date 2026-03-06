@@ -71,17 +71,17 @@ fonts:
   border-radius: 1.125rem;
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.55),
-    rgba(124, 58, 237, 0.3),
-    rgba(59, 130, 246, 0.12),
-    rgba(124, 58, 237, 0.3),
-    rgba(59, 130, 246, 0.55)
+    rgba(234, 88, 12, 0.55),
+    rgba(220, 38, 38, 0.3),
+    rgba(251, 146, 60, 0.12),
+    rgba(220, 38, 38, 0.3),
+    rgba(234, 88, 12, 0.55)
   );
   box-shadow:
-    0 0 30px rgba(59, 130, 246, 0.14),
-    0 0 60px rgba(99, 102, 241, 0.07),
-    0 0 100px rgba(59, 130, 246, 0.03),
-    0 20px 44px rgba(0, 0, 0, 0.32);
+    0 0 24px rgba(234, 88, 12, 0.45),
+    0 0 48px rgba(220, 38, 38, 0.25),
+    0 0 80px rgba(251, 146, 60, 0.15),
+    0 16px 32px rgba(0, 0, 0, 0.18);
   animation: glow-breathe 5s ease-in-out infinite;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -90,10 +90,10 @@ fonts:
 .hero-image-wrapper:hover {
   transform: scale(1.012);
   box-shadow:
-    0 0 40px rgba(59, 130, 246, 0.22),
-    0 0 80px rgba(99, 102, 241, 0.11),
-    0 0 120px rgba(59, 130, 246, 0.05),
-    0 24px 48px rgba(0, 0, 0, 0.38);
+    0 0 32px rgba(234, 88, 12, 0.55),
+    0 0 64px rgba(220, 38, 38, 0.35),
+    0 0 100px rgba(251, 146, 60, 0.2),
+    0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 /* The image itself — sits inside the gradient ring */
@@ -113,17 +113,17 @@ fonts:
 @keyframes glow-breathe {
   0%, 100% {
     box-shadow:
-      0 0 30px rgba(59, 130, 246, 0.14),
-      0 0 60px rgba(99, 102, 241, 0.07),
-      0 0 100px rgba(59, 130, 246, 0.03),
-      0 20px 44px rgba(0, 0, 0, 0.32);
+      0 0 24px rgba(234, 88, 12, 0.45),
+      0 0 48px rgba(220, 38, 38, 0.25),
+      0 0 80px rgba(251, 146, 60, 0.15),
+      0 16px 32px rgba(0, 0, 0, 0.18);
   }
   50% {
     box-shadow:
-      0 0 36px rgba(59, 130, 246, 0.19),
-      0 0 72px rgba(99, 102, 241, 0.09),
-      0 0 110px rgba(59, 130, 246, 0.05),
-      0 20px 44px rgba(0, 0, 0, 0.32);
+      0 0 32px rgba(234, 88, 12, 0.55),
+      0 0 64px rgba(220, 38, 38, 0.3),
+      0 0 96px rgba(251, 146, 60, 0.2),
+      0 16px 32px rgba(0, 0, 0, 0.18);
   }
 }
 </style>
