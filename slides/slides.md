@@ -6,6 +6,11 @@ info: |
   No GitHub auth. No public endpoints. Full tenant control.
 transition: slide-left
 mdc: true
+fonts:
+  sans: 'ui-sans-serif, system-ui, sans-serif'
+  serif: 'ui-serif, Georgia, serif'
+  mono: 'ui-monospace, monospace'
+  provider: none
 ---
 
 <div class="flex flex-col items-center justify-center h-full">
@@ -24,14 +29,10 @@ layout: center
 
 # The Problem
 
-<v-clicks>
-
 - Enterprises need **AI-powered developer chat** inside VS Code
 - Public AI endpoints violate **compliance, data sovereignty, and security** requirements
 - Air-gapped and sovereign cloud networks **cannot reach external services**
 - Teams need **full control** over which models are deployed and where inference runs
-
-</v-clicks>
 
 ---
 
@@ -39,15 +40,11 @@ layout: center
 
 A VS Code extension that routes AI chat through **your** Azure AI Foundry endpoint.
 
-<v-clicks>
-
 - 🔒 **No GitHub auth required** — uses your Entra ID or API key
 - 🏢 **Full tenant control** — all inference stays within your Azure subscription
 - 🔌 **BYOK mode** — Bring Your Own Key via the GitHub Copilot SDK
 - 🌐 **Air-gap ready** — works in disconnected, sovereign, and private networks
 - 💬 **Rich chat experience** — multi-turn, streaming, code context, tool approval
-
-</v-clicks>
 
 ---
 
@@ -66,20 +63,15 @@ graph LR
     style D fill:#0078d4,stroke:#005a9e,color:#fff
 ```
 
-<v-clicks>
-
 - **Forge Extension** manages chat UI, context attachments, and session lifecycle
 - **Copilot CLI** handles model inference via the SDK's BYOK provider
 - **Azure AI Foundry** runs your deployed models in your tenant — GPT-4.1, GPT-4o, o3, and more
-
-</v-clicks>
 
 ---
 
 # Key Features
 
 <div class="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
-<v-clicks>
 
 - 🔑 **Dual auth** — Entra ID or API key
 - 🤖 **Multi-model support** — switch between deployments
@@ -90,7 +82,6 @@ graph LR
 - ⏹️ **Stop generation** — cancel in-flight requests
 - 🔄 **Multi-turn chat** — session reuse across conversations
 
-</v-clicks>
 </div>
 
 ---
@@ -98,8 +89,6 @@ graph LR
 # Getting Started
 
 Four steps to your first chat:
-
-<v-clicks>
 
 **1. Install the extension**
 > Search "Forge" in the VS Code Extensions panel, or sideload the `.vsix`
@@ -118,8 +107,6 @@ Four steps to your first chat:
 **4. Start chatting**
 > Open the Forge panel and ask a question — streaming responses begin immediately
 
-</v-clicks>
-
 ---
 
 # Enterprise Architecture
@@ -129,27 +116,19 @@ Four steps to your first chat:
 
 **Private networking**
 
-<v-clicks>
-
 - Azure Private Endpoints
 - ExpressRoute / VPN tunnels
 - No public internet required
-
-</v-clicks>
 
 </div>
 <div>
 
 **Governance & observability**
 
-<v-clicks>
-
 - Azure API Management gateway
 - Token usage & audit logging
 - Entra ID conditional access policies
 - Model deployment controls
-
-</v-clicks>
 
 </div>
 </div>
@@ -172,26 +151,18 @@ graph LR
 
 ### Runtime
 
-<v-clicks>
-
 - **GitHub Copilot SDK** — `@github/copilot-sdk` v0.1.26
 - **VS Code Extension API** — WebviewViewProvider
 - **TypeScript** — strict mode, full type safety
-
-</v-clicks>
 
 </div>
 <div>
 
 ### Toolchain
 
-<v-clicks>
-
 - **esbuild** — fast bundling for extension host
 - **vitest** — unit testing with VS Code mocks
 - **ESLint** — code quality enforcement
-
-</v-clicks>
 
 </div>
 </div>
