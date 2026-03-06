@@ -1,637 +1,258 @@
 ---
-# try also 'default' to start simple
 theme: seriph
-# random image from a curated Unsplash collection by Anthony
-# like them? see https://unsplash.com/collections/94734566/slidev
-background: https://cover.sli.dev
-# some information about your slides (markdown enabled)
-title: Welcome to Slidev
+title: "Forge — AI Chat for Air-Gapped Environments"
 info: |
-  ## Slidev Starter Template
-  Presentation slides for developers.
-
-  Learn more at [Sli.dev](https://sli.dev)
-# apply UnoCSS classes to the current slide
-class: text-center
-# https://sli.dev/features/drawing
-drawings:
-  persist: false
-# slide transition: https://sli.dev/guide/animations.html#slide-transitions
+  A VS Code extension that routes AI chat through your Azure AI Foundry endpoint.
+  No GitHub auth. No public endpoints. Full tenant control.
 transition: slide-left
-# enable Comark Syntax: https://comark.dev/syntax/markdown
-comark: true
-# duration of the presentation
-duration: 35min
+mdc: true
+fonts:
+  sans: 'ui-sans-serif, system-ui, sans-serif'
+  serif: 'ui-serif, Georgia, serif'
+  mono: 'ui-monospace, monospace'
+  provider: none
 ---
-
-# Welcome to Slidev
-
-Presentation slides for developers
-
-<div @click="$slidev.nav.next" class="mt-12 py-1" hover:bg="white op-10">
-  Press Space for next page <carbon:arrow-right />
-</div>
-
-<div class="abs-br m-6 text-xl">
-  <button @click="$slidev.nav.openInEditor()" title="Open in Editor" class="slidev-icon-btn">
-    <carbon:edit />
-  </button>
-  <a href="https://github.com/slidevjs/slidev" target="_blank" class="slidev-icon-btn">
-    <carbon:logo-github />
-  </a>
-</div>
-
-<!--
-The last comment block of each slide will be treated as slide notes. It will be visible and editable in Presenter Mode along with the slide. [Read more in the docs](https://sli.dev/guide/syntax.html#notes)
--->
-
----
-transition: fade-out
----
-
-# What is Slidev?
-
-Slidev is a slides maker and presenter designed for developers, consist of the following features
-
-- 📝 **Text-based** - focus on the content with Markdown, and then style them later
-- 🎨 **Themable** - themes can be shared and re-used as npm packages
-- 🧑‍💻 **Developer Friendly** - code highlighting, live coding with autocompletion
-- 🤹 **Interactive** - embed Vue components to enhance your expressions
-- 🎥 **Recording** - built-in recording and camera view
-- 📤 **Portable** - export to PDF, PPTX, PNGs, or even a hostable SPA
-- 🛠 **Hackable** - virtually anything that's possible on a webpage is possible in Slidev
-<br>
-<br>
-
-Read more about [Why Slidev?](https://sli.dev/guide/why)
-
-<!--
-You can have `style` tag in markdown to override the style for the current page.
-Learn more: https://sli.dev/features/slide-scope-style
--->
 
 <style>
-h1 {
-  background-color: #2B90B6;
-  background-image: linear-gradient(45deg, #4EC5D4 10%, #146b8c 20%);
-  background-size: 100%;
-  -webkit-background-clip: text;
-  -moz-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  -moz-text-fill-color: transparent;
+#slide-container > .absolute.bottom-0.left-0 {
+  top: auto !important;
+  left: auto !important;
+  right: 1rem !important;
+  bottom: 1rem !important;
+  opacity: 1 !important;
+  padding: 0 !important;
+  z-index: 30;
+}
+
+#slide-container > .absolute.bottom-0.left-0 nav > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.35);
+}
+
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn {
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.12);
+  color: #f8fafc;
+  opacity: 1;
+}
+
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn:hover,
+#slide-container > .absolute.bottom-0.left-0 .slidev-icon-btn:focus-visible {
+  background: rgba(248, 250, 252, 0.2);
+}
+
+#slide-container > .absolute.bottom-0.left-0 .h-40px {
+  color: #f8fafc;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+  margin-left: 0.25rem;
+  padding-left: 0.5rem;
+}
+
+#slide-container > .absolute.bottom-0.left-0 .h-40px .opacity-50 {
+  opacity: 0.8;
 }
 </style>
 
-<!--
-Here is another comment.
--->
-
----
-transition: slide-up
-level: 2
----
-
-# Navigation
-
-Hover on the bottom-left corner to see the navigation's controls panel, [learn more](https://sli.dev/guide/ui#navigation-bar)
-
-## Keyboard Shortcuts
-
-|                                                     |                             |
-| --------------------------------------------------- | --------------------------- |
-| <kbd>right</kbd> / <kbd>space</kbd>                 | next animation or slide     |
-| <kbd>left</kbd>  / <kbd>shift</kbd><kbd>space</kbd> | previous animation or slide |
-| <kbd>up</kbd>                                       | previous slide              |
-| <kbd>down</kbd>                                     | next slide                  |
-
-<!-- https://sli.dev/guide/animations.html#click-animation -->
-<img
-  v-click
-  class="absolute -bottom-9 -left-7 w-80 opacity-50"
-  src="https://sli.dev/assets/arrow-bottom-left.svg"
-  alt=""
-/>
-<p v-after class="absolute bottom-23 left-45 opacity-30 transform -rotate-10">Here!</p>
-
----
-layout: two-cols
-layoutClass: gap-16
----
-
-# Table of contents
-
-You can use the `Toc` component to generate a table of contents for your slides:
-
-```html
-<Toc minDepth="1" maxDepth="1" />
-```
-
-The title will be inferred from your slide content, or you can override it with `title` and `level` in your frontmatter.
-
-::right::
-
-<Toc text-sm minDepth="1" maxDepth="2" />
-
----
-layout: image-right
-image: https://cover.sli.dev
----
-
-# Code
-
-Use code snippets and get the highlighting directly, and even types hover!
-
-```ts [filename-example.ts] {all|4|6|6-7|9|all} twoslash
-// TwoSlash enables TypeScript hover information
-// and errors in markdown code blocks
-// More at https://shiki.style/packages/twoslash
-import { computed, ref } from 'vue'
-
-const count = ref(0)
-const doubled = computed(() => count.value * 2)
-
-doubled.value = 2
-```
-
-<arrow v-click="[4, 5]" x1="350" y1="310" x2="195" y2="342" color="#953" width="2" arrowSize="1" />
-
-<!-- This allow you to embed external code blocks -->
-<<< @/snippets/external.ts#snippet
-
-<!-- Footer -->
-
-[Learn more](https://sli.dev/features/line-highlighting)
-
-<!-- Inline style -->
-<style>
-.footnotes-sep {
-  @apply mt-5 opacity-10;
-}
-.footnotes {
-  @apply text-sm opacity-75;
-}
-.footnote-backref {
-  display: none;
-}
-</style>
-
-<!--
-Notes can also sync with clicks
-
-[click] This will be highlighted after the first click
-
-[click] Highlighted with `count = ref(0)`
-
-[click:3] Last click (skip two clicks)
--->
-
----
-level: 2
----
-
-# Shiki Magic Move
-
-Powered by [shiki-magic-move](https://shiki-magic-move.netlify.app/), Slidev supports animations across multiple code snippets.
-
-Add multiple code blocks and wrap them with <code>````md magic-move</code> (four backticks) to enable the magic move. For example:
-
-````md magic-move {lines: true}
-```ts {*|2|*}
-// step 1
-const author = reactive({
-  name: 'John Doe',
-  books: [
-    'Vue 2 - Advanced Guide',
-    'Vue 3 - Basic Guide',
-    'Vue 4 - The Mystery'
-  ]
-})
-```
-
-```ts {*|1-2|3-4|3-4,8}
-// step 2
-export default {
-  data() {
-    return {
-      author: {
-        name: 'John Doe',
-        books: [
-          'Vue 2 - Advanced Guide',
-          'Vue 3 - Basic Guide',
-          'Vue 4 - The Mystery'
-        ]
-      }
-    }
-  }
-}
-```
-
-```ts
-// step 3
-export default {
-  data: () => ({
-    author: {
-      name: 'John Doe',
-      books: [
-        'Vue 2 - Advanced Guide',
-        'Vue 3 - Basic Guide',
-        'Vue 4 - The Mystery'
-      ]
-    }
-  })
-}
-```
-
-Non-code blocks are ignored.
-
-```vue
-<!-- step 4 -->
-<script setup>
-const author = {
-  name: 'John Doe',
-  books: [
-    'Vue 2 - Advanced Guide',
-    'Vue 3 - Basic Guide',
-    'Vue 4 - The Mystery'
-  ]
-}
-</script>
-```
-````
-
----
-
-# Components
-
-<div grid="~ cols-2 gap-4">
-<div>
-
-You can use Vue components directly inside your slides.
-
-We have provided a few built-in components like `<Tweet/>` and `<Youtube/>` that you can use directly. And adding your custom components is also super easy.
-
-```html
-<Counter :count="10" />
-```
-
-<!-- ./components/Counter.vue -->
-<Counter :count="10" m="t-4" />
-
-Check out [the guides](https://sli.dev/builtin/components.html) for more.
-
-</div>
-<div>
-
-```html
-<Tweet id="1390115482657726468" />
-```
-
-<Tweet id="1390115482657726468" scale="0.65" />
-
-</div>
-</div>
-
-<!--
-Presenter note with **bold**, *italic*, and ~~striked~~ text.
-
-Also, HTML elements are valid:
-<div class="flex w-full">
-  <span style="flex-grow: 1;">Left content</span>
-  <span>Right content</span>
-</div>
--->
-
----
-class: px-20
----
-
-# Themes
-
-Slidev comes with powerful theming support. Themes can provide styles, layouts, components, or even configurations for tools. Switching between themes by just **one edit** in your frontmatter:
-
-<div grid="~ cols-2 gap-2" m="t-2">
-
-```yaml
----
-theme: default
----
-```
-
-```yaml
----
-theme: seriph
----
-```
-
-<img border="rounded" src="https://github.com/slidevjs/themes/blob/main/screenshots/theme-default/01.png?raw=true" alt="">
-
-<img border="rounded" src="https://github.com/slidevjs/themes/blob/main/screenshots/theme-seriph/01.png?raw=true" alt="">
-
-</div>
-
-Read more about [How to use a theme](https://sli.dev/guide/theme-addon#use-theme) and
-check out the [Awesome Themes Gallery](https://sli.dev/resources/theme-gallery).
-
----
-
-# Clicks Animations
-
-You can add `v-click` to elements to add a click animation.
-
-<div v-click>
-
-This shows up when you click the slide:
-
-```html
-<div v-click>This shows up when you click the slide.</div>
-```
-
-</div>
-
-<br>
-
-<v-click>
-
-The <span v-mark.red="3"><code>v-mark</code> directive</span>
-also allows you to add
-<span v-mark.circle.orange="4">inline marks</span>
-, powered by [Rough Notation](https://roughnotation.com/):
-
-```html
-<span v-mark.underline.orange>inline markers</span>
-```
-
-</v-click>
-
-<div mt-20 v-click>
-
-[Learn more](https://sli.dev/guide/animations#click-animation)
-
+<div class="flex flex-col items-center justify-center h-full">
+  <img src="repoheader.png" class="w-160 mb-8" alt="Forge" />
+  <p class="text-xl text-gray-400 !leading-8">
+    AI Chat for Air-Gapped Environments
+  </p>
+  <p class="text-sm text-gray-500 mt-4">
+    A VS Code extension powered by Azure AI Foundry
+  </p>
 </div>
 
 ---
+layout: center
+---
 
-# Motions
+# The Problem
 
-Motion animations are powered by [@vueuse/motion](https://motion.vueuse.org/), triggered by `v-motion` directive.
-
-```html
-<div
-  v-motion
-  :initial="{ x: -80 }"
-  :enter="{ x: 0 }"
-  :click-3="{ x: 80 }"
-  :leave="{ x: 1000 }"
->
-  Slidev
-</div>
-```
-
-<div class="w-60 relative">
-  <div class="relative w-40 h-40">
-    <img
-      v-motion
-      :initial="{ x: 800, y: -100, scale: 1.5, rotate: -50 }"
-      :enter="final"
-      class="absolute inset-0"
-      src="https://sli.dev/logo-square.png"
-      alt=""
-    />
-    <img
-      v-motion
-      :initial="{ y: 500, x: -100, scale: 2 }"
-      :enter="final"
-      class="absolute inset-0"
-      src="https://sli.dev/logo-circle.png"
-      alt=""
-    />
-    <img
-      v-motion
-      :initial="{ x: 600, y: 400, scale: 2, rotate: 100 }"
-      :enter="final"
-      class="absolute inset-0"
-      src="https://sli.dev/logo-triangle.png"
-      alt=""
-    />
-  </div>
-
-  <div
-    class="text-5xl absolute top-14 left-40 text-[#2B90B6] -z-1"
-    v-motion
-    :initial="{ x: -80, opacity: 0}"
-    :enter="{ x: 0, opacity: 1, transition: { delay: 2000, duration: 1000 } }">
-    Slidev
-  </div>
-</div>
-
-<!-- vue script setup scripts can be directly used in markdown, and will only affects current page -->
-<script setup lang="ts">
-const final = {
-  x: 0,
-  y: 0,
-  rotate: 0,
-  scale: 1,
-  transition: {
-    type: 'spring',
-    damping: 10,
-    stiffness: 20,
-    mass: 2
-  }
-}
-</script>
-
-<div
-  v-motion
-  :initial="{ x:35, y: 30, opacity: 0}"
-  :enter="{ y: 0, opacity: 1, transition: { delay: 3500 } }">
-
-[Learn more](https://sli.dev/guide/animations.html#motion)
-
-</div>
+- Enterprises need **AI-powered developer chat** inside VS Code
+- Public AI endpoints violate **compliance, data sovereignty, and security** requirements
+- Air-gapped and sovereign cloud networks **cannot reach external services**
+- Teams need **full control** over which models are deployed and where inference runs
 
 ---
 
-# $\LaTeX$
+# What is Forge?
 
-$\LaTeX$ is supported out-of-box. Powered by [$\KaTeX$](https://katex.org/).
+A VS Code extension that routes AI chat through **your** Azure AI Foundry endpoint.
 
-<div h-3 />
-
-Inline $\sqrt{3x-1}+(1+x)^2$
-
-Block
-$$ {1|3|all}
-\begin{aligned}
-\nabla \cdot \vec{E} &= \frac{\rho}{\varepsilon_0} \\
-\nabla \cdot \vec{B} &= 0 \\
-\nabla \times \vec{E} &= -\frac{\partial\vec{B}}{\partial t} \\
-\nabla \times \vec{B} &= \mu_0\vec{J} + \mu_0\varepsilon_0\frac{\partial\vec{E}}{\partial t}
-\end{aligned}
-$$
-
-[Learn more](https://sli.dev/features/latex)
+- 🔒 **No GitHub auth required** — uses your Entra ID or API key
+- 🏢 **Full tenant control** — all inference stays within your Azure subscription
+- 🔌 **BYOK mode** — Bring Your Own Key via the GitHub Copilot SDK
+- 🌐 **Air-gap ready** — works in disconnected, sovereign, and private networks
+- 💬 **Rich chat experience** — multi-turn, streaming, code context, tool approval
 
 ---
 
-# Diagrams
+# Architecture
 
-You can create diagrams / graphs from textual descriptions, directly in your Markdown.
-
-<div class="grid grid-cols-4 gap-5 pt-4 -mb-6">
-
-```mermaid {scale: 0.5, alt: 'A simple sequence diagram'}
-sequenceDiagram
-    Alice->John: Hello John, how are you?
-    Note over Alice,John: A typical interaction
-```
-
-```mermaid {theme: 'neutral', scale: 0.8}
-graph TD
-B[Text] --> C{Decision}
-C -->|One| D[Result 1]
-C -->|Two| E[Result 2]
-```
+How Forge routes inference through your private endpoint:
 
 ```mermaid
-mindmap
-  root((mindmap))
-    Origins
-      Long history
-      ::icon(fa fa-book)
-      Popularisation
-        British popular psychology author Tony Buzan
-    Research
-      On effectiveness<br/>and features
-      On Automatic creation
-        Uses
-            Creative techniques
-            Strategic planning
-            Argument mapping
-    Tools
-      Pen and paper
-      Mermaid
+graph LR
+    A[VS Code] -->|Extension Host| B[Forge Extension]
+    B -->|"@github/copilot-sdk"| C[Copilot CLI]
+    C -->|HTTPS| D[Azure AI Foundry]
+    style A fill:#0078d4,stroke:#005a9e,color:#fff
+    style B fill:#68217a,stroke:#4b1560,color:#fff
+    style C fill:#333,stroke:#555,color:#fff
+    style D fill:#0078d4,stroke:#005a9e,color:#fff
 ```
 
-```plantuml {scale: 0.7}
-@startuml
+- **Forge Extension** manages chat UI, context attachments, and session lifecycle
+- **Copilot CLI** handles model inference via the SDK's BYOK provider
+- **Azure AI Foundry** runs your deployed models in your tenant — GPT-4.1, GPT-4o, o3, and more
 
-package "Some Group" {
-  HTTP - [First Component]
-  [Another Component]
-}
+---
 
-node "Other Groups" {
-  FTP - [Second Component]
-  [First Component] --> FTP
-}
+# Key Features
 
-cloud {
-  [Example 1]
-}
+<div class="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
 
-database "MySql" {
-  folder "This is my folder" {
-    [Folder 3]
-  }
-  frame "Foo" {
-    [Frame 4]
-  }
-}
-
-[Another Component] --> [Example 1]
-[Example 1] --> [Folder 3]
-[Folder 3] --> [Frame 4]
-
-@enduml
-```
+- 🔑 **Dual auth** — Entra ID or API key
+- 🤖 **Multi-model support** — switch between deployments
+- ⚡ **Streaming responses** — real-time token delivery
+- 📎 **Context attachments** — send selections, files, or workspace context
+- 🛡️ **Tool approval** — user confirms before tool execution
+- 🧠 **Workspace awareness** — understands your project structure
+- ⏹️ **Stop generation** — cancel in-flight requests
+- 🔄 **Multi-turn chat** — session reuse across conversations
 
 </div>
 
-Learn more: [Mermaid Diagrams](https://sli.dev/features/mermaid) and [PlantUML Diagrams](https://sli.dev/features/plantuml)
-
----
-foo: bar
-dragPos:
-  square: 691,32,167,_,-16
 ---
 
-# Draggable Elements
+# Getting Started
 
-Double-click on the draggable elements to edit their positions.
+Four steps to your first chat:
 
-<br>
+**1. Install the extension**
+> Search "Forge" in the VS Code Extensions panel, or sideload the `.vsix`
 
-###### Directive Usage
-
-```md
-<img v-drag="'square'" src="https://sli.dev/logo.png">
+**2. Configure your endpoint**
+```json
+{
+  "forge.copilot.endpoint": "https://resource.services.ai.azure.com/",
+  "forge.copilot.models": ["gpt-4.1", "gpt-4o"]
+}
 ```
 
-<br>
+**3. Authenticate**
+> Choose Entra ID (default) or store an API key via the command palette
 
-###### Component Usage
-
-```md
-<v-drag text-3xl>
-  <div class="i-carbon:arrow-up" />
-  Use the `v-drag` component to have a draggable container!
-</v-drag>
-```
-
-<v-drag pos="603,284,261,_,-15">
-  <div text-center text-3xl border border-main rounded>
-    Double-click me!
-  </div>
-</v-drag>
-
-<img v-drag="'square'" src="https://sli.dev/logo.png">
-
-###### Draggable Arrow
-
-```md
-<v-drag-arrow two-way />
-```
-
-<v-drag-arrow pos="67,452,253,46" two-way op70 />
-
----
-src: ./pages/imported-slides.md
-hide: false
----
+**4. Start chatting**
+> Open the Forge panel and ask a question — streaming responses begin immediately
 
 ---
 
-# Monaco Editor
+# Enterprise Architecture
 
-Slidev provides built-in Monaco Editor support.
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div>
 
-Add `{monaco}` to the code block to turn it into an editor:
+**Private networking**
 
-```ts {monaco}
-import { ref } from 'vue'
-import { emptyArray } from './external'
+- Azure Private Endpoints
+- ExpressRoute / VPN tunnels
+- No public internet required
 
-const arr = ref(emptyArray(10))
+</div>
+<div>
+
+**Governance & observability**
+
+- Azure API Management gateway
+- Token usage & audit logging
+- Entra ID conditional access policies
+- Model deployment controls
+
+</div>
+</div>
+
+```mermaid {scale: 0.7}
+graph LR
+    A[Developer Workstation] -->|Private Network| B[Azure APIM]
+    B -->|Managed Identity| C[Azure AI Foundry]
+    C -->|Private Endpoint| D[Model Deployment]
+    style B fill:#0078d4,stroke:#005a9e,color:#fff
+    style C fill:#68217a,stroke:#4b1560,color:#fff
 ```
 
-Use `{monaco-run}` to create an editor that can execute the code directly in the slide:
+---
 
-```ts {monaco-run}
-import { version } from 'vue'
-import { emptyArray, sayHello } from './external'
+# Built With
 
-sayHello()
-console.log(`vue ${version}`)
-console.log(emptyArray<number>(10).reduce(fib => [...fib, fib.at(-1)! + fib.at(-2)!], [1, 1]))
-```
+<div class="grid grid-cols-2 gap-8 mt-8">
+<div>
+
+### Runtime
+
+- **GitHub Copilot SDK** — `@github/copilot-sdk` v0.1.26
+- **VS Code Extension API** — WebviewViewProvider
+- **TypeScript** — strict mode, full type safety
+
+</div>
+<div>
+
+### Toolchain
+
+- **esbuild** — fast bundling for extension host
+- **vitest** — unit testing with VS Code mocks
+- **ESLint** — code quality enforcement
+
+</div>
+</div>
 
 ---
 layout: center
 class: text-center
 ---
 
-# Learn More
+# Get Started with Forge
 
-[Documentation](https://sli.dev) · [GitHub](https://github.com/slidevjs/slidev) · [Showcases](https://sli.dev/resources/showcases)
+<div class="text-lg mt-4 mb-8 text-gray-400">
+AI chat that stays within your walls.
+</div>
 
-<PoweredBySlidev mt-10 />
+<div class="grid grid-cols-3 gap-8 mt-8 text-sm">
+
+<div>
+
+📦 **Repository**
+
+[github.com/robpitcher/forge](https://github.com/robpitcher/forge)
+
+</div>
+
+<div>
+
+🏪 **VS Code Marketplace**
+
+Search "Forge" in Extensions
+
+</div>
+
+<div>
+
+📖 **Documentation**
+
+[Configuration Reference](https://github.com/robpitcher/forge/blob/main/docs/configuration-reference.md)
+
+</div>
+
+</div>
