@@ -3,3 +3,5 @@ dist/
 *.vsix
 .vscode-test/
 out/
+slides/node_modules
+slides/dist
