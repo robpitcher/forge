@@ -2,7 +2,7 @@
 name: "slidev"
 description: "Slidev (sli.dev) presentation framework — Markdown-powered slides for developers"
 domain: "presentations"
-confidence: "low"
+confidence: "medium"
 source: "manual — extracted from sli.dev official documentation"
 ---
 

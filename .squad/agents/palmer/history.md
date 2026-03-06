@@ -106,3 +106,9 @@
 - **Permissions:** `pages: write` + `id-token: write` for GitHub Pages deployment token.
 - **Concurrency:** `group: pages` with `cancel-in-progress: true` to avoid overlapping deployments.
 - **Key files:** `.github/workflows/slides.yml`, `slides/` (Slidev project, independent of VS Code extension).
+
+## 2026-03-06T00-05-00Z: GitHub Pages Workflow for Slidev Deployment
+
+📌 Team update (2026-03-06): GitHub Pages deployment workflow created in `.github/workflows/slides.yml` with two-job pipeline (build in `slides/` with Node 20, deploy with GitHub Pages actions). Triggers on `dev` push with `slides/**` path filter. Isolated from extension CI. — Palmer (DevOps Specialist)
+
+**Outcome:** Slidev deck can be deployed to GitHub Pages at https://robpitcher.github.io/forge/. Decision merged to team decisions.md.
