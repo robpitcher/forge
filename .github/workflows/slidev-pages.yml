@@ -27,12 +27,15 @@ jobs:
         with:
           node-version: 'lts/*'
 
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
         working-directory: presentation/slidev
 
       - name: Build
-        run: npm run build -- --base /${{github.event.repository.name}}/
+        run: pnpm run build -- --base /${{github.event.repository.name}}/
         working-directory: presentation/slidev
 
       - name: Setup Pages
