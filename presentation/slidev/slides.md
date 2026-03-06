@@ -173,6 +173,8 @@ layout: center
 
 How Forge routes inference through your private endpoint:
 
+<div class="my-6">
+
 ```mermaid
 graph LR
     A[VS Code] -->|Extension Host| B[Forge Extension]
@@ -183,6 +185,8 @@ graph LR
     style C fill:#333,stroke:#555,color:#fff
     style D fill:#0078d4,stroke:#005a9e,color:#fff
 ```
+
+</div>
 
 - **Forge Extension** manages chat UI, context attachments, and session lifecycle
 - **Copilot CLI** handles model inference via the SDK's BYOK provider
