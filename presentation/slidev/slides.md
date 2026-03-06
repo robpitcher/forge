@@ -161,7 +161,7 @@ A VS Code extension that routes AI chat through **your** Azure AI Foundry endpoi
 - 🏢 **Full control** — all inference stays within your Azure tenant
 - 🔌 **BYOK mode** — Bring Your Own Key via the GitHub Copilot SDK
 - 🌐 **Air-gap ready** — works in disconnected, sovereign, and private networks
-- 💬 **Rich chat experience** — multi-turn, streaming, code context, tool approval
+- 💬 **Rich chat experience** — multi-turn, streaming, code context, tool calling
 
 ---
 
@@ -188,7 +188,8 @@ graph LR
 
 # Key Features
 
-<div class="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
+<div class="flex gap-8 mt-4">
+<div class="flex-1">
 
 - 🔑 **Dual auth** — Entra ID or API key
 - 🤖 **Multi-model support**
@@ -199,17 +200,21 @@ graph LR
 - 🔄 **Multi-turn chat**
 
 </div>
+<div class="flex-1 flex items-center justify-center">
+  <img src="/chat-example.png" class="rounded-lg shadow-xl max-h-140" />
+</div>
+</div>
 
 ---
 
 # Getting Started
 
-Four steps to your first chat:
+<div class="flex gap-8 text-sm">
+<div class="flex-1">
 
-**1. Install the extension**
-> Search "forge-ai" in the VS Code Extensions panel, or sideload the `.vsix`
+**1. Install** — Search "forge-ai" in Extensions, or sideload the `.vsix`
 
-**2. Configure your endpoint**
+**2. Configure your endpoint and models**
 ```json
 {
   "forge.copilot.endpoint": "https://resource.services.ai.azure.com/",
@@ -217,11 +222,15 @@ Four steps to your first chat:
 }
 ```
 
-**3. Authenticate**
-> Choose Entra ID (default) or store an API key via the command palette
+**3. Authenticate** — Entra ID (default) or API key via command palette
 
-**4. Start chatting**
-> Open the Forge panel and ask a question — streaming responses begin immediately
+**4. Start chatting** — Open Forge and ask a question
+
+</div>
+<div class="w-2/5 flex items-center justify-center">
+  <img src="/setup.png" class="rounded-lg shadow-xl max-h-100" />
+</div>
+</div>
 
 ---
 
