@@ -569,6 +569,7 @@ describe("Error: auth error rewriting (_rewriteAuthError)", () => {
     const errors = getPostedMessagesOfType(mockView, "error");
     const messages = errors.map((e: unknown) => (e as { message: string }).message);
     expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("(HTTP 401)"))).toBe(true);
     expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
     expect(messages.some((m: string) => m.includes("API key is missing"))).toBe(false);
   });
@@ -587,7 +588,68 @@ describe("Error: auth error rewriting (_rewriteAuthError)", () => {
     const errors = getPostedMessagesOfType(mockView, "error");
     const messages = errors.map((e: unknown) => (e as { message: string }).message);
     expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("(HTTP"))).toBe(false); // No status code in this error message
     expect(messages.some((m: string) => m.includes("API key is missing"))).toBe(false);
+  });
+
+  it("rewrites 403 Forbidden error with HTTP status code for entraId", async () => {
+    setupRewriteProvider(entraIdSettings);
+    mockSession.send.mockRejectedValueOnce(new Error("Request failed with status 403"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
+  });
+
+  it("rewrites 'forbidden' keyword error for entraId", async () => {
+    setupRewriteProvider(entraIdSettings);
+    mockSession.send.mockRejectedValueOnce(new Error("Forbidden: Access denied"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("(HTTP"))).toBe(false); // No numeric status in this message
+  });
+
+  it("rewrites 403 error for apiKey auth method", async () => {
+    const apiKeySettings = {
+      endpoint: "https://example.com",
+      authMethod: "apiKey" as const,
+      apiKey: "",
+      wireApi: "completions" as const,
+      cliPath: "",
+      models: ["gpt-4"],
+    };
+    setupRewriteProvider(apiKeySettings, "test-key");
+    mockSession.send.mockRejectedValueOnce(new Error("403 Forbidden"));
+
+    simulateUserMessage(mockView, "hello");
+
+    await vi.waitFor(() => {
+      const errors = getPostedMessagesOfType(mockView, "error");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const errors = getPostedMessagesOfType(mockView, "error");
+    const messages = errors.map((e: unknown) => (e as { message: string }).message);
+    expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+    expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
   });
 
   it("does not rewrite non-auth errors when authMethod is entraId", async () => {

@@ -819,6 +819,7 @@ describe("WebviewView chat panel", () => {
       const errors = getPostedMessagesOfType(mockView, "error");
       const messages = errors.map((e: unknown) => (e as { message: string }).message);
       expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 401)"))).toBe(true);
     });
 
     it("rewrites 401 error to Entra ID message when authMethod is entraId", async () => {
@@ -835,6 +836,7 @@ describe("WebviewView chat panel", () => {
       const errors = getPostedMessagesOfType(mockView, "error");
       const messages = errors.map((e: unknown) => (e as { message: string }).message);
       expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 401)"))).toBe(true);
       expect(messages.some((m: string) => m.includes("API key"))).toBe(false);
     });
 
@@ -868,6 +870,59 @@ describe("WebviewView chat panel", () => {
       const errors = getPostedMessagesOfType(mockView, "error");
       const messages = errors.map((e: unknown) => (e as { message: string }).message);
       expect(messages.some((m: string) => m.includes("Model deployment not found"))).toBe(true);
+    });
+
+    it("rewrites 403 Forbidden error with HTTP status for apiKey auth", async () => {
+      setupConfigWithAuthMethod("apiKey");
+      mockSession.send.mockRejectedValueOnce(new Error("Request failed with status 403"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
+    });
+
+    it("rewrites 403 Forbidden error for entraId auth", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("403 Forbidden"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
+    });
+
+    it("gracefully handles errors without HTTP status codes", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("unauthorized"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected by the endpoint."))).toBe(true);
+      // Should NOT include "(HTTP undefined)" or similar
+      expect(messages.some((m: string) => m.includes("(HTTP undefined)"))).toBe(false);
+      expect(messages.some((m: string) => m.includes("(HTTP null)"))).toBe(false);
     });
   });
 });
