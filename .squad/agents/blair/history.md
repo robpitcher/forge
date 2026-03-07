@@ -78,3 +78,10 @@
 - "Checking..." shown when either state hasn't been populated yet
 - `MarkdownString` class added to `src/test/__mocks__/vscode.ts` for test compatibility
 - All 315 tests pass after changes
+
+📌 SDK upgrade 0.1.26 → 0.1.32 (protocol v3) — Bumped `@github/copilot-sdk` to fix protocol version mismatch. Key breaking changes in 0.1.32:
+1. **`onPermissionRequest` now required** in `SessionConfig` and `ResumeSessionConfig`. Fixed by: making `buildSessionConfig()` parameter non-optional, importing `approveAll` from the SDK and using it as `?? approveAll` fallback in `getOrCreateSession()` and `resumeConversation()` (preserving optional signature for test compatibility).
+2. **`approveAll` not in copilot-sdk mock** — Added `export const approveAll = vi.fn()...` to `src/test/__mocks__/copilot-sdk.ts`. Any future SDK export used directly in copilotService.ts needs a corresponding mock export.
+3. **`__COPILOT_CLI_VERSION__`** is read at test time from the installed SDK's `package.json` via `vitest.config.mts`. Tests asserting the fallback CLI version (`@github/copilot@X.Y.Z`) must be updated to match the SDK's `@github/copilot` dep whenever the SDK is bumped.
+4. **Test assertions on `createSession` args** must include `onPermissionRequest: expect.any(Function)` since it's always present now.
+- Pattern: when a required SDK field is added, add it to the mock AND update any `toHaveBeenCalledWith` snapshot assertions that check the full call shape.

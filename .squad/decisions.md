@@ -1854,3 +1854,120 @@ Made `_rewriteAuthError()` auth-method-aware by adding an `authMethod` parameter
 - If a new auth method is added in the future, `_rewriteAuthError` will need a new branch.
 - This is consistent with how `_extractEntraIdErrorSummary` already differentiates token acquisition errors — now runtime auth errors get the same treatment.
 
+
+---
+
+# Decision: SDK Upgrade Path @github/copilot-sdk 0.1.26 → 0.1.32
+
+**Date:** 2026-03-04  
+**Author:** Childs (SDK Dev)  
+**Context:** User's GitHub CLI jumped from `^0.0.414` to `^1.0.2` (protocol v3). SDK v0.1.26 is on protocol v2. Extension crashes on startup with "SDK protocol version mismatch: SDK expects version 2, but server reports version 3."
+
+## Decision
+
+Upgrade `@github/copilot-sdk` to `0.1.32`. This is the only SDK version that supports protocol v3 (matching CLI v1.0.2).
+
+## Required Code Changes Before Upgrade
+
+1. **`src/copilotService.ts`** — `onPermissionRequest` in `SessionConfig` is now a required field. `buildSessionConfig()`, `getOrCreateSession()`, and `resumeConversation()` must be updated to require `onPermissionRequest: PermissionHandler` (remove `?`), always including it in the session config object. The `approveAll` helper from the SDK is a safe fallback default.
+
+2. No other breaking changes affect Forge's codebase. `session.destroy()` is deprecated but still functional; `session.disconnect()` is preferred going forward.
+
+## Rationale
+
+- Protocol mismatch is a hard failure — extension is entirely non-functional until fixed.
+- The `onPermissionRequest` required field change will cause TypeScript compile errors that block `npm run build` — must be fixed in the same PR as the SDK bump.
+- All other changes (new `setModel()`, new `disconnect()`, new permission result variant) are additive/behavioral and safe to adopt incrementally.
+
+## Risk
+
+Low. Our BYOK provider configuration (`ProviderConfig`), event handling pattern (named events with unsubscribe), client lifecycle (`start()`/`stop()`), and CLI binary resolution are all unchanged.
+
+---
+
+# Decision: SDK Upgrade Pattern for @github/copilot-sdk
+
+**Author:** Blair  
+**Date:** 2026-03-07  
+**Status:** Accepted
+
+## Context
+
+Upgraded `@github/copilot-sdk` from 0.1.26 to 0.1.32 to resolve a protocol version mismatch (SDK spoke v2, CLI now speaks v3).
+
+## Decision
+
+### onPermissionRequest default
+
+`buildSessionConfig()` now requires `onPermissionRequest` (matching the SDK's required field). The exported functions `getOrCreateSession()` and `resumeConversation()` keep it optional and resolve to `approveAll` (SDK export) when not provided. This avoids breaking test callers while satisfying the type system.
+
+### approveAll in mock
+
+Added `export const approveAll = vi.fn()...` to `src/test/__mocks__/copilot-sdk.ts`. **Rule:** any SDK value imported directly in production code must have a corresponding export in the mock.
+
+### __COPILOT_CLI_VERSION__ maintenance
+
+`vitest.config.mts` reads `@github/copilot-sdk/package.json` at test time to set `__COPILOT_CLI_VERSION__`. Whenever the SDK is bumped, two tests in `cliInstaller.test.ts` must be updated:
+1. The "defaults version to SDK's @github/copilot dependency" test — update mock dep string and expected arg
+2. The "falls back to bundled CLI version" test — update expected arg
+
+## Consequences
+
+- `approveAll` is used as a safe catch-all for test contexts and any caller that doesn't provide a handler
+- Future SDK upgrades should check for new required fields and update the mock accordingly
+- The `__COPILOT_CLI_VERSION__` coupling means bumping the SDK without updating these two tests will cause failures
+
+---
+
+# Decision: Rich Status Bar Tooltip with CLI Info
+
+**Author:** Blair  
+**Date:** 2026-03-08  
+**Status:** Implemented
+
+## Context
+
+The Forge status bar item previously showed plain-string tooltips for auth state only. Users debugging CLI/SDK version mismatches had no way to see the resolved CLI path or version from the status bar.
+
+## Decision
+
+The status bar tooltip is now a `vscode.MarkdownString` with `supportThemeIcons = true`, displaying both auth and CLI state:
+
+```
+Forge Status
+---
+**Auth:** $(pass) user@example.com (Entra ID)
+**CLI:** $(check) v0.1.26
+**Path:** `/usr/local/bin/copilot`
+```
+
+## Implementation
+
+- `ChatViewProvider` owns tooltip building via `_buildStatusBarTooltip()` and `_rebuildTooltip()`.
+- The status bar item reference is passed to the provider at activation via `setStatusBarItem()`.
+- `updateAuthStatus()` (module-level function) calls `provider.updateTooltipAuthState()` instead of setting `statusBarItem.tooltip` directly.
+- `postCliStatus()` calls `_rebuildTooltip()` so the tooltip updates whenever CLI state changes.
+- Gracefully handles "not yet checked" state by showing "$(sync~spin) Checking...".
+
+## Rationale
+
+- Keeping tooltip logic on the provider (which already owns `_lastCliValidation`) avoids threading both auth state AND CLI state through `updateAuthStatus()` parameters.
+- Using `MarkdownString` instead of plain strings enables codicons, bold labels, and inline code for paths.
+- No status bar text was changed — only the tooltip is enriched.
+
+---
+
+# Decision: Session-Wide Model Override
+
+**Date:** 2026-03-07T15:52:00Z  
+**By:** Rob Pitcher (via Copilot)  
+**Status:** For team memory
+
+## Context
+
+User directive: For any team member that normally uses Sonnet 4.5, default to Sonnet 4.6 instead.
+
+## What
+
+Session-wide model override captured for team memory and future agent configuration.
+
