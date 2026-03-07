@@ -85,3 +85,7 @@
 3. **`__COPILOT_CLI_VERSION__`** is read at test time from the installed SDK's `package.json` via `vitest.config.mts`. Tests asserting the fallback CLI version (`@github/copilot@X.Y.Z`) must be updated to match the SDK's `@github/copilot` dep whenever the SDK is bumped.
 4. **Test assertions on `createSession` args** must include `onPermissionRequest: expect.any(Function)` since it's always present now.
 - Pattern: when a required SDK field is added, add it to the mock AND update any `toHaveBeenCalledWith` snapshot assertions that check the full call shape.
+📌 Config Status Flicker Fix — Eliminated webview flicker where the setup/welcome screen briefly appeared on fully configured extensions. Root cause: `_sendConfigStatus()` always sent a preliminary `configStatus` with `hasAuth: false` before the async auth check completed. Fix: Added `_lastKnownHasAuth` field to `ChatViewProvider` (line ~418 in `src/extension.ts`) that caches the last resolved auth state. The preliminary `configStatus` now uses priority: prefetched auth > cached auth > false (first load only). Updated logging to show whether preliminary auth came from prefetch or cache.
+- Pattern: When sending preliminary/optimistic messages before async work completes, cache the last known state instead of using a pessimistic default — prevents UI flicker on subsequent calls
+- The `_lastKnownHasAuth` field intentionally survives panel reopens (unlike `_lastAuthStatus` which resets for dedup purposes)
+- Key files: `src/extension.ts` — `_lastKnownHasAuth` field, `_sendConfigStatus()` method

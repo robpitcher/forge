@@ -415,6 +415,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _lastAuthStatus?: string;
   private _selectedModel?: string;
   private _lastCliValidation?: CopilotCliValidationResult;
+  private _lastKnownHasAuth = false;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -726,13 +727,20 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
       this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(syncConfig.models) });
 
-      // Send preliminary configStatus with hasAuth=false (will update after auth check)
+      // Use best available auth state for preliminary message to avoid UI flicker.
+      // Priority: prefetched auth > last known auth > false (first load)
+      const preliminaryHasAuth = prefetched?.authStatus
+        ? prefetched.authStatus.state === "authenticated"
+        : this._lastKnownHasAuth;
+
       this._view?.webview.postMessage({
         type: "configStatus",
         hasEndpoint,
-        hasAuth: false,
+        hasAuth: preliminaryHasAuth,
         hasModels,
       });
+
+      this._outputChannel.appendLine(`[_sendConfigStatus] Preliminary status: endpoint=${hasEndpoint}, auth=${preliminaryHasAuth} (${prefetched?.authStatus ? 'prefetched' : 'cached'}), models=${hasModels}`);
 
       // Step 2: Now do the async auth check with timeout
       let config: ExtensionConfig;
@@ -773,6 +781,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this.postAuthStatus(status, !!config.endpoint);
 
       const hasAuth = status.state === "authenticated";
+      this._lastKnownHasAuth = hasAuth;
       this._view?.webview.postMessage({
         type: "configStatus",
         hasEndpoint: !!config.endpoint,
