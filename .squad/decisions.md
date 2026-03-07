@@ -1997,3 +1997,63 @@ The fix caches the auth result after each async check and reuses it for subseque
 
 - `src/extension.ts` — `_lastKnownHasAuth` field on `ChatViewProvider`, used in `_sendConfigStatus()`
 
+
+
+# Decision: Insider Release — Marketplace Publishing Removed
+
+**Date:** 2026-03-06  
+**Author:** Palmer (DevOps Specialist)  
+**Status:** Implemented  
+
+## Problem
+
+The insider release workflow (`insider-release.yml`) was publishing pre-release builds to the VS Code Marketplace in addition to creating GitHub Releases. This caused:
+
+- **Version conflicts:** Insider builds computed versions as `{major}.{minor}.{run_number}` (e.g., `0.2.15`), while stable releases use semver. Multiple build strategies for the same artifact type.
+- **Unclear distribution path:** Developers were unclear whether insider builds were meant for marketplace testing or local development.
+- **Marketplace bloat:** Pre-release versions accumulated, creating noise in the marketplace listing.
+
+## Decision
+
+**Insider releases are GitHub-only.** The marketplace is reserved for stable releases only.
+
+### Changes
+
+- **Removed from `.github/workflows/insider-release.yml`:**
+  - "Compute marketplace version" step (was computing `{major}.{minor}.{run_number}` versions)
+  - "Publish to VS Code Marketplace (Pre-Release)" step (was running `vsce publish --pre-release`)
+  - `VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}` secret reference (no longer needed)
+
+- **Workflow now ends at:** "Verify release" step, which confirms the GitHub Release was created successfully with the `.vsix` artifact.
+
+### Distribution Path
+
+| Release Type | Distribution | Versioning | Command |
+|-------------|-------------|-----------|---------|
+| **Insider** | GitHub Releases only | `{version}-insider+{short-sha}` (tags) | `git push origin` → triggers `insider-release.yml` |
+| **Stable** | GitHub Releases + Marketplace | semver (package.json) | Manual: merge to `main` → triggers `release.yml` |
+
+### Developer UX
+
+**Insider builds:** Developers test by installing locally from GitHub Release:
+```bash
+code --install-extension forge-0.2.0-insider+abc1234.vsix
+```
+
+**Stable builds:** Available on VS Code Marketplace (single source of truth for public releases).
+
+## Rationale
+
+1. **Single source of truth:** Only stable releases manage marketplace versions, eliminating versioning conflicts.
+2. **Clear intent:** Insider = test/development (GitHub), Stable = public release (Marketplace).
+3. **Reduced complexity:** No pre-release badge management, no version computation in CI.
+4. **Alignment with team strategy:** Insider branch is for continuous development; stable releases via `main` are deliberate.
+
+## Files Modified
+
+- `.github/workflows/insider-release.yml` — removed marketplace steps
+
+## Approval
+
+- ✅ Rob Pitcher (Project Owner)
+

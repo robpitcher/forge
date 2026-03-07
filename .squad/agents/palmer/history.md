@@ -112,3 +112,14 @@
 📌 Team update (2026-03-06): GitHub Pages deployment workflow created in `.github/workflows/slides.yml` with two-job pipeline (build in `slides/` with Node 20, deploy with GitHub Pages actions). Triggers on `dev` push with `slides/**` path filter. Isolated from extension CI. — Palmer (DevOps Specialist)
 
 **Outcome:** Slidev deck can be deployed to GitHub Pages at https://robpitcher.github.io/forge/. Decision merged to team decisions.md.
+
+### Insider Release Marketplace Removal (2026-03-06)
+- **Scope change:** Insider releases (triggered on push to `insider` branch) should ONLY produce GitHub Release artifacts with .vsix files. Marketplace publishing moved to stable release path (release.yml) only.
+- **Rationale:** Pre-release marketplace versions were creating version conflicts (insider builds used `{major}.{minor}.{run_number}` while stable releases used semver). Single source of truth for marketplace versions = stable releases only.
+- **Changes to `.github/workflows/insider-release.yml`:**
+  - Removed "Compute marketplace version" step (lines 80-88)
+  - Removed "Publish to VS Code Marketplace (Pre-Release)" step (lines 90-97)
+  - Removed `VSCE_PAT: ${{ secrets.ADO_MARKETPLACE_PAT }}` secret reference
+- **Workflow now ends at:** "Verify release" step — confirms GitHub Release was created with .vsix artifact successfully.
+- **Result:** Insider releases are purely GitHub-based distribution (developers test pre-release builds locally via `code --install-extension`), marketplace is reserved for stable releases only.
+- **Commit:** TBD (Palmer feature branch)
