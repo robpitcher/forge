@@ -65,6 +65,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Status bar item for auth status
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
   statusBarItem.show();
+  provider.setStatusBarItem(statusBarItem);
 
   // Wire auth refresh callback so provider methods can trigger status updates
   const refreshAuth = () => {
@@ -290,33 +291,25 @@ async function updateAuthStatus(
   switch (status.state) {
     case "authenticated":
       statusBarItem.text = "$(pass) Forge: Authenticated";
-      if (status.method === "entraId" && status.account) {
-        statusBarItem.tooltip = `Signed in as ${status.account} (Entra ID)`;
-      } else {
-        statusBarItem.tooltip = `Authenticated via ${status.method === "entraId" ? "Entra ID" : "API Key"}`;
-      }
       statusBarItem.command = undefined;
       break;
     case "notAuthenticated":
       statusBarItem.command = "forge.signIn";
       if (config.authMethod === "entraId") {
         statusBarItem.text = "$(sign-in) Forge: Sign In";
-        statusBarItem.tooltip = "Click to sign in with Azure CLI";
       } else {
         statusBarItem.text = "$(key) Forge: Set API Key";
-        statusBarItem.tooltip = "Click to set your API key";
       }
       break;
     case "error": {
       statusBarItem.command = "forge.signIn";
       statusBarItem.text = "$(warning) Forge: Auth Issue";
-      const msg = status.message ?? "Unknown error";
-      statusBarItem.tooltip = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
       break;
     }
   }
 
   provider.postAuthStatus(status, !!config.endpoint);
+  provider.updateTooltipAuthState(status, config.authMethod);
   provider.refreshWebviewState({ config, authStatus: status });
   return status;
 }
@@ -415,6 +408,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _lastAuthStatus?: string;
   private _selectedModel?: string;
   private _lastCliValidation?: CopilotCliValidationResult;
+  private _lastKnownHasAuth = false;
+  private _statusBarItem?: vscode.StatusBarItem;
+  private _lastAuthForTooltip?: { status: AuthStatus; authMethod: ExtensionConfig["authMethod"] };
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -434,6 +430,85 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Set by activate() to trigger auth status refresh from within the provider. */
   public setAuthRefreshCallback(callback: () => void): void {
     this._refreshAuthStatus = callback;
+  }
+
+  /** Set by activate() so the provider can update the status bar tooltip. */
+  public setStatusBarItem(item: vscode.StatusBarItem): void {
+    this._statusBarItem = item;
+  }
+
+  /** Called by updateAuthStatus() to store auth state and refresh the tooltip. */
+  public updateTooltipAuthState(status: AuthStatus, authMethod: ExtensionConfig["authMethod"]): void {
+    this._lastAuthForTooltip = { status, authMethod };
+    this._rebuildTooltip();
+  }
+
+  private _buildStatusBarTooltip(): vscode.MarkdownString {
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+
+    md.appendMarkdown("**Forge Status**\n\n---\n\n");
+
+    // Auth line
+    if (!this._lastAuthForTooltip) {
+      md.appendMarkdown("**Auth:** $(sync~spin) Checking...\n\n");
+    } else {
+      const { status, authMethod } = this._lastAuthForTooltip;
+      if (status.state === "authenticated") {
+        const methodLabel = status.method === "entraId" ? "Entra ID" : "API Key";
+        if (status.method === "entraId" && status.account) {
+          md.appendMarkdown(`**Auth:** $(pass) ${status.account} (${methodLabel})\n\n`);
+        } else {
+          md.appendMarkdown(`**Auth:** $(pass) Authenticated (${methodLabel})\n\n`);
+        }
+      } else if (status.state === "notAuthenticated") {
+        const method = authMethod === "entraId" ? "Entra ID" : "API Key";
+        md.appendMarkdown(`**Auth:** $(sign-in) Not signed in (${method})\n\n`);
+      } else {
+        const msg = status.message ?? "Unknown error";
+        const truncated = msg.length > 80 ? msg.slice(0, 80) + "…" : msg;
+        md.appendMarkdown(`**Auth:** $(warning) ${truncated}\n\n`);
+      }
+    }
+
+    // CLI line
+    if (!this._lastCliValidation) {
+      md.appendMarkdown("**CLI:** $(sync~spin) Checking...\n\n");
+    } else if (this._lastCliValidation.valid) {
+      md.appendMarkdown(`**CLI:** $(check) ${this._lastCliValidation.version}\n\n`);
+      md.appendMarkdown(`**Path:** \`${this._lastCliValidation.path}\`\n\n`);
+    } else {
+      const cli = this._lastCliValidation;
+      let statusLabel: string;
+      switch (cli.reason) {
+        case "wrong_binary":
+          statusLabel = "Wrong binary";
+          break;
+        case "version_check_failed":
+          statusLabel = "Version check failed";
+          break;
+        default:
+          statusLabel = "Not found";
+          break;
+      }
+      md.appendMarkdown(`**CLI:** $(warning) ${statusLabel}\n\n`);
+      if (cli.path) {
+        md.appendMarkdown(`**Path:** \`${cli.path}\`\n\n`);
+      }
+      if (cli.details) {
+        const detailsMsg = cli.details;
+        const truncatedDetails = detailsMsg.length > 80 ? detailsMsg.slice(0, 80) + "…" : detailsMsg;
+        md.appendMarkdown(`**Details:** ${truncatedDetails}\n\n`);
+      }
+    }
+
+    return md;
+  }
+
+  private _rebuildTooltip(): void {
+    if (this._statusBarItem) {
+      this._statusBarItem.tooltip = this._buildStatusBarTooltip();
+    }
   }
 
   /** Returns the active model: persisted selection, or first entry from models array. */
@@ -481,6 +556,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public postCliStatus(result: CopilotCliValidationResult): void {
     this._lastCliValidation = result;
+    this._rebuildTooltip();
     this._view?.webview.postMessage({ type: "cliStatus", result });
   }
 
@@ -726,13 +802,20 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this._view?.webview.postMessage({ type: "modelsUpdated", models: syncConfig.models });
       this._view?.webview.postMessage({ type: "modelSelected", model: this._getActiveModel(syncConfig.models) });
 
-      // Send preliminary configStatus with hasAuth=false (will update after auth check)
+      // Use best available auth state for preliminary message to avoid UI flicker.
+      // Priority: prefetched auth > last known auth > false (first load)
+      const preliminaryHasAuth = prefetched?.authStatus
+        ? prefetched.authStatus.state === "authenticated"
+        : this._lastKnownHasAuth;
+
       this._view?.webview.postMessage({
         type: "configStatus",
         hasEndpoint,
-        hasAuth: false,
+        hasAuth: preliminaryHasAuth,
         hasModels,
       });
+
+      this._outputChannel.appendLine(`[_sendConfigStatus] Preliminary status: endpoint=${hasEndpoint}, auth=${preliminaryHasAuth} (${prefetched?.authStatus ? 'prefetched' : 'cached'}), models=${hasModels}`);
 
       // Step 2: Now do the async auth check with timeout
       let config: ExtensionConfig;
@@ -773,6 +856,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       this.postAuthStatus(status, !!config.endpoint);
 
       const hasAuth = status.state === "authenticated";
+      this._lastKnownHasAuth = hasAuth;
       this._view?.webview.postMessage({
         type: "configStatus",
         hasEndpoint: !!config.endpoint,
@@ -917,7 +1001,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
-      const message = this._rewriteAuthError(raw);
+      this._outputChannel.appendLine(`[forge] Raw SDK error: ${raw}`);
+      const message = this._rewriteAuthError(raw, config.authMethod);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
@@ -984,11 +1069,25 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return blocks.join(separator) + separator + prompt;
   }
 
-  /** Rewrites SDK auth errors to point users at the settings gear. */
-  private _rewriteAuthError(message: string): string {
+  /** Extracts HTTP status code from error message (currently limited to common auth codes like "401", "403"). */
+  private _extractHttpStatus(message: string): string | null {
+    const match = message.match(/\b(401|403)\b/);
+    return match ? match[1] : null;
+  }
+
+  /** Rewrites SDK auth errors to point users at the correct auth remedy. */
+  private _rewriteAuthError(message: string, authMethod: "entraId" | "apiKey"): string {
     const lower = message.toLowerCase();
-    if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
-      return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
+    if (lower.includes("authorization") || lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("/login")) {
+      const statusCode = this._extractHttpStatus(message);
+      const statusSuffix = statusCode ? ` (HTTP ${statusCode})` : "";
+
+      if (authMethod === "entraId") {
+        return `Entra ID authentication was rejected by the endpoint${statusSuffix}. ` +
+          "Ensure your account has the 'Cognitive Services OpenAI User' role on the Azure AI resource. " +
+          "Check Access control (IAM) in Azure Portal.";
+      }
+      return `API key is missing or invalid${statusSuffix}. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.`;
     }
     return message;
   }

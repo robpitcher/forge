@@ -2,7 +2,7 @@
   "name": "forge-ai",
   "displayName": "Forge AI",
   "description": "AI chat routed through your own Azure AI Foundry endpoint — private, self-managed, all inference in your tenant",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "publisher": "robpitcher",
   "repository": {
     "type": "git",
@@ -232,7 +232,7 @@
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",
-    "@github/copilot-sdk": "0.1.26",
+    "@github/copilot-sdk": "^0.1.32",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.3",
