@@ -68,3 +68,8 @@
 - Template literal interpolation with conditional suffix (`statusSuffix`) keeps the code readable while handling both cases (code present / code absent)
 
 📌 Team update (2026-03-06T23:33:00Z): HTTP status code extraction in auth errors — Added `_extractHttpStatus()` helper to src/extension.ts, updated `_rewriteAuthError()` to include "(HTTP XXX)" suffix in messages. Windows added 7 test cases covering regex extraction, both auth methods, graceful handling. All 57 tests passing. Ready for merge.
+
+📌 Config Status Flicker Fix — Eliminated webview flicker where the setup/welcome screen briefly appeared on fully configured extensions. Root cause: `_sendConfigStatus()` always sent a preliminary `configStatus` with `hasAuth: false` before the async auth check completed. Fix: Added `_lastKnownHasAuth` field to `ChatViewProvider` (line ~418 in `src/extension.ts`) that caches the last resolved auth state. The preliminary `configStatus` now uses priority: prefetched auth > cached auth > false (first load only). Updated logging to show whether preliminary auth came from prefetch or cache.
+- Pattern: When sending preliminary/optimistic messages before async work completes, cache the last known state instead of using a pessimistic default — prevents UI flicker on subsequent calls
+- The `_lastKnownHasAuth` field intentionally survives panel reopens (unlike `_lastAuthStatus` which resets for dedup purposes)
+- Key files: `src/extension.ts` — `_lastKnownHasAuth` field, `_sendConfigStatus()` method
