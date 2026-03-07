@@ -132,6 +132,23 @@ export class Range {
 
 export class Selection extends Range {}
 
+export class MarkdownString {
+  value = "";
+  isTrusted?: boolean;
+  supportThemeIcons?: boolean;
+  constructor(value = "", _supportThemeIcons = false) {
+    this.value = value;
+  }
+  appendMarkdown(value: string): this {
+    this.value += value;
+    return this;
+  }
+  appendText(value: string): this {
+    this.value += value;
+    return this;
+  }
+}
+
 export const languages = {
   registerCodeActionsProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
 };
