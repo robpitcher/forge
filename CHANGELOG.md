@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0] - 2026-03-07
+
+### Changed
+
+- **Version Reset** — Bumped to 0.4.0 for clean versioning. Insider builds no longer publish to VS Code Marketplace — distributed via GitHub Releases only
+
 ## [0.3.2] - 2026-03-06
 
 ### Added
