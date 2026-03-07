@@ -7,6 +7,7 @@ import {
   type MockClient,
 } from "./__mocks__/copilot-sdk.js";
 import * as copilotService from "../copilotService.js";
+import { CopilotCliNotFoundError } from "../copilotService.js";
 import { activate } from "../extension.js";
 import {
   createMockWebviewView,
@@ -28,10 +29,17 @@ vi.mock("../auth/authStatusProvider.js", () => ({
   checkAuthStatus: vi.fn().mockResolvedValue({ state: "authenticated", method: "apiKey" }),
 }));
 
+vi.mock("../auth/credentialProvider.js", () => ({
+  createCredentialProvider: vi.fn().mockResolvedValue({
+    getToken: vi.fn().mockResolvedValue("mock-token"),
+  }),
+}));
+
 vi.mock("../copilotService.js", async () => {
   const actual = await vi.importActual<typeof import("../copilotService.js")>("../copilotService.js");
   return {
     ...actual,
+    getOrCreateSession: vi.fn(),
     discoverAndValidateCli: vi.fn().mockResolvedValue({ valid: true, version: "0.1.0", path: "/usr/bin/copilot" }),
   };
 });
@@ -80,6 +88,7 @@ describe("WebviewView chat panel", () => {
     mockClient = createMockClient(mockSession);
     setMockClient(mockClient);
     setupValidConfig();
+    vi.mocked(copilotService.getOrCreateSession).mockResolvedValue(mockSession as never);
 
     const stateStore = new Map<string, unknown>();
     const mockExtContext = {
@@ -111,6 +120,7 @@ describe("WebviewView chat panel", () => {
 
   afterEach(async () => {
     await copilotService.stopClient();
+    vi.mocked(copilotService.getOrCreateSession).mockReset();
     vi.mocked(vscode.window.registerWebviewViewProvider).mockClear();
   });
 
@@ -260,8 +270,8 @@ describe("WebviewView chat panel", () => {
   // --- CopilotCliNotFoundError ---
   describe("CopilotCliNotFoundError", () => {
     it("posts error message when CLI is not found", async () => {
-      mockClient.start.mockRejectedValueOnce(
-        new Error("spawn copilot ENOENT")
+      vi.mocked(copilotService.getOrCreateSession).mockRejectedValueOnce(
+        new CopilotCliNotFoundError("Copilot CLI not found at configured path")
       );
 
       simulateUserMessage(mockView, "hello");
@@ -622,18 +632,18 @@ describe("WebviewView chat panel", () => {
     });
 
     it("cancel during thinking phase aborts before send", async () => {
-      // Delay session creation to keep processing in thinking phase
-      let resolveCreateSession!: (session: unknown) => void;
-      mockClient.createSession.mockImplementation(
-        () => new Promise((resolve) => { resolveCreateSession = resolve; })
+      // Delay getOrCreateSession to keep processing in thinking phase
+      let resolveSession!: (value: unknown) => void;
+      vi.mocked(copilotService.getOrCreateSession).mockImplementation(
+        () => new Promise((resolve) => { resolveSession = resolve as (value: unknown) => void; })
       );
 
       simulateUserMessage(mockView, "hello");
 
-      // Wait for createSession to be called (handler progressed through
+      // Wait for getOrCreateSession to be called (handler progressed through
       // config/auth steps but is paused at session creation)
       await vi.waitFor(() => {
-        expect(mockClient.createSession).toHaveBeenCalled();
+        expect(copilotService.getOrCreateSession).toHaveBeenCalled();
       });
 
       // Verify we're still in thinking phase (no _currentSession yet)
@@ -653,7 +663,7 @@ describe("WebviewView chat panel", () => {
       });
 
       // Let session creation resolve — code checks _cancelRequested and bails out
-      resolveCreateSession(mockSession);
+      resolveSession(mockSession);
       await new Promise((r) => setTimeout(r, 50));
 
       // session.send should NOT have been called
@@ -773,6 +783,146 @@ describe("WebviewView chat panel", () => {
 
       // session.send called only once (for the first message)
       expect(mockSession.send).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // --- Auth error rewriting (auth-method-aware) ---
+  describe("auth error rewriting by auth method", () => {
+    function setupConfigWithAuthMethod(authMethod: "apiKey" | "entraId") {
+      const settings: Record<string, unknown> = {
+        endpoint: "https://myresource.openai.azure.com/openai/v1/",
+        apiKey: authMethod === "apiKey" ? "test-key-123" : undefined,
+        authMethod,
+        wireApi: "completions",
+        cliPath: "",
+        models: ["gpt-4"],
+      };
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn(
+          (key: string, defaultValue: unknown) => settings[key] ?? defaultValue
+        ),
+        update: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ReturnType<typeof vscode.workspace.getConfiguration>);
+    }
+
+    it("rewrites 401 error to API key message when authMethod is apiKey", async () => {
+      setupConfigWithAuthMethod("apiKey");
+      mockSession.send.mockRejectedValueOnce(new Error("Request failed: 401 Unauthorized"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 401)"))).toBe(true);
+    });
+
+    it("rewrites 401 error to Entra ID message when authMethod is entraId", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("Request failed: 401 Unauthorized"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 401)"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("API key"))).toBe(false);
+    });
+
+    it("passes through non-auth errors unchanged for entraId auth", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("Connection timeout after 30s"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Connection timeout after 30s"))).toBe(true);
+    });
+
+    it("passes through non-auth errors unchanged for apiKey auth", async () => {
+      setupConfigWithAuthMethod("apiKey");
+      mockSession.send.mockRejectedValueOnce(new Error("Model deployment not found"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Model deployment not found"))).toBe(true);
+    });
+
+    it("rewrites 403 Forbidden error with HTTP status for apiKey auth", async () => {
+      setupConfigWithAuthMethod("apiKey");
+      mockSession.send.mockRejectedValueOnce(new Error("Request failed with status 403"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("API key is missing or invalid"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
+    });
+
+    it("rewrites 403 Forbidden error for entraId auth", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("403 Forbidden"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Cognitive Services OpenAI User"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("(HTTP 403)"))).toBe(true);
+    });
+
+    it("gracefully handles errors without HTTP status codes", async () => {
+      setupConfigWithAuthMethod("entraId");
+      mockSession.send.mockRejectedValueOnce(new Error("unauthorized"));
+
+      simulateUserMessage(mockView, "hello");
+
+      await vi.waitFor(() => {
+        const errors = getPostedMessagesOfType(mockView, "error");
+        expect(errors.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const errors = getPostedMessagesOfType(mockView, "error");
+      const messages = errors.map((e: unknown) => (e as { message: string }).message);
+      expect(messages.some((m: string) => m.includes("Entra ID authentication was rejected by the endpoint."))).toBe(true);
+      // Should NOT include "(HTTP undefined)" or similar
+      expect(messages.some((m: string) => m.includes("(HTTP undefined)"))).toBe(false);
+      expect(messages.some((m: string) => m.includes("(HTTP null)"))).toBe(false);
     });
   });
 });

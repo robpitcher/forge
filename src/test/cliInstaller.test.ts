@@ -21,7 +21,7 @@ vi.mock("child_process", () => ({
   execFile: mockExecFile,
   spawn: mockSpawn,
   execSync: vi.fn().mockReturnValue("/usr/local/bin/copilot\n"),
-  execFileSync: vi.fn().mockReturnValue("0.1.26"),
+  execFileSync: vi.fn().mockReturnValue("1.0.2"),
 }));
 
 vi.mock("@github/copilot-sdk", () =>
@@ -168,7 +168,7 @@ describe("cliInstaller", () => {
   describe("installCopilotCli - happy paths", () => {
     it("succeeds via npm when npm is available", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
@@ -196,7 +196,7 @@ describe("cliInstaller", () => {
 
     it("falls back to HTTP when npm not found", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
@@ -245,7 +245,7 @@ describe("cliInstaller", () => {
 
     it("creates globalStoragePath if it doesn't exist", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
       mockExecFile.mockImplementation(
         (cmd: string, _args: string[], _opts: Record<string, unknown>, callback?: ExecFileCallback) => {
@@ -270,7 +270,7 @@ describe("cliInstaller", () => {
 
     it("defaults version to SDK's @github/copilot dependency when not specified", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot": "^0.0.414" },
+        dependencies: { "@github/copilot": "^1.0.2" },
       }));
 
       let capturedArgs: string[] = [];
@@ -289,7 +289,7 @@ describe("cliInstaller", () => {
 
       await installCopilotCli({ globalStoragePath: "/test/storage" });
 
-      expect(capturedArgs).toContain("@github/copilot@0.0.414");
+      expect(capturedArgs).toContain("@github/copilot@1.0.2");
     });
 
     it("falls back to bundled CLI version when metadata files are unavailable", async () => {
@@ -313,14 +313,14 @@ describe("cliInstaller", () => {
 
       await installCopilotCli({ globalStoragePath: "/test/storage" });
 
-      expect(capturedArgs).toContain("@github/copilot@0.0.414");
+      expect(capturedArgs).toContain("@github/copilot@1.0.2");
     });
   });
 
   describe("installCopilotCli - error paths", () => {
     it("fails when both npm and HTTP fail", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
@@ -352,7 +352,7 @@ describe("cliInstaller", () => {
 
     it("handles npm timeout", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
@@ -375,7 +375,7 @@ describe("cliInstaller", () => {
 
     it("handles write permission errors on globalStoragePath", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockMkdirSync.mockImplementation(() => {
@@ -486,7 +486,7 @@ describe("cliInstaller", () => {
   describe("error messages", () => {
     it("tells user what to do when npm and HTTP both fail", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
@@ -519,7 +519,7 @@ describe("cliInstaller", () => {
 
     it("includes specific reason for HTTP failure", async () => {
       mockReadFileSync.mockReturnValue(JSON.stringify({
-        dependencies: { "@github/copilot-sdk": "0.1.26" },
+        dependencies: { "@github/copilot-sdk": "0.1.32" },
       }));
 
       mockExecFile.mockImplementation(
