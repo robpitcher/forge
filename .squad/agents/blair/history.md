@@ -89,3 +89,11 @@
 - Pattern: When sending preliminary/optimistic messages before async work completes, cache the last known state instead of using a pessimistic default — prevents UI flicker on subsequent calls
 - The `_lastKnownHasAuth` field intentionally survives panel reopens (unlike `_lastAuthStatus` which resets for dedup purposes)
 - Key files: `src/extension.ts` — `_lastKnownHasAuth` field, `_sendConfigStatus()` method
+
+📌 PR #170 Review Fixes (2025) — Addressed 3 review comments on `squad/combined-improvements`:
+1. **Type-safe authMethod**: Changed `_lastAuthForTooltip` field and `updateTooltipAuthState()` parameter from `string` to `ExtensionConfig["authMethod"]` (the `"entraId" | "apiKey"` union). The sole caller already passed `config.authMethod` so no caller changes needed.
+2. **MarkdownString mock fix**: Added `this.supportThemeIcons = _supportThemeIcons;` in the mock constructor body — previously the constructor parameter was accepted but never applied.
+3. **CLI tooltip reason mapping**: Replaced hardcoded "Not found" with a `switch` on `cli.reason` → "Wrong binary" / "Version check failed" / "Not found". Also shows `cli.path` and truncated `cli.details` when available.
+- Use indexed access types (`ExtensionConfig["authMethod"]`) to keep derived types in sync with the source of truth
+- Mock constructors must apply all parameters to `this` — easy to miss when TypeScript doesn't enforce it
+- All 315 tests pass, typecheck clean, build succeeds
