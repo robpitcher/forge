@@ -410,7 +410,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   private _lastCliValidation?: CopilotCliValidationResult;
   private _lastKnownHasAuth = false;
   private _statusBarItem?: vscode.StatusBarItem;
-  private _lastAuthForTooltip?: { status: AuthStatus; authMethod: string };
+  private _lastAuthForTooltip?: { status: AuthStatus; authMethod: ExtensionConfig["authMethod"] };
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -438,7 +438,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Called by updateAuthStatus() to store auth state and refresh the tooltip. */
-  public updateTooltipAuthState(status: AuthStatus, authMethod: string): void {
+  public updateTooltipAuthState(status: AuthStatus, authMethod: ExtensionConfig["authMethod"]): void {
     this._lastAuthForTooltip = { status, authMethod };
     this._rebuildTooltip();
   }
@@ -478,9 +478,27 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       md.appendMarkdown(`**CLI:** $(check) ${this._lastCliValidation.version}\n\n`);
       md.appendMarkdown(`**Path:** \`${this._lastCliValidation.path}\`\n\n`);
     } else {
-      md.appendMarkdown("**CLI:** $(warning) Not found\n\n");
-      if (this._lastCliValidation.path) {
-        md.appendMarkdown(`**Path:** \`${this._lastCliValidation.path}\`\n\n`);
+      const cli = this._lastCliValidation;
+      let statusLabel: string;
+      switch (cli.reason) {
+        case "wrong_binary":
+          statusLabel = "Wrong binary";
+          break;
+        case "version_check_failed":
+          statusLabel = "Version check failed";
+          break;
+        default:
+          statusLabel = "Not found";
+          break;
+      }
+      md.appendMarkdown(`**CLI:** $(warning) ${statusLabel}\n\n`);
+      if (cli.path) {
+        md.appendMarkdown(`**Path:** \`${cli.path}\`\n\n`);
+      }
+      if (cli.details) {
+        const detailsMsg = cli.details;
+        const truncatedDetails = detailsMsg.length > 80 ? detailsMsg.slice(0, 80) + "…" : detailsMsg;
+        md.appendMarkdown(`**Details:** ${truncatedDetails}\n\n`);
       }
     }
 

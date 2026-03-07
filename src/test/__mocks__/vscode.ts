@@ -138,6 +138,7 @@ export class MarkdownString {
   supportThemeIcons?: boolean;
   constructor(value = "", _supportThemeIcons = false) {
     this.value = value;
+    this.supportThemeIcons = _supportThemeIcons;
   }
   appendMarkdown(value: string): this {
     this.value += value;
