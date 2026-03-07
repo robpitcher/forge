@@ -71,3 +71,24 @@ Fuchs is Forge's Technical Writer. Primary work: documentation (README.md, CONTR
 📌 Team update (2026-03-06): Slidev presentation deck created with isolated project structure in `slides/`, 9-slide content (cover, problem, architecture, features, enterprise setup, links), static assets, GitHub Pages base path (`/forge/`). Deployment workflow to be handled by Palmer/DevOps. — Fuchs (Technical Writer)
 
 **Outcome:** 9 slides, GitHub Pages ready (pending Palmer's workflow). Decision merged to team decisions.md.
+
+## Learnings
+
+### docs/README.md — Documentation Hub (2026)
+
+- ✅ Created `docs/README.md` as a comprehensive documentation landing page with six sections: Problem → Solution, Prerequisites, Setup, Deployment, Architecture Diagram, Responsible AI.
+- **Structure decision:** Kept the file self-contained but cross-linked to `configuration-reference.md`, `features-and-usage.md`, and `enterprise-architecture.md` — avoids duplication while giving readers a single starting point.
+- **Responsible AI section:** Written from scratch per project owner's requirements. Covers Entra ID defaults, MCP server restrictions, tool approval gating, data sovereignty, and Azure AI Content Safety filtering. Links to Microsoft's official content safety docs for filtering details.
+- **Tone:** Matched existing docs style — concise, technical, actionable. No marketing language. Consistent with the README repositioning decision (organizational control as the headline, air-gapped as one scenario).
+- **Deployment section:** Scoped to extension installation only (Marketplace + sideload). No Azure infrastructure setup — that belongs in enterprise-architecture.md.
+- **Key learning:** Prerequisites table format works better than a bullet list when you need to add detail columns (like "Details") — used a table instead of the root README's bullet list.
+
+
+📌 Team update (2026-03-06): docs/README.md created as documentation hub with Problem→Solution, Prerequisites, Setup, Deployment, Architecture, RAI sections. Cross-links to configuration-reference.md, features-and-usage.md, enterprise-architecture.md — decided by Fuchs
+
+
+## 2026-03-06T22-12-00Z: Entra ID RBAC Role Documentation
+
+📌 Team update (2026-03-06T22-12-00Z): Entra ID RBAC role requirement (Cognitive Services OpenAI User) documented in configuration-reference.md (Prerequisites + Troubleshooting sections) and enterprise-architecture.md (auth flow warning). Clarified control-plane vs data-plane distinction. Links to Azure RBAC documentation. — Fuchs (Technical Writer)
+
+**Outcome:** Documentation updates merged to dev. Decision merged to team decisions.md.

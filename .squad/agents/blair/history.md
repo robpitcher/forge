@@ -15,6 +15,8 @@
 
 ## Recent History (Latest Entries)
 
+📌 Team update (2026-03-06T22:52:49Z): Auth-method-aware error rewriting — Fixed `_rewriteAuthError()` to take `authMethod` parameter. Entra ID users now see RBAC guidance ("Cognitive Services OpenAI User" role); API Key users see existing message. Merged decision: `auth-method-aware-error-rewriting` (#decision-in-.squad/decisions.md). Tests added by Windows: 4 new integration tests + mock fixes. All tests passing.
+
 📌 CLI Preflight Validation (2025-03-03T17:15:00Z) — Added preflight validation that checks if the GitHub Copilot CLI is correctly installed during extension activation. Implemented `performCliPreflight()` in extension.ts that calls `discoverAndValidateCli()` from copilotService. Shows VS Code warning notifications with actionable buttons ("Open Settings", "Open Terminal") based on failure reason (not_found, wrong_binary, version_check_failed). Also posts `cliStatus` message to webview to display an in-chat banner using the same pattern as auth banners. Validation runs fire-and-forget during activation and re-runs when `forge.copilot.cliPath` config changes. Added webview handler `updateCliBanner()` that shows ✅ "CLI ready" (auto-dismisses in 2s) or ⚠️ error message with "Fix" button. Updated test files to mock `discoverAndValidateCli()` and filter `cliStatus` messages. All 246 tests pass, typecheck passes. Pre-existing highlight.js bundling issue on branch is unrelated to this work.
 - Preflight validation should NOT block activation — use async fire-and-forget pattern with `.catch()` logging
 - VS Code warning messages + webview banners together provide belt-and-suspenders UX
@@ -58,3 +60,11 @@
 - Key pattern: request-scoped cancellation flags + request IDs are the right way to handle async lifecycle gaps between "user intent" (stop clicked) and "system state" (session not yet created)
 - Always `await` SDK abort calls — fire-and-forget masks errors that can surface as confusing messages later
 - Webview safety timeouts are belt-and-suspenders — the extension should always send phase updates, but the webview must be resilient to message drops
+
+📌 HTTP Status Code in Auth Errors (2026-03-07) — Modified `_rewriteAuthError()` in `extension.ts` to extract and display HTTP status codes in rewritten error messages for better debugging. Added `_extractHttpStatus()` helper that uses regex `/\b(4\d{2}|5\d{2})\b/` to extract status codes from raw SDK errors. Rewritten messages now show "(HTTP 401)", "(HTTP 403)", etc. when a status code is present in the raw error. Also expanded detection to catch 403 Forbidden errors (common with RBAC misconfigurations). If no status code is found, the messages omit the suffix gracefully.
+- Error messages should be actionable AND informative — showing the raw HTTP status helps users disambiguate "endpoint rejected" from "network timeout"
+- Use regex with word boundaries `\b` to avoid false matches in timestamps or unrelated numbers
+- Expand detection patterns for auth errors to include both 401/unauthorized and 403/forbidden — both indicate permission issues
+- Template literal interpolation with conditional suffix (`statusSuffix`) keeps the code readable while handling both cases (code present / code absent)
+
+📌 Team update (2026-03-06T23:33:00Z): HTTP status code extraction in auth errors — Added `_extractHttpStatus()` helper to src/extension.ts, updated `_rewriteAuthError()` to include "(HTTP XXX)" suffix in messages. Windows added 7 test cases covering regex extraction, both auth methods, graceful handling. All 57 tests passing. Ready for merge.

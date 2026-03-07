@@ -917,7 +917,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
-      const message = this._rewriteAuthError(raw);
+      this._outputChannel.appendLine(`[forge] Raw SDK error: ${raw}`);
+      const message = this._rewriteAuthError(raw, config.authMethod);
       this._postError(message);
       await destroySession(this._conversationId);
     } finally {
@@ -984,11 +985,25 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return blocks.join(separator) + separator + prompt;
   }
 
-  /** Rewrites SDK auth errors to point users at the settings gear. */
-  private _rewriteAuthError(message: string): string {
+  /** Extracts HTTP status code from error message (currently limited to common auth codes like "401", "403"). */
+  private _extractHttpStatus(message: string): string | null {
+    const match = message.match(/\b(401|403)\b/);
+    return match ? match[1] : null;
+  }
+
+  /** Rewrites SDK auth errors to point users at the correct auth remedy. */
+  private _rewriteAuthError(message: string, authMethod: "entraId" | "apiKey"): string {
     const lower = message.toLowerCase();
-    if (lower.includes("authorization") || lower.includes("401") || lower.includes("unauthorized") || lower.includes("/login")) {
-      return "API key is missing or invalid. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.";
+    if (lower.includes("authorization") || lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("/login")) {
+      const statusCode = this._extractHttpStatus(message);
+      const statusSuffix = statusCode ? ` (HTTP ${statusCode})` : "";
+
+      if (authMethod === "entraId") {
+        return `Entra ID authentication was rejected by the endpoint${statusSuffix}. ` +
+          "Ensure your account has the 'Cognitive Services OpenAI User' role on the Azure AI resource. " +
+          "Check Access control (IAM) in Azure Portal.";
+      }
+      return `API key is missing or invalid${statusSuffix}. Click the ⚙️ gear icon → 'Set API Key (secure)' to update it.`;
     }
     return message;
   }

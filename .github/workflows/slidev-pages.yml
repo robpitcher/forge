@@ -19,6 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: presentation/slidev
 
     steps:
       - uses: actions/checkout@v4
@@ -27,16 +30,14 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Enable corepack (pnpm)
-        run: corepack enable
+      - name: Setup @antfu/ni
+        run: npm i -g @antfu/ni
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: presentation/slidev
+        run: nci
 
       - name: Build
-        run: pnpm run build -- --base /${{github.event.repository.name}}/
-        working-directory: presentation/slidev
+        run: nr build --base /${{github.event.repository.name}}/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
