@@ -917,6 +917,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       await this._workspaceState.update("forge.lastSessionId", this._conversationId);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
+      this._outputChannel.appendLine(`[forge] Raw SDK error: ${raw}`);
       const message = this._rewriteAuthError(raw, config.authMethod);
       this._postError(message);
       await destroySession(this._conversationId);
