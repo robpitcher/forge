@@ -2,6 +2,7 @@ import { execSync, execFileSync, spawn } from "child_process";
 import { statSync } from "fs";
 import { ExtensionConfig } from "./configuration.js";
 import { getManagedCliPath } from "./cliInstaller.js";
+import { approveAll } from "@github/copilot-sdk";
 import type {
   CopilotClient,
   ICopilotSession,
@@ -523,7 +524,7 @@ function buildSessionConfig(
   config: ExtensionConfig,
   authToken: string,
   model: string,
-  onPermissionRequest?: PermissionHandler,
+  onPermissionRequest: PermissionHandler,
   workspaceRoot?: string,
 ) {
   const provider = buildProviderConfig(config, authToken);
@@ -537,7 +538,7 @@ function buildSessionConfig(
     ...toolConfig,
     ...(mcpServers && { mcpServers }),
     ...(config.systemMessage && { systemMessage: { content: config.systemMessage } }),
-    ...(onPermissionRequest && { onPermissionRequest }),
+    onPermissionRequest,
     ...(workspaceRoot && { workingDirectory: workspaceRoot }),
   };
 }
@@ -561,7 +562,7 @@ export async function getOrCreateSession(
   }
 
   const copilotClient = await getOrCreateClient(config, globalStoragePath);
-  const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest, workspaceRoot);
+  const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest ?? approveAll, workspaceRoot);
 
   const session = (await copilotClient.createSession({
     sessionId: conversationId,
@@ -671,7 +672,7 @@ export async function resumeConversation(
 ): Promise<ICopilotSession> {
   try {
     const copilotClient = await getOrCreateClient(config, globalStoragePath);
-    const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest, workspaceRoot);
+    const sessionConfig = buildSessionConfig(config, authToken, model, onPermissionRequest ?? approveAll, workspaceRoot);
 
     const session = (await copilotClient.resumeSession(
       sessionId,

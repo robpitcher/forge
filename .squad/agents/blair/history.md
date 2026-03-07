@@ -68,3 +68,13 @@
 - Template literal interpolation with conditional suffix (`statusSuffix`) keeps the code readable while handling both cases (code present / code absent)
 
 📌 Team update (2026-03-06T23:33:00Z): HTTP status code extraction in auth errors — Added `_extractHttpStatus()` helper to src/extension.ts, updated `_rewriteAuthError()` to include "(HTTP XXX)" suffix in messages. Windows added 7 test cases covering regex extraction, both auth methods, graceful handling. All 57 tests passing. Ready for merge.
+
+📌 Rich Status Bar Tooltip with CLI Info — Added `_buildStatusBarTooltip()` and `_rebuildTooltip()` private methods to `ChatViewProvider`. The tooltip is now a `vscode.MarkdownString` with `supportThemeIcons = true`, showing auth state (with method and account) and CLI state (version + path when valid, or a warning when not found). Key implementation details:
+- `_statusBarItem` and `_lastAuthForTooltip` stored on provider as private fields
+- `setStatusBarItem()` called in `activate()` right after `createStatusBarItem()`
+- Removed inline `statusBarItem.tooltip = ...` assignments from `updateAuthStatus()` switch block
+- `updateTooltipAuthState(status, authMethod)` called by `updateAuthStatus()` to store auth state and trigger tooltip rebuild
+- `postCliStatus()` calls `_rebuildTooltip()` so CLI changes always refresh the tooltip
+- "Checking..." shown when either state hasn't been populated yet
+- `MarkdownString` class added to `src/test/__mocks__/vscode.ts` for test compatibility
+- All 315 tests pass after changes
