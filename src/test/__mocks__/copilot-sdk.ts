@@ -1,6 +1,9 @@
 import { vi } from "vitest";
 import { EventEmitter } from "events";
 
+// Minimal stand-in for the SDK's approveAll permission handler
+export const approveAll = vi.fn().mockResolvedValue({ approved: true });
+
 export function createMockSession() {
   const emitter = new EventEmitter();
   return {
