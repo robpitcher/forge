@@ -330,13 +330,13 @@ describe("Error: WebviewView error paths", () => {
     newSession.send.mockImplementation(async () => {
       newSession._emit("session.idle");
     });
-    const callCountBefore = vi.mocked(getOrCreateSession).mock.calls.length;
+    vi.mocked(getOrCreateSession).mockClear();
     vi.mocked(getOrCreateSession).mockResolvedValueOnce(newSession as never);
 
     simulateUserMessage(mockView, "retry");
 
     await vi.waitFor(() => {
-      expect(vi.mocked(getOrCreateSession).mock.calls.length).toBeGreaterThan(callCountBefore);
+      expect(vi.mocked(getOrCreateSession)).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -377,13 +377,13 @@ describe("Error: WebviewView error paths", () => {
     newSession.send.mockImplementation(async () => {
       newSession._emit("session.idle");
     });
-    const callCountBefore = vi.mocked(getOrCreateSession).mock.calls.length;
+    vi.mocked(getOrCreateSession).mockClear();
     vi.mocked(getOrCreateSession).mockResolvedValueOnce(newSession as never);
 
     simulateUserMessage(mockView, "retry");
 
     await vi.waitFor(() => {
-      expect(vi.mocked(getOrCreateSession).mock.calls.length).toBeGreaterThan(callCountBefore);
+      expect(vi.mocked(getOrCreateSession)).toHaveBeenCalledTimes(1);
     });
   });
 });

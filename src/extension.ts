@@ -985,9 +985,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     return blocks.join(separator) + separator + prompt;
   }
 
-  /** Extracts HTTP status code from error message (e.g., "401", "403"). */
+  /** Extracts HTTP status code from error message (currently limited to common auth codes like "401", "403"). */
   private _extractHttpStatus(message: string): string | null {
-    const match = message.match(/\b(4\d{2}|5\d{2})\b/);
+    const match = message.match(/\b(401|403)\b/);
     return match ? match[1] : null;
   }
 
@@ -997,7 +997,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     if (lower.includes("authorization") || lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("/login")) {
       const statusCode = this._extractHttpStatus(message);
       const statusSuffix = statusCode ? ` (HTTP ${statusCode})` : "";
-      
+
       if (authMethod === "entraId") {
         return `Entra ID authentication was rejected by the endpoint${statusSuffix}. ` +
           "Ensure your account has the 'Cognitive Services OpenAI User' role on the Azure AI resource. " +
