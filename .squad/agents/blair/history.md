@@ -68,3 +68,32 @@
 - Template literal interpolation with conditional suffix (`statusSuffix`) keeps the code readable while handling both cases (code present / code absent)
 
 📌 Team update (2026-03-06T23:33:00Z): HTTP status code extraction in auth errors — Added `_extractHttpStatus()` helper to src/extension.ts, updated `_rewriteAuthError()` to include "(HTTP XXX)" suffix in messages. Windows added 7 test cases covering regex extraction, both auth methods, graceful handling. All 57 tests passing. Ready for merge.
+
+📌 Rich Status Bar Tooltip with CLI Info — Added `_buildStatusBarTooltip()` and `_rebuildTooltip()` private methods to `ChatViewProvider`. The tooltip is now a `vscode.MarkdownString` with `supportThemeIcons = true`, showing auth state (with method and account) and CLI state (version + path when valid, or a warning when not found). Key implementation details:
+- `_statusBarItem` and `_lastAuthForTooltip` stored on provider as private fields
+- `setStatusBarItem()` called in `activate()` right after `createStatusBarItem()`
+- Removed inline `statusBarItem.tooltip = ...` assignments from `updateAuthStatus()` switch block
+- `updateTooltipAuthState(status, authMethod)` called by `updateAuthStatus()` to store auth state and trigger tooltip rebuild
+- `postCliStatus()` calls `_rebuildTooltip()` so CLI changes always refresh the tooltip
+- "Checking..." shown when either state hasn't been populated yet
+- `MarkdownString` class added to `src/test/__mocks__/vscode.ts` for test compatibility
+- All 315 tests pass after changes
+
+📌 SDK upgrade 0.1.26 → 0.1.32 (protocol v3) — Bumped `@github/copilot-sdk` to fix protocol version mismatch. Key breaking changes in 0.1.32:
+1. **`onPermissionRequest` now required** in `SessionConfig` and `ResumeSessionConfig`. Fixed by: making `buildSessionConfig()` parameter non-optional, importing `approveAll` from the SDK and using it as `?? approveAll` fallback in `getOrCreateSession()` and `resumeConversation()` (preserving optional signature for test compatibility).
+2. **`approveAll` not in copilot-sdk mock** — Added `export const approveAll = vi.fn()...` to `src/test/__mocks__/copilot-sdk.ts`. Any future SDK export used directly in copilotService.ts needs a corresponding mock export.
+3. **`__COPILOT_CLI_VERSION__`** is read at test time from the installed SDK's `package.json` via `vitest.config.mts`. Tests asserting the fallback CLI version (`@github/copilot@X.Y.Z`) must be updated to match the SDK's `@github/copilot` dep whenever the SDK is bumped.
+4. **Test assertions on `createSession` args** must include `onPermissionRequest: expect.any(Function)` since it's always present now.
+- Pattern: when a required SDK field is added, add it to the mock AND update any `toHaveBeenCalledWith` snapshot assertions that check the full call shape.
+📌 Config Status Flicker Fix — Eliminated webview flicker where the setup/welcome screen briefly appeared on fully configured extensions. Root cause: `_sendConfigStatus()` always sent a preliminary `configStatus` with `hasAuth: false` before the async auth check completed. Fix: Added `_lastKnownHasAuth` field to `ChatViewProvider` (line ~418 in `src/extension.ts`) that caches the last resolved auth state. The preliminary `configStatus` now uses priority: prefetched auth > cached auth > false (first load only). Updated logging to show whether preliminary auth came from prefetch or cache.
+- Pattern: When sending preliminary/optimistic messages before async work completes, cache the last known state instead of using a pessimistic default — prevents UI flicker on subsequent calls
+- The `_lastKnownHasAuth` field intentionally survives panel reopens (unlike `_lastAuthStatus` which resets for dedup purposes)
+- Key files: `src/extension.ts` — `_lastKnownHasAuth` field, `_sendConfigStatus()` method
+
+📌 PR #170 Review Fixes (2025) — Addressed 3 review comments on `squad/combined-improvements`:
+1. **Type-safe authMethod**: Changed `_lastAuthForTooltip` field and `updateTooltipAuthState()` parameter from `string` to `ExtensionConfig["authMethod"]` (the `"entraId" | "apiKey"` union). The sole caller already passed `config.authMethod` so no caller changes needed.
+2. **MarkdownString mock fix**: Added `this.supportThemeIcons = _supportThemeIcons;` in the mock constructor body — previously the constructor parameter was accepted but never applied.
+3. **CLI tooltip reason mapping**: Replaced hardcoded "Not found" with a `switch` on `cli.reason` → "Wrong binary" / "Version check failed" / "Not found". Also shows `cli.path` and truncated `cli.details` when available.
+- Use indexed access types (`ExtensionConfig["authMethod"]`) to keep derived types in sync with the source of truth
+- Mock constructors must apply all parameters to `this` — easy to miss when TypeScript doesn't enforce it
+- All 315 tests pass, typecheck clean, build succeeds
