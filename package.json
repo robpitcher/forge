@@ -2,7 +2,7 @@
   "name": "forge-ai",
   "displayName": "Forge AI",
   "description": "AI chat routed through your own Azure AI Foundry endpoint — private, self-managed, all inference in your tenant",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "robpitcher",
   "repository": {
     "type": "git",
