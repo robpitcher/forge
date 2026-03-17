@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] - 2026-03-17
+
+### Security
+
+- **Dependency Updates** — Bumped `undici` from 7.22.0 to 7.24.1 and `dompurify` from 3.3.1 to 3.3.2
+
 ## [0.4.0] - 2026-03-07
 
 ### Changed
@@ -103,7 +109,9 @@
 
 ## Version Links
 
-- [Unreleased changes](https://github.com/robpitcher/forge/compare/v0.3.2...dev)
+- [Unreleased changes](https://github.com/robpitcher/forge/compare/v0.4.1...dev)
+- [0.4.1 Release](https://github.com/robpitcher/forge/releases/tag/v0.4.1)
+- [0.4.0 Release](https://github.com/robpitcher/forge/releases/tag/v0.4.0)
 - [0.3.2 Release](https://github.com/robpitcher/forge/releases/tag/v0.3.2)
 - [0.3.1 Release](https://github.com/robpitcher/forge/releases/tag/v0.3.1)
 - [0.3.0 Release](https://github.com/robpitcher/forge/releases/tag/v0.3.0)
