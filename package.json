@@ -233,7 +233,7 @@
   "dependencies": {
     "@azure/identity": "^4.13.0",
     "@github/copilot-sdk": "^0.1.32",
-    "dompurify": "^3.3.2",
+    "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.3",
     "marked-highlight": "^2.2.3"
